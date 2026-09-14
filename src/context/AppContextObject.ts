@@ -1,0 +1,50 @@
+import { createContext } from 'react';
+import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, RestaurantApplication } from '../types';
+
+export interface AppContextType {
+  cities: City[];
+  zones: Zone[];
+  tenants: Tenant[];
+  currentTenant: Tenant;
+  products: Product[];
+  orders: Order[];
+  transactions: Transaction[];
+  posts: Post[];
+  stories: Story[];
+  cart: CartItem[];
+  drivers: Driver[];
+  equityWeight: number;
+  userRole: UserRole;
+  currentUser: UserAccount | null;
+  toast: string | null;
+  restaurantApplications: RestaurantApplication[];
+  loginWithCredentials: (email: string, pass: string) => boolean;
+  registerAccount: (name: string, email: string, pass: string, role?: UserRole) => void;
+  setUserRole: (role: UserRole) => void;
+  setCurrentTenantBySlug: (slug: string) => void;
+  toggleTenantOpenStatus: (tenantId: string) => void;
+  addTenant: (tenantData: Omit<Tenant, 'id' | 'slug' | 'salesWeekly' | 'rating' | 'distanceKm' | 'isNew' | 'commissionRate' | 'tablesCount' | 'isOpen'>) => Tenant;
+  toggleLikePost: (postId: string) => void;
+  addComment: (postId: string, text: string, userName?: string) => void;
+  createPost: (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => void;
+  deletePost: (postId: string) => void;
+  addDriver: (driver: Omit<Driver, 'id' | 'tenantId' | 'status'>) => void;
+  deleteProduct: (productId: string) => void;
+  setEquityWeight: (weight: number) => void;
+  addToCart: (product: Product) => void;
+  removeFromCart: (productId: string) => void;
+  clearCart: () => void;
+  submitOrderWithPayment: (typeOrDetails: string | CheckoutDetails, method: PaymentMethod, transaction: Transaction) => void;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  toggleProductAvailability: (productId: string) => void;
+  addProduct: (product: Omit<Product, 'id' | 'tenantId'>) => void;
+  assignDriverToOrder: (orderId: string, driverId: string) => void;
+  submitRestaurantApplication: (applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status' | 'cityId'>) => boolean;
+  reviewRestaurantApplication: (applicationId: string, nextStatus: 'reviewing' | 'approved' | 'rejected', reviewNote?: string) => boolean;
+  activateApprovedRestaurant: (applicationId: string, temporaryPassword: string) => { success: boolean; tenantId?: string; error?: string };
+  showToast: (message: string) => void;
+  triggerTestOrder: () => void;
+  logout: () => void;
+}
+
+export const AppContext = createContext<AppContextType | undefined>(undefined);

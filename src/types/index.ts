@@ -1,0 +1,267 @@
+// Domain models for GastroSync single-city local MVP
+
+export type OrderStatus =
+  | 'pending'
+  | 'accepted'
+  | 'preparing'
+  | 'ready'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'cancelled';
+
+export type OrderFulfillment = 'pickup' | 'restaurant_delivery' | 'table_service';
+
+export type PaymentMethod = 'apple_pay' | 'google_pay' | 'card' | 'mercadopago' | 'wompi';
+
+export type UserRole = 'login' | 'client_delivery' | 'kitchen' | 'admin' | 'table_qr' | 'platform_admin';
+
+export type BusinessUserRole = 'customer' | 'restaurant_owner' | 'restaurant_staff' | 'platform_admin';
+
+export interface UserAccount {
+  email: string;
+  name: string;
+  role: UserRole;
+  businessRole?: BusinessUserRole;
+  tenantId?: string;
+}
+
+export interface City {
+  id: string;
+  name: string;
+  countryCode: string;
+  currencyCode: string;
+  isActive: boolean;
+}
+
+export interface Zone {
+  id: string;
+  cityId: string;
+  name: string;
+  isActive: boolean;
+}
+
+export type RestaurantDeliveryMode = 'pickup' | 'restaurant_delivery' | 'table_service';
+
+export type RestaurantStatus = 'draft' | 'pending_approval' | 'active' | 'suspended';
+
+export type RestaurantApplicationStatus = 'submitted' | 'reviewing' | 'approved' | 'rejected';
+
+export interface ProvisionedOwnerAccount {
+  id: string;
+  name: string;
+  email: string;
+  temporaryPassword: string;
+  tenantId: string;
+  businessRole: 'restaurant_owner';
+  userRole: 'admin';
+  createdAt: number;
+}
+
+export interface RestaurantApplication {
+  id: string;
+  submittedAt: number;
+  status: RestaurantApplicationStatus;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  restaurantName: string;
+  category: string;
+  cityId: string;
+  zoneId: string;
+  address: string;
+  whatsapp?: string;
+  minOrder?: number;
+  deliveryModes: OrderFulfillment[];
+  deliveryFee?: number;
+  deliveryRadiusKm?: number;
+  notes?: string;
+  reviewedAt?: number;
+  reviewedByEmail?: string;
+  reviewNote?: string;
+  activatedAt?: number;
+  activatedTenantId?: string;
+  activatedByEmail?: string;
+}
+
+export interface Tenant {
+  id: string;
+  slug: string;
+  name: string;
+  category: string;
+  logoUrl?: string;
+  logoEmoji?: string;
+  bannerUrl?: string;
+  description?: string;
+  address?: string;
+  deliveryTime?: string; // e.g. "20-30 min"
+  priceRange?: '$' | '$$' | '$$$';
+  minOrder?: number; // e.g. 15000 COP
+  specialties?: string[];
+  promotionBadge?: string;
+  salesWeekly: number;
+  rating: number;
+  distanceKm: number;
+  isNew: boolean;
+  commissionRate: number; // e.g. 0.03 (3%)
+  tablesCount: number;
+  isOpen: boolean; // Controls whether restaurant accepts orders
+  // Extended domain fields for location, status, and delivery modes
+  cityId?: string;
+  zoneId?: string;
+  status?: RestaurantStatus;
+  deliveryModes?: RestaurantDeliveryMode[];
+  phone?: string;
+  whatsapp?: string;
+  deliveryFee?: number;
+  deliveryRadiusKm?: number;
+  estimatedDeliveryMinutes?: string | number;
+  ownerUserId?: string;
+}
+
+export type Restaurant = Tenant;
+
+export interface PostComment {
+  id: string;
+  postId: string;
+  userName: string;
+  userAvatar: string;
+  text: string;
+  timeAgo: string;
+  likes: number;
+}
+
+export interface Post {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  tenantCategory: string;
+  tenantLogoEmoji: string;
+  tenantAddress?: string;
+  dishName: string;
+  dishEmoji: string;
+  desc: string;
+  hashtags?: string[];
+  price: number;
+  image: string;           // thumbnail (always present)
+  mediaType: 'photo' | 'video';
+  videoId?: string;        // YouTube video ID for video posts
+  videoDuration?: string;  // e.g. "0:45"
+  likes: number;
+  isLiked: boolean;
+  commentsCount: number;
+  comments?: PostComment[];
+  viewCount?: number;
+  ordersFromPost?: number; // how many orders came from this post
+  timeAgo: string;
+  productId: string;
+}
+
+export interface StoryItem {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  tenantEmoji: string;
+  image: string;
+  videoId?: string;
+  dishName: string;
+  price: number;
+  productId: string;
+  timeAgo: string;
+  seen?: boolean;
+}
+
+export interface Story {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  emoji: string;
+  title: string;
+  isLive: boolean;
+  items: StoryItem[];
+}
+
+export interface Transaction {
+  id: string;
+  orderId: string;
+  tenantId: string;
+  amount: number;
+  restaurantPayout: number;
+  platformFee: number;
+  paymentMethod: PaymentMethod;
+  status: 'approved' | 'pending' | 'rejected';
+  authorizationCode: string;
+  timestamp: number;
+}
+
+export interface Product {
+  id: string;
+  tenantId: string;
+  name: string;
+  desc: string;
+  price: number;
+  category: 'Platos Principales' | 'Bebidas' | 'Postres' | 'Entradas';
+  emoji: string;
+  available: boolean;
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}
+
+export interface OrderItem {
+  id: string;
+  name: string;
+  qty: number;
+  price: number;
+}
+
+export interface CustomerDeliveryAddress {
+  label: string;
+  addressLine: string;
+  zoneId?: string;
+  notes?: string;
+}
+
+export interface CheckoutDetails {
+  fulfillment: OrderFulfillment;
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress?: CustomerDeliveryAddress;
+  tableNumber?: string;
+  restaurantNotes?: string;
+}
+
+export interface Order {
+  id: string;
+  tenantId: string;
+  type: string; // e.g. "Recoger en local", "Domicilio" or "Mesa #4"
+  items: OrderItem[];
+  subtotal?: number;
+  deliveryFeeApplied?: number;
+  total: number;
+  status: OrderStatus;
+  createdAt: number;
+  customerName?: string;
+  driverId?: string;
+  paymentMethod?: PaymentMethod;
+  transactionId?: string;
+  // Extended domain fields for order fulfillment and delivery
+  fulfillment?: OrderFulfillment;
+  customerId?: string;
+  customerPhone?: string;
+  deliveryAddress?: CustomerDeliveryAddress;
+  tableNumber?: string;
+  restaurantNotes?: string;
+  cancellationReason?: string;
+}
+
+export interface Driver {
+  id: string;
+  tenantId: string;
+  name: string;
+  vehicle: string;
+  phone: string;
+  status: 'available' | 'busy' | 'offline';
+  assignedOrderId?: string;
+}

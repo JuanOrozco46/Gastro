@@ -1,0 +1,20 @@
+{
+  "name": "GastroSync — Red Gastronómica de Armenia",
+  "short_name": "GastroSync",
+  "description": "Descubre, explora y pide comida de los mejores restaurantes en Armenia, Quindío.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "lang": "es-CO",
+  "categories": ["food", "shopping", "lifestyle"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "48x48 192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
