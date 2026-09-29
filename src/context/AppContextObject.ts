@@ -18,12 +18,14 @@ export interface AppContextType {
   currentUser: UserAccount | null;
   toast: string | null;
   restaurantApplications: RestaurantApplication[];
-  loginWithCredentials: (email: string, pass: string) => boolean;
-  registerAccount: (name: string, email: string, pass: string, role?: UserRole) => void;
-  setUserRole: (role: UserRole) => void;
+  loginWithCredentials: (email: string, pass: string) => Promise<{ success: boolean; error?: string }> | boolean;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string }> | void;
+  registerAccount: (name: string, email: string, pass: string, role?: UserRole) => Promise<{ success: boolean; error?: string }> | void;
+  sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   setCurrentTenantBySlug: (slug: string) => void;
   toggleTenantOpenStatus: (tenantId: string) => void;
   addTenant: (tenantData: Omit<Tenant, 'id' | 'slug' | 'salesWeekly' | 'rating' | 'distanceKm' | 'isNew' | 'commissionRate' | 'tablesCount' | 'isOpen'>) => Tenant;
+  updateTenant: (tenantId: string, updates: Partial<Tenant>) => void;
   toggleLikePost: (postId: string) => void;
   addComment: (postId: string, text: string, userName?: string) => void;
   createPost: (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => void;

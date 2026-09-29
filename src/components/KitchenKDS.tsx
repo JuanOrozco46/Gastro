@@ -69,9 +69,15 @@ export const KitchenKDS: React.FC = () => {
       return (
         <div key={order.id} className={`ticket-card ${order.status}`}>
           <div className="ticket-header">
-            <span className="ticket-id">#{order.id}</span>
+            <span className="ticket-id">#{order.id.length > 10 ? order.id.slice(0, 8).toUpperCase() : order.id}</span>
             <span className="ticket-type">{badgeText}</span>
           </div>
+
+          {order.customerName && (
+            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'white', marginTop: '4px' }}>
+              👤 {order.customerName} {order.customerPhone ? `(${order.customerPhone})` : ''}
+            </div>
+          )}
 
           {order.restaurantNotes && (
             <div style={{ fontSize: '0.78rem', color: '#FCA5A5', fontStyle: 'italic', margin: '4px 0 8px' }}>

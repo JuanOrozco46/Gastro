@@ -1,13 +1,22 @@
 import React from 'react';
 import { useApp } from '../context/useApp';
-import { LogOut, Building2, User, Eye, Sparkles } from 'lucide-react';
-import type { UserRole } from '../types';
+import { LogOut, User, Sparkles, ShieldCheck, ChefHat, BarChart3, Bike, QrCode } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export const Header: React.FC = () => {
-  const { userRole, setUserRole, currentUser, logout, tenants, currentTenant, setCurrentTenantBySlug } = useApp();
+const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  client_delivery: { label: 'Cliente', icon: <Bike size={13} />, color: '#FF5533' },
+  admin: { label: 'Admin Restaurante', icon: <BarChart3 size={13} />, color: '#10B981' },
+  kitchen: { label: 'Cocina KDS', icon: <ChefHat size={13} />, color: '#F59E0B' },
+  table_qr: { label: 'Mesa QR', icon: <QrCode size={13} />, color: '#38bdf8' },
+  platform_admin: { label: 'Plataforma', icon: <ShieldCheck size={13} />, color: '#8B5CF6' },
+};
 
-  if (userRole === 'login') return null; // Hide header on login portal
+export const Header: React.FC = () => {
+  const { userRole, currentUser, currentTenant, logout } = useApp();
+
+  if (userRole === 'login') return null;
+
+  const roleInfo = ROLE_CONFIG[userRole] || ROLE_CONFIG.client_delivery;
 
   return (
     <motion.header
@@ -18,14 +27,8 @@ export const Header: React.FC = () => {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
         
-        {/* Brand Logo & Switcher */}
-        <motion.div
-          className="logo-container"
-          onClick={() => setUserRole('client_delivery')}
-          style={{ cursor: 'pointer' }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
+        {/* Brand Logo */}
+        <div className="logo-container" style={{ cursor: 'default' }}>
           <div className="logo-icon gf-glow-icon">
             <Sparkles size={22} style={{ fill: 'white' }} />
             <div className="logo-dot" />
@@ -34,62 +37,38 @@ export const Header: React.FC = () => {
             <h1 style={{ fontFamily: 'Outfit, sans-serif' }}>GastroSync</h1>
             <p>Red Social Gastronómica</p>
           </div>
-        </motion.div>
+        </div>
 
-        {/* Current User Pill */}
+        {/* User Info Pill */}
         <div className="gf-glass-pill">
           <User size={15} style={{ color: 'var(--primary)' }} />
           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
-            {currentUser ? currentUser.name : 'Usuario Autenticado'}
+            {currentUser?.name || 'Usuario'}
           </span>
         </div>
 
-        {/* View / Role Switcher Pill */}
-        <div className="gf-glass-pill gf-role-pill">
-          <Eye size={15} style={{ color: '#38bdf8' }} />
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Modo:</span>
-          <select
-            value={userRole}
-            onChange={(e) => setUserRole(e.target.value as UserRole)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontWeight: 800,
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '0.8rem',
-              outline: 'none'
-            }}
-          >
-            <option value="client_delivery" style={{ color: '#000' }}>🛵 Cliente (Feed & Pedidos)</option>
-            <option value="admin" style={{ color: '#000' }}>📊 Admin Restaurante</option>
-            <option value="kitchen" style={{ color: '#000' }}>👨‍🍳 Cocina KDS</option>
-            <option value="table_qr" style={{ color: '#000' }}>📱 Mesa QR</option>
-          </select>
+        {/* Role Badge (read-only) */}
+        <div className="gf-glass-pill" style={{ gap: '6px' }}>
+          <span style={{ color: roleInfo.color, display: 'flex', alignItems: 'center' }}>
+            {roleInfo.icon}
+          </span>
+          <span style={{
+            fontSize: '0.75rem',
+            fontWeight: 800,
+            color: roleInfo.color,
+            letterSpacing: '0.3px'
+          }}>
+            {roleInfo.label}
+          </span>
         </div>
 
-        {/* Tenant Switcher for Kitchen & Admin */}
-        {userRole !== 'client_delivery' && (
-          <div className="gf-glass-pill gf-tenant-pill">
-            <Building2 size={15} style={{ color: 'var(--secondary)' }} />
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Local:</span>
-            <select
-              value={currentTenant.slug}
-              onChange={(e) => setCurrentTenantBySlug(e.target.value)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                fontWeight: 800,
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                outline: 'none'
-              }}
-            >
-              {tenants.map(t => (
-                <option key={t.id} value={t.slug} style={{ color: '#000' }}>{t.logoEmoji} {t.name}</option>
-              ))}
-            </select>
+        {/* Tenant Name (if restaurant staff/owner) */}
+        {currentUser?.tenantId && currentTenant && (
+          <div className="gf-glass-pill" style={{ gap: '6px' }}>
+            <span style={{ fontSize: '0.85rem' }}>{currentTenant.logoEmoji || '🍽️'}</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'white' }}>
+              {currentTenant.name}
+            </span>
           </div>
         )}
       </div>

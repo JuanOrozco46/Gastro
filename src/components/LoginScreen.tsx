@@ -2,56 +2,12 @@ import React, { useState } from 'react';
 import { useApp } from '../context/useApp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Lock, Mail, User, ArrowRight, ShieldCheck,
-  Eye, EyeOff, Utensils, Bike, BarChart3, ChefHat,
-  Star, Zap, AlertCircle
+  Lock, Mail, User, ShieldCheck,
+  Eye, EyeOff, Utensils,
+  Star, AlertCircle, Building2, CheckCircle2, X, KeyRound
 } from 'lucide-react';
-import { DEMO_ACCOUNTS, COMMON_DEMO_PASSWORD } from '../context/demoAccounts';
 import { PartnerApplicationModal } from './PartnerApplicationModal';
-
-/* ── UI Demo Accounts Display Cards ────────────────────────── */
-const UI_DEMO_CARDS = [
-  {
-    email: 'cliente@demo.gastrosync.co',
-    label: 'Cliente Demo (Armenia)',
-    roleBadge: 'Cliente',
-    description: 'Explora el feed gastronómico y realiza pedidos',
-    icon: <Bike size={20} />,
-    color: '#FF5533',
-    bg: 'rgba(255, 85, 51, 0.14)',
-    border: 'rgba(255, 85, 51, 0.3)',
-  },
-  {
-    email: 'restaurante@demo.gastrosync.co',
-    label: 'Dueño de Restaurante',
-    roleBadge: 'Dueño (La Trattoria)',
-    description: 'Dashboard de ventas, menú y configuración',
-    icon: <BarChart3 size={20} />,
-    color: '#10B981',
-    bg: 'rgba(16, 185, 129, 0.14)',
-    border: 'rgba(16, 185, 129, 0.3)',
-  },
-  {
-    email: 'cocina@demo.gastrosync.co',
-    label: 'Personal de Cocina',
-    roleBadge: 'Personal Cocina (KDS)',
-    description: 'Panel KDS de comanda en vivo y preparación',
-    icon: <ChefHat size={20} />,
-    color: '#F59E0B',
-    bg: 'rgba(245, 158, 11, 0.14)',
-    border: 'rgba(245, 158, 11, 0.3)',
-  },
-  {
-    email: 'admin@demo.gastrosync.co',
-    label: 'Administrador de Plataforma',
-    roleBadge: 'Uso interno de GastroSync',
-    description: 'Revisión de solicitudes de aliados y métricas globales',
-    icon: <ShieldCheck size={20} />,
-    color: '#8B5CF6',
-    bg: 'rgba(139, 92, 246, 0.14)',
-    border: 'rgba(139, 92, 246, 0.3)',
-  },
-];
+import { isSupabaseConfigured } from '../lib/supabase';
 
 /* ── Animated feature cards shown on the left panel ────────── */
 const FEATURES = [
@@ -60,18 +16,62 @@ const FEATURES = [
   { icon: '📊', title: 'Gestión KDS en Tiempo Real', desc: 'Control de comandas, menú dinámico y analítica de ventas' },
 ];
 
+/* ── Password strength validation ────────────────────────── */
+interface PasswordStrength {
+  score: number; // 0-4
+  label: string;
+  color: string;
+  checks: { passed: boolean; text: string }[];
+}
+
+function evaluatePasswordStrength(password: string): PasswordStrength {
+  const checks = [
+    { passed: password.length >= 8, text: 'Mínimo 8 caracteres' },
+    { passed: /[A-Z]/.test(password), text: 'Al menos una mayúscula' },
+    { passed: /[a-z]/.test(password), text: 'Al menos una minúscula' },
+    { passed: /[0-9]/.test(password), text: 'Al menos un número' },
+    { passed: /[^A-Za-z0-9]/.test(password), text: 'Al menos un carácter especial' },
+  ];
+
+  const score = checks.filter(c => c.passed).length;
+
+  const configs: Record<number, { label: string; color: string }> = {
+    0: { label: 'Muy débil', color: '#EF4444' },
+    1: { label: 'Débil', color: '#EF4444' },
+    2: { label: 'Regular', color: '#F59E0B' },
+    3: { label: 'Buena', color: '#F59E0B' },
+    4: { label: 'Fuerte', color: '#10B981' },
+    5: { label: 'Excelente', color: '#10B981' },
+  };
+
+  const config = configs[score] || configs[0];
+
+  return { score, label: config.label, color: config.color, checks };
+}
+
 export const LoginScreen: React.FC = () => {
-  const { loginWithCredentials, registerAccount } = useApp();
+  const { loginWithCredentials, loginWithGoogle, registerAccount, sendPasswordReset } = useApp();
   const [tab, setTab] = useState<'login' | 'register'>('login');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [activeFeature, setActiveFeature] = useState(0);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
+
+  // Password strength
+  const passwordStrength = evaluatePasswordStrength(password);
+
+  // Modal para restablecer contraseña
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
+  const [resetErrorMessage, setResetErrorMessage] = useState<string | null>(null);
 
   // Cycle features every 3.5s
   React.useEffect(() => {
@@ -83,25 +83,64 @@ export const LoginScreen: React.FC = () => {
     e.preventDefault();
     setLoginError(null);
     if (!email || !password) return;
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 400));
-    if (tab === 'login') {
-      const ok = loginWithCredentials(email, password);
-      if (!ok) {
-        setLoginError('Correo o contraseña incorrectos.');
+
+    if (tab === 'register') {
+      if (!name.trim()) {
+        setLoginError('Por favor ingresa tu nombre completo.');
+        return;
       }
-    } else {
-      // Demo local registration only; real registration will be backed by API service
-      registerAccount(name || 'Cliente Demo', email, password, 'client_delivery');
+      if (passwordStrength.score < 3) {
+        setLoginError('La contraseña es demasiado débil. Debe tener al menos 8 caracteres con mayúsculas, minúsculas y números.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setLoginError('Las contraseñas no coinciden. Por favor verifícalas.');
+        return;
+      }
     }
-    setLoading(false);
+
+    setLoading(true);
+
+    try {
+      if (tab === 'login') {
+        const res = await loginWithCredentials(email, password);
+        if (typeof res === 'object' && !res.success) {
+          setLoginError(res.error || 'Correo o contraseña incorrectos.');
+        } else if (res === false) {
+          setLoginError('Correo o contraseña incorrectos.');
+        }
+      } else {
+        const res = await registerAccount(name.trim(), email, password, 'client_delivery');
+        if (typeof res === 'object' && !res.success) {
+          setLoginError(res.error || 'Error al crear la cuenta.');
+        }
+      }
+    } catch {
+      setLoginError('Ocurrió un error inesperado al procesar la solicitud.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleQuickDemoLogin = (demoEmail: string) => {
-    setLoginError(null);
-    setEmail(demoEmail);
-    setPassword(COMMON_DEMO_PASSWORD);
-    loginWithCredentials(demoEmail, COMMON_DEMO_PASSWORD);
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) return;
+    setResetLoading(true);
+    setResetErrorMessage(null);
+    setResetSuccessMessage(null);
+
+    try {
+      const res = await sendPasswordReset(resetEmail);
+      if (res.success) {
+        setResetSuccessMessage('Hemos enviado las instrucciones para restablecer tu contraseña a tu correo electrónico.');
+      } else {
+        setResetErrorMessage(res.error || 'No se pudo procesar la solicitud.');
+      }
+    } catch {
+      setResetErrorMessage('Error al conectar con el servicio de autenticación.');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   return (
@@ -117,6 +156,11 @@ export const LoginScreen: React.FC = () => {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="login-brand-panel"
+        style={{
+          background: 'linear-gradient(145deg, #181614 0%, #25211D 100%)',
+          border: '1px solid var(--primary-border)',
+          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.12)'
+        }}
       >
         {/* Background decorative glow spots */}
         <div style={{
@@ -125,7 +169,7 @@ export const LoginScreen: React.FC = () => {
           left: '-60px',
           width: '300px',
           height: '300px',
-          background: 'radial-gradient(circle, rgba(255, 85, 51, 0.25) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(200, 169, 126, 0.18) 0%, transparent 70%)',
           pointerEvents: 'none'
         }} />
         <div style={{
@@ -134,7 +178,7 @@ export const LoginScreen: React.FC = () => {
           right: '-60px',
           width: '300px',
           height: '300px',
-          background: 'radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(107, 140, 106, 0.15) 0%, transparent 70%)',
           pointerEvents: 'none'
         }} />
 
@@ -142,49 +186,50 @@ export const LoginScreen: React.FC = () => {
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '2rem' }}>
             <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, var(--primary), #e11d48)',
+              width: '46px',
+              height: '46px',
+              borderRadius: '14px',
+              background: 'var(--neutral-dark)',
+              border: '1px solid var(--primary-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'white',
-              boxShadow: '0 6px 20px rgba(255, 85, 51, 0.4)'
+              color: 'var(--primary)',
+              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)'
             }}>
-              <Utensils size={26} />
+              <Utensils size={24} />
             </div>
             <div>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: '1.6rem', fontWeight: 900, color: 'white', letterSpacing: '-0.5px' }}>
+              <span style={{ fontFamily: "var(--font-display)", fontSize: '1.6rem', fontWeight: 700, color: 'white', letterSpacing: '-0.3px' }}>
                 GastroSync
               </span>
               <span style={{
                 marginLeft: '8px',
-                padding: '2px 8px',
-                borderRadius: '8px',
-                background: 'rgba(255, 85, 51, 0.2)',
+                padding: '3px 9px',
+                borderRadius: '6px',
+                background: 'var(--primary-light)',
+                border: '1px solid var(--primary-border)',
                 color: 'var(--primary)',
-                fontSize: '0.7rem',
-                fontWeight: 800
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                letterSpacing: '0.5px'
               }}>
-                ARMENIA PILOT MVP
+                ARMENIA MVP
               </span>
             </div>
           </div>
 
           {/* Headline */}
           <div style={{ marginBottom: '2rem' }}>
-            <h1 style={{ fontFamily: "'Outfit', sans-serif", fontSize: '2.3rem', fontWeight: 900, lineHeight: 1.15, color: 'white', letterSpacing: '-0.8px', marginBottom: '1rem' }}>
+            <h1 style={{ fontFamily: "var(--font-display)", fontSize: '2.3rem', fontWeight: 700, lineHeight: 1.2, color: 'white', letterSpacing: '-0.5px', marginBottom: '1rem' }}>
               La plataforma<br />gastronómica<br />
               <span style={{
-                background: 'linear-gradient(135deg, var(--primary), #F59E0B)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
+                color: 'var(--primary)'
               }}>
                 sin comisiones abusivas.
               </span>
             </h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.98rem', lineHeight: 1.6 }}>
+            <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.95rem', lineHeight: 1.6 }}>
               Conecta restaurantes independientes, chefs y comensales en un ecosistema directo, transparente y orgánico en Armenia, Quindío.
             </p>
           </div>
@@ -192,8 +237,8 @@ export const LoginScreen: React.FC = () => {
           {/* Animated Feature Card */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '20px',
+            border: '1px solid rgba(200, 169, 126, 0.2)',
+            borderRadius: '16px',
             padding: '1.25rem 1.5rem',
             marginBottom: '2rem',
             backdropFilter: 'blur(10px)'
@@ -207,14 +252,14 @@ export const LoginScreen: React.FC = () => {
                 transition={{ duration: 0.3 }}
                 style={{ display: 'flex', alignItems: 'center', gap: '16px' }}
               >
-                <span style={{ fontSize: '2rem', background: 'rgba(255,255,255,0.08)', padding: '10px', borderRadius: '14px' }}>
+                <span style={{ fontSize: '1.8rem', background: 'rgba(200, 169, 126, 0.15)', padding: '10px', borderRadius: '12px' }}>
                   {FEATURES[activeFeature].icon}
                 </span>
                 <div>
-                  <strong style={{ fontSize: '0.95rem', color: 'white', display: 'block', marginBottom: '2px' }}>
+                  <strong style={{ fontSize: '0.95rem', color: 'white', display: 'block', marginBottom: '2px', fontFamily: "var(--font-display)" }}>
                     {FEATURES[activeFeature].title}
                   </strong>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                  <p style={{ fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.65)', margin: 0, lineHeight: 1.4 }}>
                     {FEATURES[activeFeature].desc}
                   </p>
                 </div>
@@ -228,8 +273,8 @@ export const LoginScreen: React.FC = () => {
                   onClick={() => setActiveFeature(i)}
                   style={{
                     width: i === activeFeature ? '24px' : '8px',
-                    height: '8px',
-                    borderRadius: '4px',
+                    height: '6px',
+                    borderRadius: '3px',
                     background: i === activeFeature ? 'var(--primary)' : 'rgba(255,255,255,0.2)',
                     border: 'none',
                     cursor: 'pointer',
@@ -245,27 +290,27 @@ export const LoginScreen: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'rgba(0, 0, 0, 0.25)',
+            background: 'rgba(0, 0, 0, 0.35)',
             padding: '14px 20px',
-            borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.06)'
+            borderRadius: '14px',
+            border: '1px solid rgba(200, 169, 126, 0.15)'
           }}>
             <div>
-              <span style={{ fontSize: '1.2rem', fontWeight: 900, color: 'white', display: 'block' }}>97%</span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>Pago Directo</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)', display: 'block' }}>97%</span>
+              <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Pago Directo</span>
             </div>
             <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Star size={16} fill="#F59E0B" strokeWidth={0} />
+              <Star size={16} fill="var(--primary)" strokeWidth={0} />
               <div>
-                <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white', display: 'block' }}>4.9/5</span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>Satisfacción</span>
+                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'white', display: 'block' }}>4.9/5</span>
+                <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Satisfacción</span>
               </div>
             </div>
             <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }} />
             <div>
-              <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#10B981', display: 'block' }}>0%</span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>Comisión Extra</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#6B8C6A', display: 'block' }}>0%</span>
+              <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Comisión Extra</span>
             </div>
           </div>
         </div>
@@ -278,63 +323,52 @@ export const LoginScreen: React.FC = () => {
         transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
         className="login-form-panel"
       >
-        {/* Direct One-Click Client Feed Entrance Banner */}
-        <motion.div 
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          style={{ marginBottom: '1.25rem' }}
-        >
-          <button
-            type="button"
-            onClick={() => handleQuickDemoLogin(DEMO_ACCOUNTS[0].email)}
-            style={{
-              width: '100%',
-              padding: '16px 20px',
-              borderRadius: '18px',
-              fontWeight: 900,
-              fontSize: '1rem',
-              background: 'linear-gradient(135deg, var(--primary), #e04424)',
-              boxShadow: '0 8px 24px rgba(255, 85, 51, 0.35)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              border: 'none',
-              color: 'white',
-              cursor: 'pointer',
-              letterSpacing: '-0.2px'
-            }}
-          >
-            <Bike size={22} />
-            <span>🛵 Probar como Cliente Demo (Armenia)</span>
-            <ArrowRight size={20} />
-          </button>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', textAlign: 'center', marginTop: '8px', fontWeight: 600 }}>
-            ⚡ Iniciar sesión instantánea como Cliente sin escribir
-          </span>
-        </motion.div>
+        {/* Connection Status */}
+        {!isSupabaseConfigured && (
+          <div style={{
+            padding: '12px 14px',
+            borderRadius: 'var(--radius-sm)',
+            background: '#FEF2F2',
+            border: '1px solid #FCA5A5',
+            fontSize: '0.8rem',
+            color: '#991B1B',
+            marginBottom: '1.25rem',
+            lineHeight: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <AlertCircle size={18} style={{ flexShrink: 0, color: '#DC2626' }} />
+            <span><strong>Error de conexión:</strong> El servicio de autenticación no está configurado. Contacta al administrador de la plataforma.</span>
+          </div>
+        )}
 
-        {/* Local Demo Notice */}
-        <div style={{
-          padding: '10px 14px',
-          borderRadius: '12px',
-          background: 'rgba(255, 255, 255, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          fontSize: '0.78rem',
-          color: 'var(--text-muted)',
-          marginBottom: '1.25rem',
-          lineHeight: 1.4
-        }}>
-          💡 <strong>Demostración Local MVP:</strong> Accede con credenciales predefinidas. Contraseña demo para todas las cuentas: <code style={{ color: 'white', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{COMMON_DEMO_PASSWORD}</code>
-        </div>
+        {isSupabaseConfigured && (
+          <div style={{
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-sm)',
+            background: '#ECFDF5',
+            border: '1px solid #A7F3D0',
+            fontSize: '0.78rem',
+            color: '#065F46',
+            marginBottom: '1.25rem',
+            lineHeight: 1.4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <ShieldCheck size={18} style={{ flexShrink: 0, color: '#059669' }} />
+            <span><strong>Conexión segura activa</strong> — Tu información está protegida con cifrado de extremo a extremo.</span>
+          </div>
+        )}
 
         {/* Tab Switcher */}
         <div style={{
           display: 'flex',
-          background: 'rgba(255, 255, 255, 0.05)',
+          background: 'var(--neutral-surface-alt)',
           padding: '4px',
-          borderRadius: '14px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--neutral-border)',
           marginBottom: '1.25rem',
           gap: '4px'
         }}>
@@ -344,17 +378,17 @@ export const LoginScreen: React.FC = () => {
             style={{
               flex: 1,
               padding: '10px',
-              borderRadius: '10px',
+              borderRadius: '8px',
               border: 'none',
-              background: tab === 'login' ? 'var(--primary)' : 'transparent',
+              background: tab === 'login' ? 'var(--neutral-dark)' : 'transparent',
               color: tab === 'login' ? 'white' : 'var(--text-muted)',
-              fontWeight: 800,
+              fontWeight: 700,
               fontSize: '0.875rem',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
           >
-            Iniciar Sesión Demo
+            Iniciar Sesión
           </button>
           <button
             type="button"
@@ -362,17 +396,17 @@ export const LoginScreen: React.FC = () => {
             style={{
               flex: 1,
               padding: '10px',
-              borderRadius: '10px',
+              borderRadius: '8px',
               border: 'none',
-              background: tab === 'register' ? 'var(--primary)' : 'transparent',
+              background: tab === 'register' ? 'var(--neutral-dark)' : 'transparent',
               color: tab === 'register' ? 'white' : 'var(--text-muted)',
-              fontWeight: 800,
+              fontWeight: 700,
               fontSize: '0.875rem',
               cursor: 'pointer',
               transition: 'all 0.2s'
             }}
           >
-            Registro Cliente
+            Crear Cuenta
           </button>
         </div>
 
@@ -383,10 +417,10 @@ export const LoginScreen: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             style={{
               padding: '12px 14px',
-              borderRadius: '12px',
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.35)',
-              color: '#FCA5A5',
+              borderRadius: 'var(--radius-sm)',
+              background: '#FEF2F2',
+              border: '1px solid #FCA5A5',
+              color: '#991B1B',
               fontSize: '0.82rem',
               fontWeight: 600,
               display: 'flex',
@@ -395,7 +429,7 @@ export const LoginScreen: React.FC = () => {
               marginBottom: '1.1rem'
             }}
           >
-            <AlertCircle size={18} style={{ color: '#EF4444', flexShrink: 0 }} />
+            <AlertCircle size={18} style={{ color: '#DC2626', flexShrink: 0 }} />
             <span>{loginError}</span>
           </motion.div>
         )}
@@ -404,55 +438,111 @@ export const LoginScreen: React.FC = () => {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
           {tab === 'register' && (
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
                 Nombre completo
               </label>
               <div style={{ position: 'relative' }}>
-                <User size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <User size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
                 <input
                   type="text"
-                  placeholder="Ej. María Fernanda"
+                  placeholder="Ej. María Fernanda López"
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  style={{ width: '100%', paddingLeft: '44px' }}
+                  style={{
+                    width: '100%',
+                    paddingLeft: '44px',
+                    paddingRight: '14px',
+                    paddingTop: '12px',
+                    paddingBottom: '12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1.5px solid var(--neutral-border)',
+                    background: 'var(--neutral-surface-alt)',
+                    color: 'var(--text-main)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
                   required
                 />
               </div>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                El registro local crea una cuenta con perfil de Cliente para Armenia.
-              </span>
             </div>
           )}
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
               Correo electrónico
             </label>
             <div style={{ position: 'relative' }}>
-              <Mail size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <Mail size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
               <input
                 type="email"
-                placeholder="ejemplo@demo.gastrosync.co"
+                placeholder="tu.correo@ejemplo.com"
                 value={email}
                 onChange={e => { setEmail(e.target.value); setLoginError(null); }}
-                style={{ width: '100%', paddingLeft: '44px' }}
+                style={{
+                  width: '100%',
+                  paddingLeft: '44px',
+                  paddingRight: '14px',
+                  paddingTop: '12px',
+                  paddingBottom: '12px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1.5px solid var(--neutral-border)',
+                  background: 'var(--neutral-surface-alt)',
+                  color: 'var(--text-main)',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
                 required
               />
             </div>
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' }}>
-              Contraseña
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                Contraseña
+              </label>
+              {tab === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetEmail(email);
+                    setResetSuccessMessage(null);
+                    setResetErrorMessage(null);
+                    setShowResetModal(true);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--primary)',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              )}
+            </div>
             <div style={{ position: 'relative' }}>
-              <Lock size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <Lock size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder="GastroSyncDemo2026!"
+                placeholder="••••••••••••"
                 value={password}
                 onChange={e => { setPassword(e.target.value); setLoginError(null); }}
-                style={{ width: '100%', paddingLeft: '44px', paddingRight: '44px' }}
+                style={{
+                  width: '100%',
+                  paddingLeft: '44px',
+                  paddingRight: '44px',
+                  paddingTop: '12px',
+                  paddingBottom: '12px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1.5px solid var(--neutral-border)',
+                  background: 'var(--neutral-surface-alt)',
+                  color: 'var(--text-main)',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
                 required
               />
               <button
@@ -463,101 +553,359 @@ export const LoginScreen: React.FC = () => {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+
+            {/* Password Strength Indicator (only on register) */}
+            {tab === 'register' && password.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                style={{ marginTop: '8px' }}
+              >
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
+                  {[0, 1, 2, 3, 4].map(i => (
+                    <div
+                      key={i}
+                      style={{
+                        flex: 1,
+                        height: '4px',
+                        borderRadius: '2px',
+                        background: i < passwordStrength.score
+                          ? passwordStrength.color
+                          : 'var(--neutral-border)',
+                        transition: 'all 0.3s'
+                      }}
+                    />
+                  ))}
+                </div>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: passwordStrength.color
+                }}>
+                  Seguridad: {passwordStrength.label}
+                </span>
+                {passwordStrength.score < 3 && (
+                  <div style={{ marginTop: '4px' }}>
+                    {passwordStrength.checks.filter(c => !c.passed).map((c, i) => (
+                      <span key={i} style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                        • {c.text}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
           </div>
+
+          {tab === 'register' && (
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
+                Confirmar contraseña
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••••••"
+                  value={confirmPassword}
+                  onChange={e => { setConfirmPassword(e.target.value); setLoginError(null); }}
+                  style={{
+                    width: '100%',
+                    paddingLeft: '44px',
+                    paddingRight: '14px',
+                    paddingTop: '12px',
+                    paddingBottom: '12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1.5px solid var(--neutral-border)',
+                    background: 'var(--neutral-surface-alt)',
+                    color: 'var(--text-main)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                  required
+                />
+              </div>
+              {confirmPassword.length > 0 && password !== confirmPassword && (
+                <span style={{ fontSize: '0.72rem', color: '#DC2626', fontWeight: 600, marginTop: '4px', display: 'block' }}>
+                  Las contraseñas no coinciden
+                </span>
+              )}
+            </div>
+          )}
 
           <motion.button
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
             type="submit"
-            className="btn btn-primary"
             style={{
-              padding: '14px',
-              fontSize: '0.95rem',
-              fontWeight: 800,
-              borderRadius: '14px',
-              marginTop: '4px'
+              padding: '13px',
+              fontSize: '0.92rem',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              marginTop: '4px',
+              background: 'var(--neutral-dark)',
+              color: '#FFFFFF',
+              border: 'none',
+              cursor: loading || !isSupabaseConfigured ? 'not-allowed' : 'pointer',
+              opacity: loading || !isSupabaseConfigured ? 0.6 : 1
             }}
-            disabled={loading}
+            disabled={loading || !isSupabaseConfigured}
           >
-            {loading ? 'Validando...' : (tab === 'login' ? 'Iniciar Sesión' : 'Registrar Cuenta Cliente')}
+            {loading
+              ? 'Validando...'
+              : (tab === 'login' ? 'Iniciar Sesión' : 'Crear Mi Cuenta')
+            }
+          </motion.button>
+
+          <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--neutral-border)' }} />
+            <span style={{ padding: '0 10px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, color: 'var(--text-muted)' }}>o también</span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--neutral-border)' }} />
+          </div>
+
+          <motion.button
+            whileHover={{ scale: 1.01, backgroundColor: 'var(--neutral-surface-alt)' }}
+            whileTap={{ scale: 0.99 }}
+            type="button"
+            onClick={() => loginWithGoogle()}
+            disabled={!isSupabaseConfigured}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1.5px solid var(--neutral-border-strong)',
+              background: '#FFFFFF',
+              color: '#141210',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              cursor: isSupabaseConfigured ? 'pointer' : 'not-allowed',
+              opacity: isSupabaseConfigured ? 1 : 0.5,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            Continuar con Google
           </motion.button>
         </form>
 
-        {/* Demo Roles Quick Cards */}
-        <div style={{ marginTop: '1.25rem', paddingTop: '1.1rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '10px' }}>
-            ⚡ CUENTAS DEMO HABILITADAS (CLIC PARA INGRESAR)
-          </span>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {UI_DEMO_CARDS.map(acc => (
-              <motion.button
-                key={acc.email}
-                whileHover={{ scale: 1.015, x: 4 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleQuickDemoLogin(acc.email)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '10px 14px',
-                  borderRadius: '14px',
-                  background: acc.bg,
-                  border: `1px solid ${acc.border}`,
-                  color: 'white',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  width: '100%'
-                }}
-              >
-                <div style={{ color: acc.color, display: 'flex', alignItems: 'center' }}>
-                  {acc.icon}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <strong style={{ fontSize: '0.84rem', color: 'white' }}>{acc.label}</strong>
-                    <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.12)', color: acc.color, padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>
-                      {acc.roleBadge}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
-                    <code>{acc.email}</code>
-                  </span>
-                </div>
-                <Zap size={15} style={{ color: acc.color }} />
-              </motion.button>
-            ))}
+        {/* Dedicated Restaurant Onboarding Card */}
+        <div style={{
+          marginTop: '1.5rem',
+          padding: '1.25rem',
+          borderRadius: 'var(--radius-md)',
+          background: 'var(--primary-light)',
+          border: '1px solid var(--primary-border)',
+          textAlign: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-main)', fontWeight: 800, marginBottom: '6px', fontSize: '0.92rem' }}>
+            <Building2 size={18} style={{ color: 'var(--primary)' }} /> ¿Eres dueño de un Restaurante en Armenia?
           </div>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: '1.25rem' }}>
-          <button
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.9rem', lineHeight: 1.5 }}>
+            Registra tu negocio y empieza a recibir pedidos directos. Configura tu menú digital, mesas QR y ventas sin comisiones abusivas.
+          </p>
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
             type="button"
             onClick={() => setShowPartnerModal(true)}
             style={{
-              background: 'none',
+              width: '100%',
+              padding: '11px 18px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--primary)',
+              color: '#FFFFFF',
+              fontWeight: 700,
+              fontSize: '0.88rem',
               border: 'none',
-              color: 'var(--primary)',
-              fontWeight: 800,
-              fontSize: '0.85rem',
               cursor: 'pointer',
-              textDecoration: 'underline',
-              padding: '4px 8px'
+              boxShadow: '0 4px 12px rgba(200, 169, 126, 0.3)'
             }}
           >
-            🏪 ¿Tienes un restaurante en Armenia? Únete como Aliado GastroSync
-          </button>
+            🤝 Registrar Mi Restaurante Aliado
+          </motion.button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '1.1rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
           <ShieldCheck size={14} style={{ color: '#10B981' }} />
-          Demostración local segura MVP GastroSync Armenia
+          GastroSync Armenia — Plataforma Gastronómica Segura
         </div>
 
         <PartnerApplicationModal
           isOpen={showPartnerModal}
           onClose={() => setShowPartnerModal(false)}
         />
+
+        {/* Modal de Restablecimiento de Contraseña */}
+        <AnimatePresence>
+          {showResetModal && (
+            <div className="modal-overlay" style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.75)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px'
+            }}>
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                style={{
+                  background: 'var(--neutral-surface)',
+                  border: '1px solid var(--neutral-border)',
+                  borderRadius: 'var(--radius-xl)',
+                  padding: '2rem',
+                  maxWidth: '440px',
+                  width: '100%',
+                  position: 'relative',
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.12)'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '18px',
+                    right: '18px',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1rem' }}>
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '12px',
+                    background: 'var(--primary-light)',
+                    border: '1px solid var(--primary-border)',
+                    color: 'var(--primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <KeyRound size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>
+                      Recuperar Contraseña
+                    </h3>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      Restablece el acceso a tu cuenta
+                    </span>
+                  </div>
+                </div>
+
+                {resetSuccessMessage ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    style={{
+                      padding: '1rem',
+                      borderRadius: 'var(--radius-sm)',
+                      background: '#ECFDF5',
+                      border: '1px solid #A7F3D0',
+                      color: '#065F46',
+                      fontSize: '0.85rem',
+                      lineHeight: 1.5,
+                      marginBottom: '1rem'
+                    }}
+                  >
+                    <CheckCircle2 size={24} style={{ marginBottom: '8px', display: 'block', color: '#059669' }} />
+                    {resetSuccessMessage}
+                  </motion.div>
+                ) : (
+                  <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                      Ingresa tu correo electrónico registrado y te enviaremos un enlace seguro para crear una nueva contraseña.
+                    </p>
+
+                    {resetErrorMessage && (
+                      <div style={{
+                        padding: '10px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: '#FEF2F2',
+                        border: '1px solid #FCA5A5',
+                        color: '#991B1B',
+                        fontSize: '0.8rem'
+                      }}>
+                        {resetErrorMessage}
+                      </div>
+                    )}
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
+                        Correo electrónico
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <Mail size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
+                        <input
+                          type="email"
+                          placeholder="tu.correo@ejemplo.com"
+                          value={resetEmail}
+                          onChange={e => setResetEmail(e.target.value)}
+                          style={{
+                            width: '100%',
+                            paddingLeft: '44px',
+                            paddingRight: '14px',
+                            paddingTop: '12px',
+                            paddingBottom: '12px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1.5px solid var(--neutral-border)',
+                            background: 'var(--neutral-surface-alt)',
+                            color: 'var(--text-main)',
+                            fontSize: '0.9rem',
+                            outline: 'none'
+                          }}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={resetLoading}
+                      style={{
+                        padding: '12px',
+                        borderRadius: 'var(--radius-sm)',
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        marginTop: '4px',
+                        background: 'var(--neutral-dark)',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        cursor: resetLoading ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {resetLoading ? 'Enviando enlace...' : 'Enviar correo de recuperación'}
+                    </button>
+                  </form>
+                )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </motion.div>
   );

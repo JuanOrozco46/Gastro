@@ -145,6 +145,7 @@ export interface Post {
   image: string;           // thumbnail (always present)
   mediaType: 'photo' | 'video';
   videoId?: string;        // YouTube video ID for video posts
+  videoUrl?: string;       // Direct video URL or Data URL for uploaded videos
   videoDuration?: string;  // e.g. "0:45"
   likes: number;
   isLiked: boolean;
@@ -201,6 +202,7 @@ export interface Product {
   price: number;
   category: 'Platos Principales' | 'Bebidas' | 'Postres' | 'Entradas';
   emoji: string;
+  image?: string;
   available: boolean;
 }
 

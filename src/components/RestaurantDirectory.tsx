@@ -294,7 +294,25 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
       </div>
 
       {/* Directory Content List/Grid */}
-      {filteredTenants.length === 0 ? (
+      {tenants.length === 0 ? (
+        <div className="directory-empty-state" style={{ background: 'rgba(15, 23, 42, 0.75)', borderColor: 'rgba(255, 85, 51, 0.2)', color: 'var(--text-muted)', padding: '3.5rem 2rem' }}>
+          <Store size={52} className="empty-icon" style={{ color: 'var(--primary)' }} />
+          <h3 style={{ color: 'white', marginTop: '1rem', fontWeight: 900 }}>Aún no hay restaurantes registrados en la plataforma</h3>
+          <p style={{ maxWidth: '460px', margin: '0.5rem auto 1.5rem', lineHeight: 1.5 }}>
+            ¡Sé el primero en vender con comisiones justas! Registra tu comercio en minutos para habilitar tu menú digital, pedidos QR y entregas a domicilio.
+          </p>
+          <button
+            className="btn btn-primary"
+            style={{ borderRadius: '12px', padding: '12px 24px', fontWeight: 900 }}
+            onClick={() => {
+              const btn = document.querySelector('.gf-partner-apply-btn') as HTMLButtonElement | null;
+              if (btn) btn.click();
+            }}
+          >
+            🤝 Registrar Mi Restaurante Ahora
+          </button>
+        </div>
+      ) : filteredTenants.length === 0 ? (
         <div className="directory-empty-state" style={{ background: 'rgba(15, 23, 42, 0.75)', borderColor: 'rgba(255, 255, 255, 0.1)', color: 'var(--text-muted)' }}>
           <Store size={48} className="empty-icon" style={{ color: 'var(--primary)' }} />
           <h3 style={{ color: 'white', marginTop: '1rem' }}>No encontramos restaurantes con ese criterio</h3>

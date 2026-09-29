@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/useApp';
 import { getOperationalTenant, getFulfillmentBadgeText, getValidOrderTransitions } from '../utils/tenantHelpers';
 import { motion } from 'framer-motion';
+import { FileUploadInput } from './FileUploadInput';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar
 } from 'recharts';
@@ -48,6 +49,7 @@ export const RestaurantAdmin: React.FC = () => {
   const [newPrice, setNewPrice] = useState('');
   const [newCategory, setNewCategory] = useState<'Platos Principales' | 'Bebidas' | 'Postres' | 'Entradas'>('Platos Principales');
   const [newEmoji, setNewEmoji] = useState('🍲');
+  const [newProductImage, setNewProductImage] = useState('');
 
   // Form State for Drivers
   const [driverName, setDriverName] = useState('');
@@ -61,8 +63,9 @@ export const RestaurantAdmin: React.FC = () => {
   const [postDesc, setPostDesc] = useState('');
   const [postHashtags, setPostHashtags] = useState('#GastroSync #ComidaArtesanal #SaborLocal');
   const [postMediaType, setPostMediaType] = useState<'photo' | 'video'>('video');
-  const [postVideoId, setPostVideoId] = useState('Hm86TKO0ZTA');
-  const [postImage, setPostImage] = useState('https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=900&q=85');
+  const [postVideoId, setPostVideoId] = useState('');
+  const [postImage, setPostImage] = useState('');
+  const [postMediaUrl, setPostMediaUrl] = useState('');
 
   if (!operatingTenant) {
     return (
@@ -113,12 +116,14 @@ export const RestaurantAdmin: React.FC = () => {
       price: parseFloat(newPrice),
       category: newCategory,
       emoji: newEmoji,
+      image: newProductImage || undefined,
       available: true
     });
 
     setNewName('');
     setNewDesc('');
     setNewPrice('');
+    setNewProductImage('');
     setShowAddProductForm(false);
   };
 
@@ -148,6 +153,12 @@ export const RestaurantAdmin: React.FC = () => {
     const existingProduct = tenantProducts.find(p => p.name.toLowerCase().includes(postDishName.toLowerCase()));
     const productId = existingProduct ? existingProduct.id : (tenantProducts[0]?.id || 'p1');
 
+    const finalImage = postMediaType === 'photo' && postMediaUrl
+      ? postMediaUrl
+      : (postImage || operatingTenant.bannerUrl || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=900&q=85');
+
+    const finalVideoUrl = postMediaType === 'video' && postMediaUrl ? postMediaUrl : undefined;
+
     createPost({
       tenantId: operatingTenant.id,
       tenantName: operatingTenant.name,
@@ -159,15 +170,19 @@ export const RestaurantAdmin: React.FC = () => {
       desc: postDesc,
       hashtags: hashtagsArr,
       price: parseFloat(postPrice),
-      image: postImage || operatingTenant.bannerUrl || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=900&q=85',
+      image: finalImage,
       mediaType: postMediaType,
-      videoId: postMediaType === 'video' ? postVideoId : undefined,
+      videoId: postMediaType === 'video' ? (postVideoId || undefined) : undefined,
+      videoUrl: finalVideoUrl,
       videoDuration: postMediaType === 'video' ? '0:45' : undefined,
       productId
     });
 
     setPostDishName('');
     setPostDesc('');
+    setPostMediaUrl('');
+    setPostImage('');
+    setPostVideoId('');
   };
 
   const applyStoryPreset = (type: string) => {
@@ -584,10 +599,22 @@ export const RestaurantAdmin: React.FC = () => {
                 </div>
               </div>
 
-              {postMediaType === 'video' && (
-                <div>
+              <FileUploadInput
+                label={postMediaType === 'video' ? "Archivo de Video o URL del Reel" : "Foto del Plato"}
+                accept={postMediaType === 'video' ? 'video' : 'image'}
+                value={postMediaUrl}
+                onChange={(val, type) => {
+                  setPostMediaUrl(val);
+                  setPostMediaType(type);
+                }}
+                placeholder={postMediaType === 'video' ? "Subir archivo MP4/WebM o ingresar enlace YouTube/URL..." : "Subir foto del plato o ingresar URL..."}
+                folder="posts"
+              />
+
+              {postMediaType === 'video' && !postMediaUrl.startsWith('data:video') && (
+                <div style={{ marginBottom: '12px' }}>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    ID de Video en YouTube (e.g. Hm86TKO0ZTA):
+                    Opcional - ID de Video en YouTube (e.g. Hm86TKO0ZTA):
                   </label>
                   <input
                     type="text"
@@ -598,18 +625,6 @@ export const RestaurantAdmin: React.FC = () => {
                   />
                 </div>
               )}
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                  URL de Imagen de Portada (Thumbnail):
-                </label>
-                <input
-                  type="text"
-                  value={postImage}
-                  onChange={e => setPostImage(e.target.value)}
-                  style={{ width: '100%' }}
-                />
-              </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
@@ -878,6 +893,15 @@ export const RestaurantAdmin: React.FC = () => {
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
                 style={{ width: '100%', marginBottom: '14px' }}
+              />
+
+              <FileUploadInput
+                label="Foto del Producto / Plato"
+                accept="image"
+                value={newProductImage}
+                onChange={(val) => setNewProductImage(val)}
+                placeholder="Seleccionar foto o pegar enlace de la imagen..."
+                folder="dishes"
               />
 
               <motion.button 

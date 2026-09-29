@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, BusinessUserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount } from '../types';
 import { AppContext } from './AppContextObject';
-import { DEMO_ACCOUNTS } from './demoAccounts';
+
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication } from '../services/supabaseDataService';
+import { signInWithEmailPassword, signUpCustomer, signInWithGoogleOAuth, sendPasswordResetEmail, signOutUser, fetchUserProfileAndRole } from '../services/supabaseAuthService';
+import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders } from '../services/supabaseOrderService';
 
 // Internal typed authorization helpers
 const isRestaurantOwner = (user: UserAccount | null): boolean => {
@@ -66,9 +68,9 @@ const validateAndGetProvisionedAccounts = (): ProvisionedOwnerAccount[] => {
   }
 };
 
-// Technical Note: This validation protects local demo data consistency against state tampering,
-// but does not replace secure server-side authentication and session management.
-const validateAndGetDemoSession = (): UserAccount | null => {
+// Validates a cached session from localStorage for Supabase session recovery fallback.
+// In production, onAuthStateChange handles session restoration. This is a safety net.
+const validateCachedSession = (): UserAccount | null => {
   try {
     const saved = localStorage.getItem('gs_demo_session_v1');
     if (!saved) return null;
@@ -81,7 +83,6 @@ const validateAndGetDemoSession = (): UserAccount | null => {
 
     const obj = parsed as Record<string, unknown>;
 
-    // Structural validations
     if (typeof obj.name !== 'string' || obj.name.trim() === '') {
       localStorage.removeItem('gs_demo_session_v1');
       return null;
@@ -108,57 +109,13 @@ const validateAndGetDemoSession = (): UserAccount | null => {
       return null;
     }
 
-    const normalizedEmail = obj.email.trim().toLowerCase();
-
-    // Business Invariants checking
-    const demoMatch = DEMO_ACCOUNTS.find(acc => acc.email.toLowerCase() === normalizedEmail);
-
-    if (demoMatch) {
-      // Must strictly match demo account definitions
-      if (
-        obj.role !== demoMatch.userRole ||
-        obj.businessRole !== demoMatch.businessRole ||
-        obj.tenantId !== demoMatch.tenantId
-      ) {
-        localStorage.removeItem('gs_demo_session_v1');
-        return null;
-      }
-    } else {
-      const provisionedAccounts = validateAndGetProvisionedAccounts();
-      const provMatch = provisionedAccounts.find(acc => acc.email.toLowerCase() === normalizedEmail);
-
-      if (provMatch) {
-        // Must strictly match provisioned owner account definition
-        if (
-          obj.role !== 'admin' ||
-          obj.businessRole !== 'restaurant_owner' ||
-          obj.tenantId !== provMatch.tenantId
-        ) {
-          localStorage.removeItem('gs_demo_session_v1');
-          return null;
-        }
-      } else {
-        // Publicly registered local sessions MUST be customer only with no tenantId
-        if (
-          obj.role !== 'client_delivery' ||
-          obj.businessRole !== 'customer' ||
-          obj.tenantId !== undefined
-        ) {
-          localStorage.removeItem('gs_demo_session_v1');
-          return null;
-        }
-      }
-    }
-
-    const validatedUser: UserAccount = {
+    return {
       name: obj.name.trim(),
-      email: normalizedEmail,
+      email: obj.email.trim().toLowerCase(),
       role: obj.role as UserRole,
       businessRole: obj.businessRole as BusinessUserRole | undefined,
       tenantId: obj.tenantId as string | undefined
     };
-
-    return validatedUser;
   } catch {
     localStorage.removeItem('gs_demo_session_v1');
     return null;
@@ -230,7 +187,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  const [initialSession] = useState<UserAccount | null>(() => validateAndGetDemoSession());
+  const [initialSession] = useState<UserAccount | null>(() => validateCachedSession());
 
   const [currentTenant, setCurrentTenant] = useState<Tenant>(() => {
     if (initialSession?.tenantId) {
@@ -294,7 +251,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('⚠️ No se pudieron cargar los datos en vivo de Supabase:', err);
       });
     }
-  }, []);
+
+    if (isSupabaseConfigured && supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          const userAccount = await fetchUserProfileAndRole(session.user.id, session.user.email || '');
+          setCurrentUser(userAccount);
+          setUserRole(userAccount.role);
+          if (userAccount.tenantId) {
+            const tenantMatch = tenants.find(t => t.id === userAccount.tenantId);
+            if (tenantMatch) setCurrentTenant(tenantMatch);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          setUserRole('login');
+          try { localStorage.removeItem('gs_demo_session_v1'); } catch {}
+        }
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, [tenants]);
 
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
@@ -363,78 +342,96 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('gs_cart_v5', JSON.stringify(cart));
   }, [cart]);
 
-  const loginWithCredentials = (email: string, pass: string): boolean => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const demoAccount = DEMO_ACCOUNTS.find(
-      acc => acc.email.toLowerCase() === normalizedEmail && acc.demoPassword === pass
-    );
+  // Carga y suscripción WebSockets en tiempo real para pedidos
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+      let activeUnsub = () => {};
 
-    let sessionUser: UserAccount | null = null;
-
-    if (demoAccount) {
-      sessionUser = {
-        name: demoAccount.name,
-        email: demoAccount.email,
-        role: demoAccount.userRole,
-        businessRole: demoAccount.businessRole,
-        tenantId: demoAccount.tenantId
+      const syncOrders = async () => {
+        if (currentUser?.tenantId) {
+          const liveOrders = await fetchLiveOrdersForRestaurant(currentUser.tenantId);
+          if (liveOrders.length > 0) {
+            setOrders(liveOrders);
+          }
+          activeUnsub = subscribeToRestaurantOrders(currentUser.tenantId, async () => {
+            const updated = await fetchLiveOrdersForRestaurant(currentUser.tenantId!);
+            setOrders(updated);
+            playChime();
+            showToast('🔔 ¡Nueva comanda o actualización recibida en tiempo real!');
+          });
+        } else if (currentUser?.email) {
+          const liveOrders = await fetchLiveOrdersForCustomer(currentUser.email);
+          if (liveOrders.length > 0) {
+            setOrders(liveOrders);
+          }
+          activeUnsub = subscribeToCustomerOrders(currentUser.email, async () => {
+            const updated = await fetchLiveOrdersForCustomer(currentUser.email!);
+            setOrders(updated);
+            showToast('🚴 El estado de tu pedido ha sido actualizado por la cocina.');
+          });
+        }
       };
-    } else {
-      const provAccount = provisionedOwnerAccounts.find(
-        acc => acc.email.toLowerCase() === normalizedEmail && acc.temporaryPassword === pass
-      );
 
-      if (provAccount) {
-        sessionUser = {
-          name: provAccount.name,
-          email: provAccount.email,
-          role: 'admin',
-          businessRole: 'restaurant_owner',
-          tenantId: provAccount.tenantId
-        };
+      syncOrders();
+
+      return () => {
+        activeUnsub();
+      };
+    }
+  }, [currentUser, currentTenant]);
+
+  const loginWithCredentials = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'El servicio de autenticación no está disponible. Contacta al administrador.' };
+    }
+
+    const res = await signInWithEmailPassword(email, pass);
+    if (res.success && res.user) {
+      setCurrentUser(res.user);
+      setUserRole(res.user.role);
+      if (res.user.tenantId) {
+        const tenantMatch = tenants.find(t => t.id === res.user!.tenantId);
+        if (tenantMatch) setCurrentTenant(tenantMatch);
       }
+      showToast(`👋 ¡Bienvenid@, ${res.user.name}!`);
+      return { success: true };
     }
-
-    if (!sessionUser) {
-      return false;
-    }
-
-    setCurrentUser(sessionUser);
-    setUserRole(sessionUser.role);
-
-    if (sessionUser.tenantId) {
-      const tenantMatch = tenants.find(t => t.id === sessionUser.tenantId);
-      if (tenantMatch) {
-        setCurrentTenant(tenantMatch);
-      }
-    }
-
-    try {
-      localStorage.setItem('gs_demo_session_v1', JSON.stringify(sessionUser));
-    } catch {}
-
-    showToast(`👋 ¡Bienvenid@, ${sessionUser.name}!`);
-    return true;
+    return { success: false, error: res.error || 'Correo o contraseña incorrectos.' };
   };
 
-  // Demo local registration only; real registration will be backed by API service
-  const registerAccount = (name: string, email: string, _pass: string, _role?: UserRole) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const customerUser: UserAccount = {
-      name: name.trim() || 'Cliente Demo',
-      email: normalizedEmail,
-      role: 'client_delivery',
-      businessRole: 'customer'
-    };
+  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'El servicio de autenticación no está disponible.' };
+    }
+    return await signInWithGoogleOAuth();
+  };
 
-    setCurrentUser(customerUser);
-    setUserRole('client_delivery');
+  const registerAccount = async (name: string, email: string, pass: string, _role?: UserRole): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'El servicio de autenticación no está disponible.' };
+    }
 
-    try {
-      localStorage.setItem('gs_demo_session_v1', JSON.stringify(customerUser));
-    } catch {}
+    const res = await signUpCustomer(email, pass, name);
+    if (res.success && res.user) {
+      setCurrentUser(res.user);
+      setUserRole('client_delivery');
+      showToast(`🎉 ¡Cuenta creada exitosamente para ${res.user.name}!`);
+      return { success: true };
+    }
+    return { success: false, error: res.error || 'Error al crear la cuenta.' };
+  };
 
-    showToast(`🎉 ¡Cuenta de cliente creada exitosamente para ${customerUser.name}!`);
+  const sendPasswordReset = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'El servicio de autenticación no está disponible.' };
+    }
+
+    const res = await sendPasswordResetEmail(email);
+    if (res.success) {
+      showToast('✉️ Correo de restablecimiento enviado con éxito.');
+      return { success: true };
+    }
+    return { success: false, error: res.error || 'No se pudo enviar el correo de recuperación.' };
   };
 
   const toggleLikePost = (postId: string) => {
@@ -472,6 +469,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (currentTenant.id === tenantId) {
       setCurrentTenant(prev => ({ ...prev, isOpen: !prev.isOpen }));
     }
+  };
+
+  const updateTenant = (tenantId: string, updates: Partial<Tenant>) => {
+    setTenants(prev => prev.map(t => t.id === tenantId ? { ...t, ...updates } : t));
+    if (currentTenant.id === tenantId) {
+      setCurrentTenant(prev => ({ ...prev, ...updates }));
+    }
+    showToast('Perfil del restaurante actualizado con éxito');
   };
 
   const showToast = (message: string) => {
@@ -621,6 +626,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       restaurantNotes
     };
 
+    if (isSupabaseConfigured) {
+      createLiveOrder(newOrder, currentUser?.email).then(res => {
+        if (res.success && res.orderId) {
+          newOrder.id = res.orderId;
+          normalizedTransaction.orderId = res.orderId;
+        }
+      });
+    }
+
     setOrders(prev => [newOrder, ...prev]);
     setTransactions(prev => [normalizedTransaction, ...prev]);
     clearCart();
@@ -672,7 +686,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-    showToast(`Pedido #${orderId} actualizado a ${status.toUpperCase()}`);
+
+    if (isSupabaseConfigured) {
+      updateLiveOrderStatus(orderId, status).catch(err => {
+        console.warn('⚠️ No se pudo actualizar el pedido en Supabase:', err);
+      });
+    }
+
+    showToast(`Pedido #${orderId.slice(0, 8)} actualizado a ${status.toUpperCase()}`);
   };
 
   const toggleProductAvailability = (productId: string) => {
@@ -1070,11 +1091,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const normalizedEmail = targetApp.ownerEmail.trim().toLowerCase();
 
-    if (DEMO_ACCOUNTS.some(a => a.email.toLowerCase() === normalizedEmail)) {
-      const err = '⚠️ El correo del dueño coincide con una cuenta demo predefinida.';
-      showToast(err);
-      return { success: false, error: err };
-    }
 
     if (provisionedOwnerAccounts.some(a => a.email.toLowerCase() === normalizedEmail)) {
       const err = '⚠️ Ya existe una cuenta de dueño registrada con este correo electrónico.';
@@ -1164,11 +1180,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, tenantId: newTenantId };
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await signOutUser();
     setUserRole('login');
     setCurrentUser(null);
+    setCart([]);
     try {
       localStorage.removeItem('gs_demo_session_v1');
+      localStorage.removeItem('gs_cart_v5');
     } catch {}
     showToast('Sesión cerrada correctamente');
   };
@@ -1192,11 +1211,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast,
       restaurantApplications,
       loginWithCredentials,
+      loginWithGoogle,
       registerAccount,
-      setUserRole,
+      sendPasswordReset,
       setCurrentTenantBySlug,
       toggleTenantOpenStatus,
       addTenant,
+      updateTenant,
       toggleLikePost,
       addComment,
       createPost,

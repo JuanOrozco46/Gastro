@@ -472,39 +472,41 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                 </div>
               </div>
 
-              {/* Step 3: Payment Method Tabs */}
+              {/* Step 3: Payment Method Selection */}
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '8px' }}>
-                  2. Método de Pago Simulado:
+                  2. Método de Pago Colombia:
                 </label>
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: 'repeat(4, 1fr)', 
-                  gap: '6px', 
+                  gridTemplateColumns: 'repeat(5, 1fr)', 
+                  gap: '4px', 
                   background: 'rgba(0,0,0,0.3)', 
                   padding: '5px', 
                   borderRadius: '16px', 
                   border: '1px solid rgba(255, 255, 255, 0.08)' 
                 }}>
                   {[
-                    { id: 'apple_pay', label: '🍏 Apple' },
-                    { id: 'google_pay', label: '🌐 GPay' },
+                    { id: 'wompi', label: '🇨🇴 PSE/Nequi' },
+                    { id: 'mercadopago', label: '📱 MercadoPago' },
                     { id: 'card', label: '💳 Tarjeta' },
-                    { id: 'mercadopago', label: '📱 PSE' }
+                    { id: 'apple_pay', label: '🍏 Apple' },
+                    { id: 'google_pay', label: '🌐 GPay' }
                   ].map(item => (
                     <button
                       key={item.id}
                       type="button"
                       style={{
-                        padding: '8px 4px',
-                        fontSize: '0.78rem',
+                        padding: '8px 2px',
+                        fontSize: '0.72rem',
                         fontWeight: 800,
                         borderRadius: '12px',
                         border: 'none',
-                        background: method === item.id ? 'var(--primary)' : 'transparent',
-                        color: method === item.id ? 'white' : 'var(--text-muted)',
+                        background: method === item.id || (method === 'wompi' && item.id === 'wompi') ? 'var(--primary)' : 'transparent',
+                        color: method === item.id || (method === 'wompi' && item.id === 'wompi') ? 'white' : 'var(--text-muted)',
                         cursor: 'pointer',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
                       }}
                       onClick={() => setMethod(item.id as PaymentMethod)}
                     >
@@ -564,7 +566,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
 
               <motion.button
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.99 }}
                 type="submit"
                 className="btn btn-secondary btn-full"
                 style={{ padding: '14px', fontSize: '0.98rem', fontWeight: 900, borderRadius: '14px' }}
@@ -575,7 +577,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
 
               <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                 <ShieldCheck size={14} style={{ color: '#10B981' }} />
-                Pago simulado cifrado para el piloto en Armenia
+                Pago seguro cifrado 256-bit SSL · Registrado en PostgreSQL
               </div>
             </form>
           )}

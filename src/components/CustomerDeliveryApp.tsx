@@ -38,14 +38,23 @@ const VideoModal: React.FC<{ post: Post; onClose: () => void; onOrder: () => voi
       <button className="video-modal-close" onClick={onClose}><X size={20} /></button>
 
       <div className="video-modal-player">
-        <iframe
-          src={`https://www.youtube.com/embed/${post.videoId}?autoplay=1&rel=0&modestbranding=1`}
-          title={post.dishName}
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          style={{ width: '100%', height: '100%', borderRadius: '0' }}
-        />
+        {post.videoUrl ? (
+          <video
+            src={post.videoUrl}
+            controls
+            autoPlay
+            style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
+          />
+        ) : (
+          <iframe
+            src={`https://www.youtube.com/embed/${post.videoId || 'Hm86TKO0ZTA'}?autoplay=1&rel=0&modestbranding=1`}
+            title={post.dishName}
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            style={{ width: '100%', height: '100%', borderRadius: '0' }}
+          />
+        )}
       </div>
 
       <div className="video-modal-footer">
