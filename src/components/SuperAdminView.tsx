@@ -84,17 +84,13 @@ export const SuperAdminView: React.FC = () => {
     }
   };
 
-  const handleConfirmActivation = (appId: string) => {
+  const handleConfirmActivation = async (appId: string) => {
     setActivationError(null);
-    if (!tempPasswordInput || tempPasswordInput.trim().length < 10) {
-      setActivationError('La contraseña temporal debe tener al menos 10 caracteres.');
-      return;
-    }
 
     const app = restaurantApplications.find(a => a.id === appId);
     if (!app) return;
 
-    const res = activateApprovedRestaurant(appId, tempPasswordInput.trim());
+    const res = await activateApprovedRestaurant(appId);
     if (res.success && res.tenantId) {
       setActivationSuccessInfo({
         restaurantName: app.restaurantName,
@@ -102,7 +98,6 @@ export const SuperAdminView: React.FC = () => {
         tenantId: res.tenantId
       });
       setActivatingAppId(null);
-      setTempPasswordInput('');
     } else if (res.error) {
       setActivationError(res.error);
     }
@@ -449,7 +444,7 @@ export const SuperAdminView: React.FC = () => {
                               </div>
 
                               <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '10px 12px', borderRadius: '10px', fontSize: '0.78rem', color: '#FCD34D', marginBottom: '12px', lineHeight: 1.4 }}>
-                                ⚠️ <strong>Aviso Importante:</strong> Esta contraseña es temporal y se usa solo en la demo local. Debes comunicarla al dueño por un canal seguro.
+                                ⚠️ <strong>Aviso Importante:</strong> Al confirmar, se creará el restaurante en la base de datos y se enviará una <strong>Invitación Oficial</strong> al correo del dueño para que establezca su propia contraseña segura.
                               </div>
 
                               {activationError && (
@@ -457,19 +452,6 @@ export const SuperAdminView: React.FC = () => {
                                   {activationError}
                                 </div>
                               )}
-
-                              <div style={{ marginBottom: '12px' }}>
-                                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                                  Contraseña temporal para el dueño (mínimo 10 caracteres):
-                                </label>
-                                <input
-                                  type="text"
-                                  placeholder="Ej: GastroOwner2026!"
-                                  value={tempPasswordInput}
-                                  onChange={e => { setTempPasswordInput(e.target.value); setActivationError(null); }}
-                                  style={{ width: '100%', fontSize: '0.85rem' }}
-                                />
-                              </div>
 
                               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                 <button
@@ -482,7 +464,7 @@ export const SuperAdminView: React.FC = () => {
                                 <button
                                   className="btn btn-outline"
                                   style={{ padding: '8px 14px', fontSize: '0.82rem', borderRadius: '10px' }}
-                                  onClick={() => { setActivatingAppId(null); setTempPasswordInput(''); setActivationError(null); }}
+                                  onClick={() => { setActivatingAppId(null); setActivationError(null); }}
                                 >
                                   Cancelar
                                 </button>
@@ -492,7 +474,7 @@ export const SuperAdminView: React.FC = () => {
                             <button
                               className="btn btn-primary"
                               style={{ padding: '10px 18px', fontSize: '0.85rem', fontWeight: 900, borderRadius: '12px', background: 'linear-gradient(135deg, #8B5CF6, #6366F1)', border: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}
-                              onClick={() => { setActivatingAppId(app.id); setTempPasswordInput(''); setActivationError(null); }}
+                              onClick={() => { setActivatingAppId(app.id); setActivationError(null); }}
                             >
                               <Zap size={16} />
                               <span>Activar restaurante</span>

@@ -1071,10 +1071,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const activateApprovedRestaurant = (
+  const activateApprovedRestaurant = async (
     applicationId: string,
-    temporaryPassword: string
-  ): { success: boolean; tenantId?: string; error?: string } => {
+    temporaryPassword?: string // Ignorado ahora que usamos Edge Functions
+  ): Promise<{ success: boolean; tenantId?: string; error?: string }> => {
     if (!isPlatformAdmin(currentUser)) {
       const err = '⚠️ No tienes autorización para activar restaurantes.';
       showToast(err);
@@ -1100,101 +1100,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: err };
     }
 
-    if (!temporaryPassword || temporaryPassword.trim().length < 10) {
-      const err = '⚠️ La contraseña temporal debe tener al menos 10 caracteres.';
-      showToast(err);
-      return { success: false, error: err };
+    showToast('⏳ Conectando con Supabase para crear restaurante y enviar invitación...');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('approve_restaurant', {
+        body: { application: targetApp }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const reviewerEmail = currentUser.email;
+
+      setRestaurantApplications(prev => prev.map(app => {
+        if (app.id === applicationId) {
+          return {
+            ...app,
+            activatedAt: Date.now(),
+            activatedByEmail: reviewerEmail,
+            activatedTenantId: 'created_in_db'
+          };
+        }
+        return app;
+      }));
+
+      showToast(`🎉 ¡Restaurante "${targetApp.restaurantName}" creado! Invitación enviada a ${targetApp.ownerEmail}.`);
+      return { success: true };
+    } catch (err: any) {
+      const msg = err.message || 'Error al procesar la activación en la nube.';
+      showToast(`⚠️ ${msg}`);
+      return { success: false, error: msg };
     }
-
-    const normalizedEmail = targetApp.ownerEmail.trim().toLowerCase();
-
-
-    if (provisionedOwnerAccounts.some(a => a.email.toLowerCase() === normalizedEmail)) {
-      const err = '⚠️ Ya existe una cuenta de dueño registrada con este correo electrónico.';
-      showToast(err);
-      return { success: false, error: err };
-    }
-
-    const newTenantId = `tenant_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    if (tenants.some(t => t.id === newTenantId)) {
-      const err = '⚠️ Colisión de ID de restaurante. Intenta de nuevo.';
-      showToast(err);
-      return { success: false, error: err };
-    }
-
-    const baseSlug = targetApp.restaurantName
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'restaurante';
-
-    let finalSlug = baseSlug;
-    let counter = 1;
-    while (tenants.some(t => t.slug === finalSlug)) {
-      finalSlug = `${baseSlug}-${counter}`;
-      counter++;
-    }
-
-    const newTenant: Tenant = {
-      id: newTenantId,
-      slug: finalSlug,
-      name: targetApp.restaurantName.trim(),
-      category: targetApp.category.trim(),
-      cityId: targetApp.cityId,
-      zoneId: targetApp.zoneId,
-      address: targetApp.address,
-      phone: targetApp.ownerPhone,
-      whatsapp: targetApp.whatsapp,
-      minOrder: targetApp.minOrder,
-      deliveryModes: targetApp.deliveryModes,
-      deliveryFee: targetApp.deliveryFee,
-      deliveryRadiusKm: targetApp.deliveryRadiusKm,
-      status: 'active',
-      isOpen: false,
-      isNew: true,
-      rating: 0,
-      salesWeekly: 0,
-      distanceKm: 0,
-      tablesCount: 0,
-      commissionRate: 0.03,
-      deliveryTime: '20-35 min',
-      priceRange: '$$',
-      description: `Nuevo aliado en Armenia, Quindío. Especialidad en ${targetApp.category.trim()}.`,
-      logoEmoji: '🏪',
-      bannerUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80',
-      ownerUserId: normalizedEmail
-    };
-
-    const newOwnerAccount: ProvisionedOwnerAccount = {
-      id: `prov_owner_${Date.now()}`,
-      name: targetApp.ownerName.trim(),
-      email: normalizedEmail,
-      temporaryPassword: temporaryPassword.trim(),
-      tenantId: newTenantId,
-      businessRole: 'restaurant_owner',
-      userRole: 'admin',
-      createdAt: Date.now()
-    };
-
-    const reviewerEmail = currentUser.email;
-
-    setTenants(prev => [...prev, newTenant]);
-    setProvisionedOwnerAccounts(prev => [...prev, newOwnerAccount]);
-    setRestaurantApplications(prev => prev.map(app => {
-      if (app.id === applicationId) {
-        return {
-          ...app,
-          activatedAt: Date.now(),
-          activatedTenantId: newTenantId,
-          activatedByEmail: reviewerEmail
-        };
-      }
-      return app;
-    }));
-
-    showToast(`🎉 ¡Restaurante "${newTenant.name}" activado con éxito!`);
-    return { success: true, tenantId: newTenantId };
   };
 
   const logout = async () => {
