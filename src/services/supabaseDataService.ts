@@ -10,7 +10,7 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
     const { data, error } = await supabase
-      .from('tenants')
+      .from('restaurants')
       .select('*')
       .eq('status', 'active');
 

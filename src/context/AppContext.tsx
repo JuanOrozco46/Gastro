@@ -197,6 +197,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return tenants[0] || EMPTY_TENANT;
   });
 
+  // Fetch real tenants from Supabase on load
+  useEffect(() => {
+    const loadRealTenants = async () => {
+      const liveTenants = await fetchLiveTenants();
+      if (liveTenants.length > 0) {
+        setTenants(liveTenants);
+        
+        // Also update current tenant if the user is already logged in
+        if (currentUser?.tenantId) {
+          const match = liveTenants.find(t => t.id === currentUser.tenantId);
+          if (match) setCurrentTenant(match);
+        }
+      }
+    };
+    loadRealTenants();
+  }, []);
+
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(initialSession);
   const [userRole, setUserRole] = useState<UserRole>(initialSession ? initialSession.role : 'login');
 
