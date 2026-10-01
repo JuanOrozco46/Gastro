@@ -35,7 +35,11 @@ const ViewLoader: React.FC = () => (
 );
 
 const MainContent: React.FC = () => {
-  const { userRole } = useApp();
+  const { userRole, isAuthLoading } = useApp();
+
+  if (isAuthLoading) {
+    return <ViewLoader />;
+  }
 
   if (userRole === 'login') {
     return <LoginScreen />;

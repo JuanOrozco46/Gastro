@@ -212,22 +212,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return tenants[0] || EMPTY_TENANT;
   });
 
-  // Fetch real tenants from Supabase on load
-  useEffect(() => {
-    const loadRealTenants = async () => {
-      const liveTenants = await fetchLiveTenants();
-      if (liveTenants.length > 0) {
-        setTenants(liveTenants);
-        
-        // Also update current tenant if the user is already logged in
-        if (currentUser?.tenantId) {
-          const match = liveTenants.find(t => t.id === currentUser.tenantId);
-          if (match) setCurrentTenant(match);
-        }
-      }
-    };
-    loadRealTenants();
-  }, [currentUser?.tenantId]);
+
 
   const [products, setProducts] = useState<Product[]>(() => {
     try {
@@ -267,52 +252,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (authMode === 'remote') {
       let isSubscribed = true;
 
-      Promise.all([
-        fetchLiveTenants(),
-        fetchLiveProducts(),
-        fetchLivePosts(),
-        getCurrentSupabaseSession()
-      ]).then(async ([liveTenants, liveProducts, livePosts, sessionResponse]) => {
-        if (!isSubscribed) return;
-        
-        setRemoteTenants(liveTenants);
-        remoteTenantsRef.current = liveTenants;
-        setRemoteProducts(liveProducts);
-        setRemotePosts(livePosts);
-        
-        setCurrentTenant(prev => {
-          if (prev.id === EMPTY_TENANT.id && liveTenants.length > 0) {
-            return liveTenants[0];
-          }
-          return prev;
-        });
+      const initializeApp = async () => {
+        try {
+          const sessionResponse = await getCurrentSupabaseSession();
+          let userAccount = null;
 
-        if (sessionResponse.data.session?.user) {
-          const userAccount = await resolveSupabaseUserProfile(
-            sessionResponse.data.session.user.id,
-            sessionResponse.data.session.user.email || ''
-          );
-          if (userAccount && isSubscribed) {
+          if (sessionResponse.data.session?.user) {
+            userAccount = await resolveSupabaseUserProfile(
+              sessionResponse.data.session.user.id,
+              sessionResponse.data.session.user.email || ''
+            );
+          }
+
+          const [liveTenants, liveProducts, livePosts] = await Promise.all([
+            fetchLiveTenants(),
+            fetchLiveProducts(),
+            fetchLivePosts()
+          ]);
+
+          if (!isSubscribed) return;
+
+          setRemoteTenants(liveTenants);
+          remoteTenantsRef.current = liveTenants;
+          if (liveTenants.length > 0) {
+            setTenants(liveTenants);
+          }
+          
+          setRemoteProducts(liveProducts);
+          setRemotePosts(livePosts);
+
+          setCurrentTenant(prev => {
+            if (prev.id === EMPTY_TENANT.id && liveTenants.length > 0) {
+              return liveTenants[0];
+            }
+            return prev;
+          });
+
+          if (userAccount) {
             setCurrentUser(userAccount);
             setUserRole(userAccount.role);
             if (userAccount.tenantId) {
               const match = liveTenants.find(t => t.id === userAccount.tenantId);
               if (match) setCurrentTenant(match);
             }
-          } else if (isSubscribed) {
+          } else {
             await signOutFromSupabase();
           }
+        } catch (err) {
+          if (!isSubscribed) return;
+          console.warn('⚠️ No se pudieron cargar los datos en vivo de Supabase:', err);
+          setCatalogError('No fue posible cargar el catálogo remoto. Revisa tu conexión.');
+        } finally {
+          if (isSubscribed) {
+            setIsAuthLoading(false);
+            setIsCatalogLoading(false);
+          }
         }
-      }).catch(err => {
-        if (!isSubscribed) return;
-        console.warn('⚠️ No se pudieron cargar los datos en vivo de Supabase:', err);
-        setCatalogError('No fue posible cargar el catálogo remoto. Revisa tu conexión.');
-      }).finally(() => {
-        if (isSubscribed) {
-          setIsAuthLoading(false);
-          setIsCatalogLoading(false);
-        }
-      });
+      };
+
+      initializeApp();
       
       const { data: { subscription } } = subscribeToSupabaseAuthChanges(async (event, session) => {
         if (session?.user && event !== 'INITIAL_SESSION') {
