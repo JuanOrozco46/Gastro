@@ -45,7 +45,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
   // Customer & Delivery Form State
   const [customerName, setCustomerName] = useState(currentUser?.name || 'Cliente Demo');
   const [customerPhone, setCustomerPhone] = useState('+57 300 123 4567');
-  const [deliveryAddress, setDeliveryAddress] = useState('Armenia, Quindío · Norte');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
 
   // Table Service Form State
