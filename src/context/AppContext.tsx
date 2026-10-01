@@ -1181,7 +1181,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRestaurantApplications(prev => [newApp, ...prev]);
 
     if (isSupabaseConfigured) {
-      submitLiveApplication(newApp).catch(err => {
+      submitLiveApplication(newApp).then(realApp => {
+        if (realApp) {
+          setRestaurantApplications(prev => prev.map(a => a.id === newApp.id ? realApp : a));
+        }
+      }).catch(err => {
         console.warn('⚠️ No se pudo enviar la solicitud a Supabase:', err);
       });
     }

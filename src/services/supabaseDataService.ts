@@ -108,10 +108,10 @@ export async function fetchLivePosts(): Promise<Post[]> {
   }
 }
 
-export async function submitLiveApplication(appData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>): Promise<boolean> {
-  if (!isSupabaseConfigured || !supabase) return false;
+export async function submitLiveApplication(appData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>): Promise<RestaurantApplication | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
   try {
-    const { error } = await supabase.from('restaurant_applications').insert([{
+    const { data, error } = await supabase.from('restaurant_applications').insert([{
       owner_name: appData.ownerName,
       owner_email: appData.ownerEmail,
       owner_phone: appData.ownerPhone,
@@ -127,12 +127,32 @@ export async function submitLiveApplication(appData: Omit<RestaurantApplication,
       delivery_radius_km: appData.deliveryRadiusKm,
       notes: appData.notes,
       status: 'submitted'
-    }]);
+    }]).select().single();
 
-    return !error;
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      ownerName: data.owner_name,
+      ownerEmail: data.owner_email,
+      ownerPhone: data.owner_phone,
+      restaurantName: data.restaurant_name,
+      category: data.category,
+      cityId: data.city_id,
+      zoneId: data.zone_id,
+      address: data.address,
+      whatsapp: data.whatsapp,
+      minOrder: data.min_order,
+      deliveryModes: data.delivery_modes,
+      deliveryFee: data.delivery_fee,
+      deliveryRadiusKm: data.delivery_radius_km,
+      notes: data.notes,
+      status: data.status,
+      submittedAt: new Date(data.created_at).getTime(),
+    } as RestaurantApplication;
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al insertar aplicacion en Supabase:', err);
-    return false;
+    return null;
   }
 }
 
