@@ -226,13 +226,21 @@ export async function updateLiveApplicationStatus(
 ): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
+    const isAppUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(applicationId);
+    if (!isAppUuid) {
+      console.info('ℹ️ ID de solicitud local/mock, omitiendo persistencia remota:', applicationId);
+      return true;
+    }
+
+    const isReviewerUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reviewerId);
+
     const { error } = await supabase
       .from('restaurant_applications')
       .update({
         status: nextStatus,
         review_note: reviewNote?.trim() || null,
         reviewed_at: new Date().toISOString(),
-        reviewed_by: reviewerId
+        reviewed_by: isReviewerUuid ? reviewerId : null
       })
       .eq('id', applicationId);
 

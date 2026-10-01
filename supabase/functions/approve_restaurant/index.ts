@@ -60,8 +60,8 @@ serve(async (req) => {
       throw new Error(`Solicitud no encontrada. Detalles: ${appError?.message || 'Ninguno'}. ID buscado: ${applicationId}`);
     }
 
-    if (application.status !== 'approved') {
-      throw new Error('La solicitud debe estar aprobada para poder activarse');
+    if (application.status === 'rejected') {
+      throw new Error('La solicitud fue rechazada y no puede activarse');
     }
 
     if (application.activated_restaurant_id || application.activated_at) {
@@ -139,8 +139,11 @@ serve(async (req) => {
       throw new Error('Error al vincular el usuario al restaurante.');
     }
 
-    // 5. Marcar solicitud como activada
+    // 5. Marcar solicitud como aprobada y activada
     await supabaseAdmin.from('restaurant_applications').update({
+      status: 'approved',
+      reviewed_at: application.reviewed_at || new Date().toISOString(),
+      reviewed_by: application.reviewed_by || user.id,
       activated_at: new Date().toISOString(),
       activated_restaurant_id: restaurantData.id,
       activated_by: user.id
