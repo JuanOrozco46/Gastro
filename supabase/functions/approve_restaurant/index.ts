@@ -42,7 +42,9 @@ serve(async (req) => {
       throw new Error('Permisos insuficientes');
     }
 
-    const { applicationId } = await req.json();
+    const body = await req.json();
+    const applicationId = body.applicationId || body.application?.id;
+    
     if (!applicationId) {
       throw new Error('Falta el ID de la solicitud');
     }
@@ -152,7 +154,7 @@ serve(async (req) => {
     const msg = error instanceof Error ? error.message : String(error);
     return new Response(
       JSON.stringify({ error: msg }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   }
 })

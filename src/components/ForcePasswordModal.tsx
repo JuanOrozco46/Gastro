@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { KeyRound, ShieldAlert } from 'lucide-react';
 import { useApp } from '../context/useApp';
+import { supabase } from '../lib/supabase';
 
 export const ForcePasswordModal: React.FC = () => {
-  const { currentUser, setForcePasswordReset } = useApp();
+  const { currentUser } = useApp();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  if (!currentUser || currentUser.user_metadata?.needs_password_set !== true) {
+  if (!currentUser || (currentUser as any).user_metadata?.needs_password_set !== true) {
     return null;
   }
 
@@ -29,7 +30,6 @@ export const ForcePasswordModal: React.FC = () => {
 
     setLoading(true);
     try {
-      const { supabase } = await import('../services/supabaseClient');
       if (!supabase) throw new Error('Supabase no configurado');
 
       const { error: updateError } = await supabase.auth.updateUser({
@@ -38,11 +38,6 @@ export const ForcePasswordModal: React.FC = () => {
       });
 
       if (updateError) throw updateError;
-      
-      // Update local context to unblock UI
-      if (setForcePasswordReset) {
-         setForcePasswordReset(false);
-      }
       
       // Reload page strictly to clean up states and ensure everything is updated
       window.location.reload();

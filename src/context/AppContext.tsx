@@ -1236,7 +1236,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const activateApprovedRestaurant = async (
     applicationId: string
-  ): Promise<{ success: boolean; tenantId?: string; error?: string }> => {
+  ): Promise<{ success: boolean; tenantId?: string; error?: string; message?: string }> => {
     if (!isPlatformAdmin(currentUser)) {
       const err = '⚠️ No tienes autorización para activar restaurantes.';
       showToast(err);
