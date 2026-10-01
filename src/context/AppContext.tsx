@@ -500,8 +500,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (res.success && res.user) {
       setCurrentUser(res.user);
       setUserRole(res.user.role);
+      
+      let updatedTenants = tenants;
+      if (isSupabaseConfigured) {
+        const liveTenants = await fetchLiveTenants();
+        if (liveTenants.length > 0) {
+          setTenants(liveTenants);
+          updatedTenants = liveTenants;
+        }
+      }
+
       if (res.user.tenantId) {
-        const tenantMatch = tenants.find(t => t.id === res.user!.tenantId);
+        const tenantMatch = updatedTenants.find(t => t.id === res.user!.tenantId);
         if (tenantMatch) setCurrentTenant(tenantMatch);
       }
       showToast(`👋 ¡Bienvenid@, ${res.user.name}!`);
