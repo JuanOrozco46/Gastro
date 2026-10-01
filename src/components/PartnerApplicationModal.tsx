@@ -34,6 +34,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
   // UI state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Keyboard shortcut ESC to close modal
   useEffect(() => {
@@ -87,28 +88,34 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
-    const ok = submitRestaurantApplication({
-      ownerName: ownerName.trim(),
-      ownerEmail: ownerEmail.trim(),
-      ownerPhone: ownerPhone.trim(),
-      restaurantName: restaurantName.trim(),
-      category: category.trim(),
-      zoneId,
-      address: address.trim(),
-      deliveryModes,
-      whatsapp: whatsapp.trim() || undefined,
-      minOrder: minOrder !== '' ? Number(minOrder) : undefined,
-      deliveryFee: deliveryModes.includes('restaurant_delivery') && deliveryFee !== '' ? Number(deliveryFee) : undefined,
-      deliveryRadiusKm: deliveryModes.includes('restaurant_delivery') && deliveryRadiusKm !== '' ? Number(deliveryRadiusKm) : undefined,
-      notes: notes.trim() || undefined
-    });
+    setIsSubmitting(true);
+    try {
+      const ok = await submitRestaurantApplication({
+        ownerName: ownerName.trim(),
+        ownerEmail: ownerEmail.trim(),
+        ownerPhone: ownerPhone.trim(),
+        restaurantName: restaurantName.trim(),
+        category: category.trim(),
+        zoneId,
+        address: address.trim(),
+        deliveryModes,
+        whatsapp: whatsapp.trim() || undefined,
+        minOrder: minOrder !== '' ? Number(minOrder) : undefined,
+        deliveryFee: deliveryModes.includes('restaurant_delivery') && deliveryFee !== '' ? Number(deliveryFee) : undefined,
+        deliveryRadiusKm: deliveryModes.includes('restaurant_delivery') && deliveryRadiusKm !== '' ? Number(deliveryRadiusKm) : undefined,
+        notes: notes.trim() || undefined
+      });
 
-    if (ok) {
-      setSubmittedSuccess(true);
+      if (ok) {
+        setSubmittedSuccess(true);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -518,18 +525,27 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   type="button"
                   className="btn btn-outline"
                   onClick={onClose}
-                  style={{ flex: 1, padding: '12px', borderRadius: '14px' }}
+                  disabled={isSubmitting}
+                  style={{ flex: 1, padding: '12px', borderRadius: '14px', opacity: isSubmitting ? 0.5 : 1 }}
                 >
                   Cancelar
                 </button>
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={!isSubmitting ? { scale: 1.02 } : {}}
+                  whileTap={!isSubmitting ? { scale: 0.98 } : {}}
                   type="submit"
+                  disabled={isSubmitting}
                   className="btn btn-primary"
-                  style={{ flex: 2, padding: '12px', fontWeight: 900, borderRadius: '14px' }}
+                  style={{ flex: 2, padding: '12px', fontWeight: 900, borderRadius: '14px', opacity: isSubmitting ? 0.7 : 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
                 >
-                  Enviar Solicitud de Aliado
+                  {isSubmitting ? (
+                    <>
+                      <div className="spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                      Enviando...
+                    </>
+                  ) : (
+                    'Enviar Solicitud de Aliado'
+                  )}
                 </motion.button>
               </div>
 

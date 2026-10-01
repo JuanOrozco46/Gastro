@@ -234,6 +234,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [stories] = useState<Story[]>(DEFAULT_STORIES);
 
+  const [restaurantApplications, setRestaurantApplications] = useState<RestaurantApplication[]>(() => {
+    try {
+      const saved = localStorage.getItem('gs_restaurant_applications_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [provisionedOwnerAccounts] = useState<ProvisionedOwnerAccount[]>(() =>
+    validateAndGetProvisionedAccounts()
+  );
+
   // Sync state to localStorage
   useEffect(() => {
     try { localStorage.setItem('gs_tenants_v5', JSON.stringify(tenants)); } catch {}
@@ -246,6 +259,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     try { localStorage.setItem('gs_posts_v5', JSON.stringify(posts)); } catch {}
   }, [posts]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gs_restaurant_applications_v1', JSON.stringify(restaurantApplications));
+    } catch {}
+  }, [restaurantApplications]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gs_provisioned_owner_accounts_v1', JSON.stringify(provisionedOwnerAccounts));
+    } catch {}
+  }, [provisionedOwnerAccounts]);
 
   // Carga inicial de datos desde Supabase
   useEffect(() => {
@@ -396,31 +421,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // AudioContext bloqueado o no soportado sin intervención previa del usuario
     }
   };
-
-  const [restaurantApplications, setRestaurantApplications] = useState<RestaurantApplication[]>(() => {
-    try {
-      const saved = localStorage.getItem('gs_restaurant_applications_v1');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [provisionedOwnerAccounts] = useState<ProvisionedOwnerAccount[]>(() =>
-    validateAndGetProvisionedAccounts()
-  );
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('gs_restaurant_applications_v1', JSON.stringify(restaurantApplications));
-    } catch {}
-  }, [restaurantApplications]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('gs_provisioned_owner_accounts_v1', JSON.stringify(provisionedOwnerAccounts));
-    } catch {}
-  }, [provisionedOwnerAccounts]);
 
   useEffect(() => {
     localStorage.setItem('gs_orders_v5', JSON.stringify(orders));
@@ -1100,9 +1100,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setEquityWeight(weight);
   };
 
-  const submitRestaurantApplication = (
+  const submitRestaurantApplication = async (
     applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status' | 'cityId'>
-  ): boolean => {
+  ): Promise<boolean> => {
     if (
       !applicationData.ownerName?.trim() ||
       !applicationData.ownerEmail?.trim() ||
@@ -1178,16 +1178,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cityId: 'city_armenia_quindio'
     };
 
-    setRestaurantApplications(prev => [newApp, ...prev]);
-
     if (isSupabaseConfigured) {
-      submitLiveApplication(newApp).then(realApp => {
-        if (realApp) {
-          setRestaurantApplications(prev => prev.map(a => a.id === newApp.id ? realApp : a));
+      try {
+        const realApp = await submitLiveApplication(newApp);
+        if (!realApp) {
+          showToast('⚠️ Hubo un error de conexión o validación al enviar la solicitud al servidor.');
+          return false; // Stop the flow, do not add fake app
         }
-      }).catch(err => {
+        // Success! Only save the real App
+        setRestaurantApplications(prev => [realApp, ...prev]);
+      } catch (err) {
         console.warn('⚠️ No se pudo enviar la solicitud a Supabase:', err);
-      });
+        showToast('⚠️ Hubo un error inesperado al conectar con el servidor.');
+        return false;
+      }
+    } else {
+      // Local demo mode
+      setRestaurantApplications(prev => [newApp, ...prev]);
     }
 
     showToast('📝 ¡Solicitud recibida! Quedará pendiente de revisión antes de activar el restaurante.');
