@@ -111,14 +111,28 @@ export async function fetchLivePosts(): Promise<Post[]> {
 export async function submitLiveApplication(appData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>): Promise<RestaurantApplication | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
+    // Transform local IDs into Supabase slugs to get the real UUIDs
+    const citySlug = appData.cityId.replace('city_', '').replace('_', '-'); // e.g. 'armenia-quindio'
+    const zoneSlug = appData.zoneId.replace('zone_', '').replace('_', '-'); // e.g. 'armenia-centro'
+
+    const [{ data: cityData }, { data: zoneData }] = await Promise.all([
+      supabase.from('cities').select('id').eq('slug', citySlug).single(),
+      supabase.from('zones').select('id').eq('slug', zoneSlug).single()
+    ]);
+
+    if (!cityData || !zoneData) {
+      console.warn('⚠️ No se encontraron los UUIDs reales para la ciudad o zona especificada.');
+      return null;
+    }
+
     const { data, error } = await supabase.from('restaurant_applications').insert([{
       owner_name: appData.ownerName,
       owner_email: appData.ownerEmail,
       owner_phone: appData.ownerPhone,
       restaurant_name: appData.restaurantName,
       category: appData.category,
-      city_id: appData.cityId,
-      zone_id: appData.zoneId,
+      city_id: cityData.id,
+      zone_id: zoneData.id,
       address: appData.address,
       whatsapp: appData.whatsapp,
       min_order: appData.minOrder,
