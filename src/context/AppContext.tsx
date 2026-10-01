@@ -4,7 +4,7 @@ import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment } from '../services/supabaseOrderService';
@@ -264,10 +264,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             );
           }
 
-          const [liveTenants, liveProducts, livePosts] = await Promise.all([
+          const [liveTenants, liveProducts, livePosts, liveApps] = await Promise.all([
             fetchLiveTenants(),
             fetchLiveProducts(),
-            fetchLivePosts()
+            fetchLivePosts(),
+            fetchLiveApplications()
           ]);
 
           if (!isSubscribed) return;
@@ -280,6 +281,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           
           setRemoteProducts(liveProducts);
           setRemotePosts(livePosts);
+          setRestaurantApplications(liveApps);
 
           setCurrentTenant(prev => {
             if (prev.id === EMPTY_TENANT.id && liveTenants.length > 0) {

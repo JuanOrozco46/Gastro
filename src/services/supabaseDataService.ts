@@ -135,3 +135,41 @@ export async function submitLiveApplication(appData: Omit<RestaurantApplication,
     return false;
   }
 }
+
+export async function fetchLiveApplications(): Promise<RestaurantApplication[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('restaurant_applications')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map((app: any) => ({
+      id: app.id,
+      ownerName: app.owner_name,
+      ownerEmail: app.owner_email,
+      ownerPhone: app.owner_phone,
+      restaurantName: app.restaurant_name,
+      category: app.category,
+      cityId: app.city_id,
+      zoneId: app.zone_id,
+      address: app.address,
+      whatsapp: app.whatsapp,
+      minOrder: app.min_order,
+      deliveryModes: app.delivery_modes,
+      deliveryFee: app.delivery_fee,
+      deliveryRadiusKm: app.delivery_radius_km,
+      notes: app.notes,
+      status: app.status,
+      submittedAt: new Date(app.created_at).getTime(),
+      activatedAt: app.activated_at ? new Date(app.activated_at).getTime() : undefined,
+      activatedByEmail: app.activated_by_email,
+      activatedTenantId: app.activated_tenant_id
+    }));
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción al consultar aplicaciones en Supabase:', err);
+    return [];
+  }
+}
