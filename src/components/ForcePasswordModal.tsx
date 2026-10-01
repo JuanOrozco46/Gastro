@@ -11,7 +11,7 @@ export const ForcePasswordModal: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  if (!currentUser || (currentUser as any).user_metadata?.needs_password_set !== true) {
+  if (!currentUser || currentUser.needsPasswordSet !== true) {
     return null;
   }
 

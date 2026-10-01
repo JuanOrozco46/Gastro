@@ -163,8 +163,9 @@ export function subscribeToRestaurantOrders(
 ) {
   if (!isSupabaseConfigured || !supabase || !tenantId) return () => {};
 
+  const channelName = `kds_orders_${tenantId}_${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
   const channel = supabase
-    .channel(`kds_orders_${tenantId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
@@ -195,8 +196,9 @@ export function subscribeToCustomerOrders(
 ) {
   if (!isSupabaseConfigured || !supabase || !customerId) return () => {};
 
+  const channelName = `customer_orders_${customerId}_${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
   const channel = supabase
-    .channel(`customer_orders_${customerId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {

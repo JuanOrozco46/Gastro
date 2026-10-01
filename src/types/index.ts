@@ -18,11 +18,13 @@ export type UserRole = 'login' | 'client_delivery' | 'kitchen' | 'admin' | 'tabl
 export type BusinessUserRole = 'customer' | 'restaurant_owner' | 'restaurant_staff' | 'platform_admin';
 
 export interface UserAccount {
+  id?: string;
   email: string;
   name: string;
   role: UserRole;
   businessRole?: BusinessUserRole;
   tenantId?: string;
+  needsPasswordSet?: boolean;
 }
 
 export interface City {
@@ -50,7 +52,6 @@ export interface ProvisionedOwnerAccount {
   id: string;
   name: string;
   email: string;
-  temporaryPassword: string;
   tenantId: string;
   businessRole: 'restaurant_owner';
   userRole: 'admin';

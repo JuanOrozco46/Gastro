@@ -57,7 +57,7 @@ serve(async (req) => {
       .single();
 
     if (appError || !application) {
-      throw new Error('Solicitud no encontrada');
+      throw new Error(`Solicitud no encontrada. Detalles: ${appError?.message || 'Ninguno'}. ID buscado: ${applicationId}`);
     }
 
     if (application.status !== 'approved') {
@@ -147,7 +147,7 @@ serve(async (req) => {
     }).eq('id', applicationId);
 
     return new Response(
-      JSON.stringify({ success: true, message: successMsg }),
+      JSON.stringify({ success: true, message: successMsg, tenantId: restaurantData.id }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: unknown) {

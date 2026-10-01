@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { Tenant, Product, Post, RestaurantApplication } from '../types';
+import type { Tenant, Product, Post, RestaurantApplication, OrderFulfillment } from '../types';
 import type {
   DbRestaurant, DbProduct, DbPost
 } from './supabaseTypes';
@@ -112,8 +112,8 @@ export async function submitLiveApplication(appData: Omit<RestaurantApplication,
   if (!isSupabaseConfigured || !supabase) return null;
   try {
     // Transform local IDs into Supabase slugs to get the real UUIDs
-    const citySlug = appData.cityId.replace('city_', '').replace('_', '-'); // e.g. 'armenia-quindio'
-    const zoneSlug = appData.zoneId.replace('zone_', '').replace('_', '-'); // e.g. 'armenia-centro'
+    const citySlug = appData.cityId.replace('city_', '').replace(/_/g, '-'); // e.g. 'armenia-quindio'
+    const zoneSlug = appData.zoneId.replace('zone_', '').replace(/_/g, '-'); // e.g. 'armenia-centro'
 
     const [{ data: cityData }, { data: zoneData }] = await Promise.all([
       supabase.from('cities').select('id').eq('slug', citySlug).single(),
@@ -125,7 +125,9 @@ export async function submitLiveApplication(appData: Omit<RestaurantApplication,
       return null;
     }
 
-    const { data, error } = await supabase.from('restaurant_applications').insert([{
+    const newId = crypto.randomUUID();
+    const { error } = await supabase.from('restaurant_applications').insert([{
+      id: newId,
       owner_name: appData.ownerName,
       owner_email: appData.ownerEmail,
       owner_phone: appData.ownerPhone,
@@ -141,28 +143,31 @@ export async function submitLiveApplication(appData: Omit<RestaurantApplication,
       delivery_radius_km: appData.deliveryRadiusKm,
       notes: appData.notes,
       status: 'submitted'
-    }]).select().single();
+    }]);
 
-    if (error || !data) return null;
+    if (error) {
+      console.warn('⚠️ Error al insertar la solicitud en Supabase:', error);
+      return null;
+    }
 
     return {
-      id: data.id,
-      ownerName: data.owner_name,
-      ownerEmail: data.owner_email,
-      ownerPhone: data.owner_phone,
-      restaurantName: data.restaurant_name,
-      category: data.category,
-      cityId: data.city_id,
-      zoneId: data.zone_id,
-      address: data.address,
-      whatsapp: data.whatsapp,
-      minOrder: data.min_order,
-      deliveryModes: data.delivery_modes,
-      deliveryFee: data.delivery_fee,
-      deliveryRadiusKm: data.delivery_radius_km,
-      notes: data.notes,
-      status: data.status,
-      submittedAt: new Date(data.created_at).getTime(),
+      id: newId,
+      ownerName: appData.ownerName,
+      ownerEmail: appData.ownerEmail,
+      ownerPhone: appData.ownerPhone,
+      restaurantName: appData.restaurantName,
+      category: appData.category,
+      cityId: cityData.id,
+      zoneId: zoneData.id,
+      address: appData.address,
+      whatsapp: appData.whatsapp,
+      minOrder: appData.minOrder,
+      deliveryModes: appData.deliveryModes,
+      deliveryFee: appData.deliveryFee,
+      deliveryRadiusKm: appData.deliveryRadiusKm,
+      notes: appData.notes,
+      status: 'submitted',
+      submittedAt: Date.now(),
     } as RestaurantApplication;
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al insertar aplicacion en Supabase:', err);
@@ -180,30 +185,65 @@ export async function fetchLiveApplications(): Promise<RestaurantApplication[]> 
 
     if (error || !data) return [];
 
-    return data.map((app: any) => ({
-      id: app.id,
-      ownerName: app.owner_name,
-      ownerEmail: app.owner_email,
-      ownerPhone: app.owner_phone,
-      restaurantName: app.restaurant_name,
-      category: app.category,
-      cityId: app.city_id,
-      zoneId: app.zone_id,
-      address: app.address,
-      whatsapp: app.whatsapp,
-      minOrder: app.min_order,
-      deliveryModes: app.delivery_modes,
-      deliveryFee: app.delivery_fee,
-      deliveryRadiusKm: app.delivery_radius_km,
-      notes: app.notes,
-      status: app.status,
-      submittedAt: new Date(app.created_at).getTime(),
-      activatedAt: app.activated_at ? new Date(app.activated_at).getTime() : undefined,
-      activatedByEmail: app.activated_by_email,
-      activatedTenantId: app.activated_tenant_id
+    return data.map((app: Record<string, unknown>) => ({
+      id: app.id as string,
+      ownerName: app.owner_name as string,
+      ownerEmail: app.owner_email as string,
+      ownerPhone: app.owner_phone as string,
+      restaurantName: app.restaurant_name as string,
+      category: app.category as string,
+      cityId: app.city_id as string,
+      zoneId: app.zone_id as string,
+      address: app.address as string,
+      whatsapp: app.whatsapp as string | undefined,
+      minOrder: app.min_order as number | undefined,
+      deliveryModes: app.delivery_modes as OrderFulfillment[],
+      deliveryFee: app.delivery_fee as number | undefined,
+      deliveryRadiusKm: app.delivery_radius_km as number | undefined,
+      notes: app.notes as string | undefined,
+      status: app.status as RestaurantApplication['status'],
+      submittedAt: new Date(app.created_at as string).getTime(),
+      reviewedAt: app.reviewed_at ? new Date(app.reviewed_at as string).getTime() : undefined,
+      reviewNote: app.review_note as string | undefined,
+      activatedAt: app.activated_at ? new Date(app.activated_at as string).getTime() : undefined,
+      activatedTenantId: app.activated_restaurant_id as string | undefined,
     }));
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al consultar aplicaciones en Supabase:', err);
     return [];
   }
 }
+
+/**
+ * Persiste un cambio de estado de revisión (reviewing/approved/rejected) en Supabase.
+ * Retorna true si la actualización fue exitosa, false en caso contrario.
+ */
+export async function updateLiveApplicationStatus(
+  applicationId: string,
+  nextStatus: 'reviewing' | 'approved' | 'rejected',
+  reviewerId: string,
+  reviewNote?: string
+): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { error } = await supabase
+      .from('restaurant_applications')
+      .update({
+        status: nextStatus,
+        review_note: reviewNote?.trim() || null,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: reviewerId
+      })
+      .eq('id', applicationId);
+
+    if (error) {
+      console.warn('⚠️ Error al actualizar estado de solicitud en Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción al actualizar estado de solicitud:', err);
+    return false;
+  }
+}
+

@@ -29,6 +29,9 @@ export const SuperAdminView: React.FC = () => {
     message?: string;
   } | null>(null);
 
+  const [isReviewing, setIsReviewing] = useState<string | null>(null);
+  const [isActivating, setIsActivating] = useState<boolean>(false);
+
   // Access guard
   if (!currentUser || currentUser.businessRole !== 'platform_admin') {
     return (
@@ -72,9 +75,10 @@ export const SuperAdminView: React.FC = () => {
     setReviewNotes(prev => ({ ...prev, [appId]: note }));
   };
 
-  const handleReviewAction = (appId: string, nextStatus: 'reviewing' | 'approved' | 'rejected') => {
+  const handleReviewAction = async (appId: string, nextStatus: 'reviewing' | 'approved' | 'rejected') => {
+    setIsReviewing(appId);
     const note = reviewNotes[appId] || '';
-    const ok = reviewRestaurantApplication(appId, nextStatus, note);
+    const ok = await reviewRestaurantApplication(appId, nextStatus, note);
     if (ok) {
       setReviewNotes(prev => {
         const copy = { ...prev };
@@ -82,13 +86,19 @@ export const SuperAdminView: React.FC = () => {
         return copy;
       });
     }
+    setIsReviewing(null);
   };
 
   const handleConfirmActivation = async (appId: string) => {
+    if (isActivating) return;
     setActivationError(null);
+    setIsActivating(true);
 
     const app = restaurantApplications.find(a => a.id === appId);
-    if (!app) return;
+    if (!app) {
+      setIsActivating(false);
+      return;
+    }
 
     const res = await activateApprovedRestaurant(appId);
     if (res.success) {
@@ -102,6 +112,7 @@ export const SuperAdminView: React.FC = () => {
     } else if (res.error) {
       setActivationError(res.error);
     }
+    setIsActivating(false);
   };
 
   const totalEthicalFees = transactions.reduce((sum, t) => sum + t.platformFee, 0);
@@ -398,8 +409,9 @@ export const SuperAdminView: React.FC = () => {
                             {app.status === 'submitted' && (
                               <button
                                 className="btn btn-outline"
-                                style={{ padding: '8px 14px', fontSize: '0.8rem', fontWeight: 800, borderRadius: '10px', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38BDF8' }}
+                                style={{ padding: '8px 14px', fontSize: '0.8rem', fontWeight: 800, borderRadius: '10px', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38BDF8', opacity: isReviewing ? 0.5 : 1, cursor: isReviewing ? 'not-allowed' : 'pointer' }}
                                 onClick={() => handleReviewAction(app.id, 'reviewing')}
+                                disabled={isReviewing !== null}
                               >
                                 🔍 Marcar En Revisión
                               </button>
@@ -407,16 +419,18 @@ export const SuperAdminView: React.FC = () => {
 
                             <button
                               className="btn btn-secondary"
-                              style={{ padding: '8px 16px', fontSize: '0.8rem', fontWeight: 900, borderRadius: '10px' }}
+                              style={{ padding: '8px 16px', fontSize: '0.8rem', fontWeight: 900, borderRadius: '10px', opacity: isReviewing ? 0.5 : 1, cursor: isReviewing ? 'not-allowed' : 'pointer' }}
                               onClick={() => handleReviewAction(app.id, 'approved')}
+                              disabled={isReviewing !== null}
                             >
                               ✅ Aprobar Solicitud
                             </button>
 
                             <button
                               className="btn btn-outline"
-                              style={{ padding: '8px 14px', fontSize: '0.8rem', fontWeight: 800, borderRadius: '10px', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#EF4444' }}
+                              style={{ padding: '8px 14px', fontSize: '0.8rem', fontWeight: 800, borderRadius: '10px', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#EF4444', opacity: isReviewing ? 0.5 : 1, cursor: isReviewing ? 'not-allowed' : 'pointer' }}
                               onClick={() => handleReviewAction(app.id, 'rejected')}
+                              disabled={isReviewing !== null}
                             >
                               ❌ Rechazar Solicitud
                             </button>
@@ -457,15 +471,17 @@ export const SuperAdminView: React.FC = () => {
                               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                 <button
                                   className="btn btn-primary"
-                                  style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: 900, borderRadius: '10px', background: '#8B5CF6', borderColor: '#8B5CF6' }}
+                                  style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: 900, borderRadius: '10px', background: '#8B5CF6', borderColor: '#8B5CF6', opacity: isActivating ? 0.5 : 1, cursor: isActivating ? 'not-allowed' : 'pointer' }}
                                   onClick={() => handleConfirmActivation(app.id)}
+                                  disabled={isActivating}
                                 >
-                                  ⚡ Confirmar y Activar Restaurante
+                                  {isActivating ? '⏳ Procesando...' : '⚡ Confirmar y Activar Restaurante'}
                                 </button>
                                 <button
                                   className="btn btn-outline"
-                                  style={{ padding: '8px 14px', fontSize: '0.82rem', borderRadius: '10px' }}
+                                  style={{ padding: '8px 14px', fontSize: '0.82rem', borderRadius: '10px', opacity: isActivating ? 0.5 : 1, cursor: isActivating ? 'not-allowed' : 'pointer' }}
                                   onClick={() => { setActivatingAppId(null); setActivationError(null); }}
+                                  disabled={isActivating}
                                 >
                                   Cancelar
                                 </button>

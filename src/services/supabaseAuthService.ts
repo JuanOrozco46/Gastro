@@ -45,13 +45,14 @@ function translateAuthError(errMessage: string): string {
  * Consulta las tablas `public.profiles` y `public.restaurant_members`
  * para determinar el rol del usuario autenticado en la plataforma.
  */
-export async function resolveSupabaseUserProfile(userId: string, email: string): Promise<UserAccount> {
+export async function resolveSupabaseUserProfile(userId: string, email: string, needsPasswordSet?: boolean): Promise<UserAccount> {
   if (!isSupabaseConfigured || !supabase) {
     return {
       email,
       name: email.split('@')[0],
       role: 'client_delivery',
-      businessRole: 'customer'
+      businessRole: 'customer',
+      needsPasswordSet
     };
   }
 
@@ -71,7 +72,8 @@ export async function resolveSupabaseUserProfile(userId: string, email: string):
         email,
         name: fullName,
         role: 'platform_admin',
-        businessRole: 'platform_admin'
+        businessRole: 'platform_admin',
+        needsPasswordSet
       };
     }
 
@@ -89,7 +91,8 @@ export async function resolveSupabaseUserProfile(userId: string, email: string):
           name: fullName,
           role: 'admin',
           businessRole: 'restaurant_owner',
-          tenantId: member.restaurant_id
+          tenantId: member.restaurant_id,
+          needsPasswordSet
         };
       } else {
         return {
@@ -97,7 +100,8 @@ export async function resolveSupabaseUserProfile(userId: string, email: string):
           name: fullName,
           role: 'kitchen',
           businessRole: 'restaurant_staff',
-          tenantId: member.restaurant_id
+          tenantId: member.restaurant_id,
+          needsPasswordSet
         };
       }
     }
@@ -107,7 +111,8 @@ export async function resolveSupabaseUserProfile(userId: string, email: string):
       email,
       name: fullName,
       role: 'client_delivery',
-      businessRole: 'customer'
+      businessRole: 'customer',
+      needsPasswordSet
     };
   } catch (err: unknown) {
     console.warn('⚠️ Error al resolver perfil de Supabase:', err);
@@ -115,7 +120,8 @@ export async function resolveSupabaseUserProfile(userId: string, email: string):
       email,
       name: email.split('@')[0],
       role: 'client_delivery',
-      businessRole: 'customer'
+      businessRole: 'customer',
+      needsPasswordSet
     };
   }
 }
@@ -138,7 +144,7 @@ export async function signInWithSupabase(email: string, pass: string): Promise<A
       return { success: false, error: translateAuthError(error?.message || '') };
     }
 
-    const userAccount = await resolveSupabaseUserProfile(data.user.id, data.user.email || email);
+    const userAccount = await resolveSupabaseUserProfile(data.user.id, data.user.email || email, data.user.user_metadata?.needs_password_set);
     return { success: true, user: userAccount };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

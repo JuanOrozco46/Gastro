@@ -4,7 +4,7 @@ import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications, updateLiveApplicationStatus } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment } from '../services/supabaseOrderService';
@@ -55,7 +55,6 @@ const validateAndGetProvisionedAccounts = (): ProvisionedOwnerAccount[] => {
           id: obj.id,
           name: obj.name.trim(),
           email: obj.email.trim().toLowerCase(),
-          temporaryPassword: obj.temporaryPassword,
           tenantId: obj.tenantId.trim(),
           businessRole: 'restaurant_owner',
           userRole: 'admin',
@@ -285,7 +284,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (sessionResponse.data.session?.user) {
             userAccount = await resolveSupabaseUserProfile(
               sessionResponse.data.session.user.id,
-              sessionResponse.data.session.user.email || ''
+              sessionResponse.data.session.user.email || '',
+              sessionResponse.data.session.user.user_metadata?.needs_password_set
             );
           }
 
@@ -341,7 +341,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       const { data: { subscription } } = subscribeToSupabaseAuthChanges(async (event, session) => {
         if (session?.user && event !== 'INITIAL_SESSION') {
-          const userAccount = await resolveSupabaseUserProfile(session.user.id, session.user.email || '');
+          const userAccount = await resolveSupabaseUserProfile(session.user.id, session.user.email || '', session.user.user_metadata?.needs_password_set);
           setCurrentUser(userAccount);
           setUserRole(userAccount.role);
           if (userAccount.tenantId) {
@@ -451,13 +451,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             playChime();
             showToast('🔔 ¡Nueva comanda o actualización recibida en tiempo real!');
           });
-        } else if (currentUser?.email) {
-          const liveOrders = await fetchLiveOrdersForCustomer(currentUser.email);
+        } else if (currentUser?.id && currentUser.role === 'customer') {
+          const liveOrders = await fetchLiveOrdersForCustomer(currentUser.id);
           if (liveOrders.length > 0) {
             setOrders(liveOrders);
           }
-          activeUnsub = subscribeToCustomerOrders(currentUser.email, async () => {
-            const updated = await fetchLiveOrdersForCustomer(currentUser.email!);
+          activeUnsub = subscribeToCustomerOrders(currentUser.id, async () => {
+            const updated = await fetchLiveOrdersForCustomer(currentUser.id!);
             setOrders(updated);
             showToast('🚴 El estado de tu pedido ha sido actualizado por la cocina.');
           });
@@ -1201,11 +1201,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const reviewRestaurantApplication = (
+  const reviewRestaurantApplication = async (
     applicationId: string,
     nextStatus: 'reviewing' | 'approved' | 'rejected',
     reviewNote?: string
-  ): boolean => {
+  ): Promise<boolean> => {
     if (!isPlatformAdmin(currentUser)) {
       showToast('⚠️ No tienes autorización para revisar solicitudes de restaurante.');
       return false;
@@ -1227,14 +1227,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
+    if (authMode === 'remote' && isSupabaseConfigured && currentUser?.id) {
+      // In remote mode, persist to Supabase FIRST
+      const success = await updateLiveApplicationStatus(applicationId, nextStatus, currentUser.id, reviewNote);
+      if (!success) {
+        showToast('⚠️ Error al actualizar el estado en el servidor. Inténtalo nuevamente.');
+        return false;
+      }
+    }
+
     const reviewerEmail = currentUser.email;
+    const now = Date.now();
 
     setRestaurantApplications(prev => prev.map(app => {
       if (app.id === applicationId) {
         return {
           ...app,
           status: nextStatus,
-          reviewedAt: Date.now(),
+          reviewedAt: now,
           reviewedByEmail: reviewerEmail,
           reviewNote: reviewNote?.trim() || undefined
         };
@@ -1293,7 +1303,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...app,
             activatedAt: Date.now(),
             activatedByEmail: reviewerEmail,
-            activatedTenantId: 'created_in_db'
+            activatedTenantId: data.tenantId || 'created_in_db'
           };
         }
         return app;
@@ -1301,7 +1311,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const apiMsg = data?.message || `¡Restaurante "${targetApp.restaurantName}" creado exitosamente!`;
       showToast(`🎉 ${apiMsg}`);
-      return { success: true, message: apiMsg };
+      return { success: true, message: apiMsg, tenantId: data.tenantId };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al procesar la activación en la nube.';
       showToast(`⚠️ ${msg}`);
