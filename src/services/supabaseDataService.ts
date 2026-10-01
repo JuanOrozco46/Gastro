@@ -19,8 +19,7 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
   try {
     const { data, error } = await supabase
       .from('restaurants')
-      .select(`id, slug, name, category, description, address, phone, whatsapp, city_id, zone_id, status, is_open, delivery_modes, min_order, delivery_fee, delivery_radius_km, commission_rate`)
-      .eq('status', 'active');
+      .select(`id, slug, name, category, description, address, phone, whatsapp, city_id, zone_id, status, is_open, delivery_modes, min_order, delivery_fee, delivery_radius_km, commission_rate`);
 
     if (error || !data) {
       console.warn('⚠️ Error al cargar restaurantes de Supabase:', error);
@@ -31,8 +30,8 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
     
     return (data as unknown as DbRestaurant[]).map(mapDbRestaurantToTenant).filter(t => {
       // Filter out tenants with no valid delivery modes or missing required fields
-      if (!t.name || !t.id || !t.cityId || !t.zoneId) {
-        console.warn(`⚠️ Omitiendo restaurante inválido (datos faltantes): ${t.id || 'desconocido'}`);
+      if (!t.name || !t.id) {
+        console.warn(`⚠️ Omitiendo restaurante inválido (sin ID o nombre): ${t.id || 'desconocido'}`);
         return false;
       }
       
