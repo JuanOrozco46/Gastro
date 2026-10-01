@@ -451,7 +451,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             playChime();
             showToast('🔔 ¡Nueva comanda o actualización recibida en tiempo real!');
           });
-        } else if (currentUser?.id && currentUser.role === 'customer') {
+        } else if (currentUser?.id && currentUser.businessRole === 'customer') {
           const liveOrders = await fetchLiveOrdersForCustomer(currentUser.id);
           if (liveOrders.length > 0) {
             setOrders(liveOrders);
