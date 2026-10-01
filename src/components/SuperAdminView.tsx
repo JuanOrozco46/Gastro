@@ -26,6 +26,7 @@ export const SuperAdminView: React.FC = () => {
     restaurantName: string;
     ownerEmail: string;
     tenantId: string;
+    message?: string;
   } | null>(null);
 
   // Access guard
@@ -90,11 +91,12 @@ export const SuperAdminView: React.FC = () => {
     if (!app) return;
 
     const res = await activateApprovedRestaurant(appId);
-    if (res.success && res.tenantId) {
+    if (res.success) {
       setActivationSuccessInfo({
         restaurantName: app.restaurantName,
         ownerEmail: app.ownerEmail,
-        tenantId: res.tenantId
+        tenantId: res.tenantId || 'creado',
+        message: res.message
       });
       setActivatingAppId(null);
     } else if (res.error) {
@@ -443,7 +445,7 @@ export const SuperAdminView: React.FC = () => {
                               </div>
 
                               <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '10px 12px', borderRadius: '10px', fontSize: '0.78rem', color: '#FCD34D', marginBottom: '12px', lineHeight: 1.4 }}>
-                                ⚠️ <strong>Aviso Importante:</strong> Al confirmar, se creará el restaurante en la base de datos y se enviará una <strong>Invitación Oficial</strong> al correo del dueño para que establezca su propia contraseña segura.
+                                ⚠️ <strong>Aviso Importante:</strong> Al confirmar, se creará el restaurante en la base de datos y <strong>se generará una contraseña temporal</strong> para el usuario si es nuevo. Deberás comunicarle esta contraseña al dueño.
                               </div>
 
                               {activationError && (
@@ -628,6 +630,11 @@ export const SuperAdminView: React.FC = () => {
               <div style={{ marginBottom: '4px' }}>👤 Correo del dueño: <code style={{ color: '#38BDF8' }}>{activationSuccessInfo.ownerEmail}</code></div>
               <div style={{ marginBottom: '4px' }}>🏬 ID de Restaurante: <code style={{ color: 'white' }}>{activationSuccessInfo.tenantId}</code></div>
               <div>🔒 Estado inicial: <span style={{ color: '#F59E0B', fontWeight: 700 }}>Cerrado temporalmente (0 productos)</span></div>
+              {activationSuccessInfo.message && (
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed rgba(255,255,255,0.1)', color: '#10B981', fontWeight: 700, fontSize: '0.85rem' }}>
+                  🔑 {activationSuccessInfo.message}
+                </div>
+              )}
             </div>
             <button
               className="btn btn-primary"

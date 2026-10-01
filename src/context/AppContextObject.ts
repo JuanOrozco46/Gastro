@@ -53,7 +53,7 @@ export interface AppContextType {
   assignDriverToOrder: (orderId: string, driverId: string) => void;
   submitRestaurantApplication: (applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status' | 'cityId'>) => boolean;
   reviewRestaurantApplication: (applicationId: string, nextStatus: 'reviewing' | 'approved' | 'rejected', reviewNote?: string) => boolean;
-  activateApprovedRestaurant: (applicationId: string) => Promise<{ success: boolean; tenantId?: string; error?: string }>;
+  activateApprovedRestaurant: (applicationId: string) => Promise<{ success: boolean; tenantId?: string; error?: string; message?: string }>;
   showToast: (message: string) => void;
   triggerTestOrder: () => void;
   logout: () => void;

@@ -69,16 +69,36 @@ serve(async (req) => {
       );
     }
 
-    // 1. Enviar Invitación al Usuario
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      application.owner_email.trim()
-    )
+    // 1. Crear Usuario o Vincular Existente
+    let newOwnerId = '';
+    let successMsg = '';
+    
+    // Primero, verificamos si el usuario ya existe
+    const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const existingUser = listData?.users.find(u => u.email === application.owner_email.trim());
+    
+    if (existingUser) {
+      newOwnerId = existingUser.id;
+      successMsg = 'Restaurante activado y vinculado a la cuenta existente del usuario.';
+    } else {
+      // Si no existe, lo invitamos y forzamos el cambio de contraseña
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        application.owner_email.trim()
+      );
 
-    if (inviteError) {
-      throw new Error('Error al enviar invitación al usuario.');
+      if (inviteError) {
+        throw new Error('Error al enviar invitación al usuario: ' + inviteError.message);
+      }
+
+      newOwnerId = inviteData.user.id;
+      
+      // Marcar al usuario para que cambie la contraseña obligatoriamente al iniciar sesión
+      await supabaseAdmin.auth.admin.updateUserById(newOwnerId, {
+        user_metadata: { needs_password_set: true }
+      });
+      
+      successMsg = `Restaurante activado. Se ha enviado un correo de invitación al dueño.`;
     }
-
-    const newOwnerId = inviteData.user.id;
 
     // 2. Generar un slug único
     const baseSlug = application.restaurant_name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'restaurante';
@@ -125,7 +145,7 @@ serve(async (req) => {
     }).eq('id', applicationId);
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Restaurante creado y usuario invitado con éxito.' }),
+      JSON.stringify({ success: true, message: successMsg }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: unknown) {

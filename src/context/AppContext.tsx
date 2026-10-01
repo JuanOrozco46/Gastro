@@ -1266,7 +1266,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     try {
       const { data, error } = await supabase!.functions.invoke('approve_restaurant', {
-        body: { application: targetApp }
+        body: { applicationId: targetApp.id }
       });
 
       if (error) throw error;
@@ -1286,8 +1286,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return app;
       }));
 
-      showToast(`🎉 ¡Restaurante "${targetApp.restaurantName}" creado! Invitación enviada a ${targetApp.ownerEmail}.`);
-      return { success: true };
+      const apiMsg = data?.message || `¡Restaurante "${targetApp.restaurantName}" creado exitosamente!`;
+      showToast(`🎉 ${apiMsg}`);
+      return { success: true, message: apiMsg };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al procesar la activación en la nube.';
       showToast(`⚠️ ${msg}`);

@@ -34,6 +34,8 @@ const ViewLoader: React.FC = () => (
   </div>
 );
 
+import { ForcePasswordModal } from './components/ForcePasswordModal';
+
 const MainContent: React.FC = () => {
   const { userRole, isAuthLoading } = useApp();
 
@@ -47,6 +49,7 @@ const MainContent: React.FC = () => {
 
   return (
     <main>
+      <ForcePasswordModal />
       <Suspense fallback={<ViewLoader />}>
         {userRole === 'client_delivery' && <CustomerDeliveryApp />}
         {userRole === 'kitchen' && <KitchenPanel />}
