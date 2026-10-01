@@ -16,7 +16,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
   selectedZone,
   onSelectTenantAndGoToFeed
 }) => {
-  const { tenants, products, addToCart, setCurrentTenantBySlug } = useApp();
+  const { tenants, products, addToCart, setCurrentTenantBySlug, isCatalogLoading, catalogError } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
@@ -99,7 +99,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
       <div 
         className="directory-hero"
         style={{
-          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
+          background: 'linear-gradient(135deg, var(--glass-dark), rgba(30, 41, 59, 0.95))',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '32px',
@@ -108,34 +108,33 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
       >
         <div className="directory-hero-content">
           <div className="directory-hero-badge" style={{ background: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)', color: '#10B981' }}>
-            <ShieldCheck size={16} /> DOMICILIOS DIRECTOS • COMISIONES JUSTAS 3%
+            <ShieldCheck size={16} /> PEDIDOS DIRECTOS · COMISIÓN JUSTA DEL 3%
           </div>
-          <h2 className="directory-hero-title" style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 900 }}>
-            Directorio de Locales & Restaurantes Aliados
+          <h2 className="directory-hero-title" style={{ fontFamily: "var(--font-heading)", fontWeight: 900 }}>
+            Restaurantes en Armenia
           </h2>
           <p className="directory-hero-subtitle">
-            Conecta directamente con las mejores cocinas independientes. Tu compra apoya 100% al comercio local y llega más rápido.
+            Explora las cocinas independientes de tu ciudad. Tu compra apoya directamente al comercio local.
           </p>
           <div className="directory-hero-stats">
             <div className="hero-stat-item">
               <span className="stat-value">{tenants.length}</span>
-              <span className="stat-label">Comercios Aliados</span>
+              <span className="stat-label">Restaurantes</span>
             </div>
             <div className="hero-stat-divider" />
             <div className="hero-stat-item">
               <span className="stat-value">⭐ 4.8</span>
-              <span className="stat-label">Calificación Promedio</span>
+              <span className="stat-label">Calificación</span>
             </div>
             <div className="hero-stat-divider" />
             <div className="hero-stat-item">
-              <span className="stat-value">97%</span>
-              <span className="stat-label">Directo al Restaurante</span>
+              <span className="stat-value">3%</span>
+              <span className="stat-label">Comisión</span>
             </div>
           </div>
         </div>
 
-        {/* Featured Spotlight Card */}
-        {featuredTenant && (
+        {featuredTenant && !isCatalogLoading && !catalogError && (
           <motion.div 
             whileHover={{ scale: 1.02 }}
             className="hero-spotlight-card"
@@ -183,7 +182,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
       <div 
         className="directory-controls-card"
         style={{
-          background: 'rgba(15, 23, 42, 0.8)',
+          background: 'var(--glass-medium)',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '24px'
@@ -213,7 +212,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
               <span className="sort-label">Ordenar:</span>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as 'rating' | 'distance' | 'time')}
                 className="sort-select"
               >
                 <option value="rating">⭐ Mejor Valorados</option>
@@ -294,12 +293,48 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
       </div>
 
       {/* Directory Content List/Grid */}
-      {tenants.length === 0 ? (
-        <div className="directory-empty-state" style={{ background: 'rgba(15, 23, 42, 0.75)', borderColor: 'rgba(255, 85, 51, 0.2)', color: 'var(--text-muted)', padding: '3.5rem 2rem' }}>
+      {isCatalogLoading ? (
+        <div 
+          style={{
+            textAlign: 'center',
+            padding: '4rem 2rem',
+            background: 'var(--glass-light)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '24px',
+            color: 'var(--text-muted)'
+          }}
+        >
+          <div className="gf-spinner" style={{ margin: '0 auto 1rem', width: '36px', height: '36px', border: '3px solid var(--primary-glass-border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          <h3 style={{ fontSize: '1.4rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
+            Cargando el directorio...
+          </h3>
+          <p style={{ fontSize: '0.92rem' }}>Explorando las mejores cocinas independientes para ti.</p>
+        </div>
+      ) : catalogError ? (
+        <div 
+          style={{
+            textAlign: 'center',
+            padding: '4rem 2rem',
+            background: 'var(--glass-light)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            borderRadius: '24px',
+            color: 'var(--text-muted)'
+          }}
+        >
+          <X size={54} style={{ color: '#EF4444', margin: '0 auto 1rem' }} />
+          <h3 style={{ fontSize: '1.4rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
+            No fue posible cargar los restaurantes
+          </h3>
+          <p style={{ fontSize: '0.92rem' }}>{catalogError}</p>
+        </div>
+      ) : tenants.length === 0 ? (
+        <div className="directory-empty-state" style={{ background: 'var(--glass-light)', borderColor: 'var(--primary-glass-border)', color: 'var(--text-muted)', padding: '3.5rem 2rem' }}>
           <Store size={52} className="empty-icon" style={{ color: 'var(--primary)' }} />
-          <h3 style={{ color: 'white', marginTop: '1rem', fontWeight: 900 }}>Aún no hay restaurantes registrados en la plataforma</h3>
+          <h3 style={{ color: 'white', marginTop: '1rem', fontWeight: 900 }}>Aún no hay restaurantes registrados</h3>
           <p style={{ maxWidth: '460px', margin: '0.5rem auto 1.5rem', lineHeight: 1.5 }}>
-            ¡Sé el primero en vender con comisiones justas! Registra tu comercio en minutos para habilitar tu menú digital, pedidos QR y entregas a domicilio.
+            ¡Sé el primero en registrar tu restaurante! Empieza a recibir pedidos directos y gestiona tu menú digital.
           </p>
           <button
             className="btn btn-primary"
@@ -313,7 +348,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
           </button>
         </div>
       ) : filteredTenants.length === 0 ? (
-        <div className="directory-empty-state" style={{ background: 'rgba(15, 23, 42, 0.75)', borderColor: 'rgba(255, 255, 255, 0.1)', color: 'var(--text-muted)' }}>
+        <div className="directory-empty-state" style={{ background: 'var(--glass-light)', borderColor: 'rgba(255, 255, 255, 0.1)', color: 'var(--text-muted)' }}>
           <Store size={48} className="empty-icon" style={{ color: 'var(--primary)' }} />
           <h3 style={{ color: 'white', marginTop: '1rem' }}>No encontramos restaurantes con ese criterio</h3>
           <p>Intenta buscando con otro término o seleccionando la categoría "Todas".</p>
@@ -346,7 +381,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                 transition={{ duration: 0.25 }}
                 className={`tenant-card ${!tenant.isOpen ? 'tenant-closed' : ''}`}
                 style={{
-                  background: 'rgba(15, 23, 42, 0.85)',
+                  background: 'var(--glass-medium)',
                   backdropFilter: 'blur(20px)',
                   borderColor: 'rgba(255, 255, 255, 0.09)',
                   borderRadius: '24px'
@@ -485,7 +520,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
             exit={{ opacity: 0, scale: 0.9 }}
             className="modal-content tenant-modal" 
             style={{
-              background: 'rgba(15, 23, 42, 0.95)',
+              background: 'var(--glass-dark)',
               backdropFilter: 'blur(24px)',
               border: '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '28px',
@@ -529,13 +564,13 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                 </span>
               </div>
 
-              {/* Ethical Commission Card */}
+              {/* Direct payment info */}
               <div className="ethical-commission-banner" style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10B981', borderRadius: '16px' }}>
                 <ShieldCheck size={24} style={{ color: '#10B981', flexShrink: 0 }} />
                 <div>
-                  <strong>Comercio Ético GastroSync</strong>
+                  <strong>Compra directa</strong>
                   <p style={{ margin: '2px 0 0', color: 'var(--text-muted)' }}>
-                    Este local conserva el <strong>97% del valor de tu compra</strong> (vs. el 30% que cobran plataformas tradicionales).
+                    Con GastroSync, <strong>el 97% de tu compra</strong> va directamente al restaurante.
                   </p>
                 </div>
               </div>

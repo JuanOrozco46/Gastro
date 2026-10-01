@@ -161,7 +161,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
           maxWidth: '620px',
           maxHeight: '90vh',
           overflowY: 'auto',
-          background: 'rgba(15, 23, 42, 0.95)',
+          background: 'var(--glass-dark)',
           backdropFilter: 'blur(24px)',
           border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '28px',
@@ -220,7 +220,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
         ) : (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: 'rgba(255, 85, 51, 0.15)', border: '1px solid rgba(255, 85, 51, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: 'var(--primary-glow)', border: '1px solid var(--primary-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
                 <Building2 size={24} />
               </div>
               <div>
@@ -431,7 +431,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'rgba(255, 85, 51, 0.06)', border: '1px solid rgba(255, 85, 51, 0.2)', padding: '12px', borderRadius: '14px' }}
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'rgba(255, 85, 51, 0.06)', border: '1px solid var(--primary-glass-border)', padding: '12px', borderRadius: '14px' }}
                 >
                   <div>
                     <label htmlFor="deliveryFee" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>

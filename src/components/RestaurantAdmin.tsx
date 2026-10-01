@@ -31,7 +31,7 @@ export const RestaurantAdmin: React.FC = () => {
     products, toggleProductAvailability, addProduct, deleteProduct,
     drivers, addDriver,
     posts, createPost, deletePost, transactions,
-    orders, updateOrderStatus
+    orders, updateOrderStatus, authMode, showToast
   } = useApp();
 
   const operatingTenant = getOperationalTenant(currentUser, tenants);
@@ -73,7 +73,7 @@ export const RestaurantAdmin: React.FC = () => {
         style={{
           textAlign: 'center',
           padding: '4rem 2rem',
-          background: 'rgba(15, 23, 42, 0.85)',
+          background: 'var(--glass-medium)',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(239, 68, 68, 0.3)',
           borderRadius: '28px',
@@ -108,6 +108,10 @@ export const RestaurantAdmin: React.FC = () => {
 
   const handleAddProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (authMode === 'remote') {
+      showToast('⚠️ La edición remota del catálogo estará disponible en una próxima fase.');
+      return;
+    }
     if (!newName || !newPrice) return;
 
     addProduct({
@@ -143,6 +147,10 @@ export const RestaurantAdmin: React.FC = () => {
 
   const handleCreatePostSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (authMode === 'remote') {
+      showToast('⚠️ La edición remota del catálogo estará disponible en una próxima fase.');
+      return;
+    }
     if (!postDishName || !postDesc || !postPrice) return;
 
     const hashtagsArr = postHashtags
@@ -213,7 +221,7 @@ export const RestaurantAdmin: React.FC = () => {
         style={{ 
           padding: '1.75rem 2rem', 
           marginBottom: '1.75rem',
-          background: 'rgba(15, 23, 42, 0.85)',
+          background: 'var(--glass-medium)',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '28px'
@@ -339,7 +347,7 @@ export const RestaurantAdmin: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
           
           {/* Active Orders */}
-          <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '1.5rem' }}>
+          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'white', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -390,7 +398,7 @@ export const RestaurantAdmin: React.FC = () => {
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', background: 'rgba(255,85,51,0.15)', padding: '4px 10px', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-glow)', padding: '4px 10px', borderRadius: '12px' }}>
                             Estado: {order.status.toUpperCase()}
                           </span>
                           <strong style={{ fontSize: '1.05rem', color: 'white', fontWeight: 900 }}>
@@ -462,7 +470,7 @@ export const RestaurantAdmin: React.FC = () => {
 
           {/* Past Orders */}
           {pastOrders.length > 0 && (
-            <div className="card" style={{ background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.08)', borderRadius: '24px', padding: '1.5rem' }}>
+            <div className="card" style={{ background: 'var(--glass-light)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.08)', borderRadius: '24px', padding: '1.5rem' }}>
               <h4 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white', marginBottom: '1rem' }}>
                 Historial de Pedidos Completados / Cancelados ({pastOrders.length})
               </h4>
@@ -489,7 +497,7 @@ export const RestaurantAdmin: React.FC = () => {
         <div className="grid-2" style={{ gridTemplateColumns: '1.4fr 1fr', gap: '1.75rem' }}>
           
           {/* Creator Form */}
-          <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
             <div className="card-header">
               <div className="card-title" style={{ fontSize: '1.2rem', fontWeight: 900, color: 'white' }}>
                 <Sparkles size={20} style={{ color: 'var(--primary)' }} /> Publicar Foto o Reel para {operatingTenant.name}
@@ -669,7 +677,7 @@ export const RestaurantAdmin: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             
             {/* Live Card Preview */}
-            <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
               <div className="card-header">
                 <div className="card-title" style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white' }}>
                   <Eye size={18} /> Vista Previa en Vivo ({operatingTenant.name})
@@ -708,7 +716,7 @@ export const RestaurantAdmin: React.FC = () => {
             </div>
 
             {/* Published Posts Analytics */}
-            <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
               <div className="card-header">
                 <div className="card-title" style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white' }}>
                   📊 Publicaciones Activas ({tenantPosts.length})
@@ -737,7 +745,13 @@ export const RestaurantAdmin: React.FC = () => {
                       <button
                         className="btn btn-outline"
                         style={{ padding: '6px 10px', color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '10px' }}
-                        onClick={() => deletePost(p.id)}
+                        onClick={() => {
+                          if (authMode === 'remote') {
+                            showToast('⚠️ La edición remota del catálogo estará disponible en una próxima fase.');
+                            return;
+                          }
+                          deletePost(p.id);
+                        }}
                         title="Eliminar publicación"
                       >
                         <Trash2 size={14} />
@@ -757,7 +771,7 @@ export const RestaurantAdmin: React.FC = () => {
       {activeTab === 'analytics' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
           
-          <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '28px', padding: '2rem' }}>
+          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '28px', padding: '2rem' }}>
             <div className="card-header" style={{ marginBottom: '1.5rem' }}>
               <div>
                 <div className="card-title" style={{ fontSize: '1.3rem', fontWeight: 900, color: 'white' }}>
@@ -789,8 +803,7 @@ export const RestaurantAdmin: React.FC = () => {
                   <XAxis dataKey="day" stroke="#94A3B8" />
                   <YAxis stroke="#94A3B8" tickFormatter={val => `$${(val/1000).toFixed(0)}k`} />
                   <Tooltip 
-                    contentStyle={{ background: '#0F172A', borderColor: 'rgba(255,255,255,0.15)', borderRadius: '12px', color: 'white' }} 
-                    formatter={(value: any) => [`$${Number(value).toLocaleString('es-CO')} COP`, '']}
+                    formatter={(value: unknown) => [`$${Number(value || 0).toLocaleString('es-CO')} COP`, ''] as [string, string]}
                   />
                   <Area type="monotone" dataKey="ventas" name="Ventas Brutas" stroke="#FF5533" fillOpacity={1} fill="url(#colorVentas)" strokeWidth={3} />
                   <Area type="monotone" dataKey="ahorro" name="Dinero Ahorrado en Comisiones" stroke="#10B981" fillOpacity={1} fill="url(#colorAhorro)" strokeWidth={3} />
@@ -800,7 +813,7 @@ export const RestaurantAdmin: React.FC = () => {
           </div>
 
           <div className="grid-2">
-            <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
               <div className="card-header">
                 <div className="card-title" style={{ color: 'white', fontWeight: 900 }}>
                   🛡️ Comparativa de Tarifas: GastroSync vs. Rappi
@@ -820,7 +833,7 @@ export const RestaurantAdmin: React.FC = () => {
               </div>
             </div>
 
-            <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <ShieldCheck size={48} style={{ color: '#10B981', marginBottom: '1rem' }} />
               <h3 style={{ fontSize: '1.4rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
                 Modelo de Negocio Ético
@@ -836,7 +849,7 @@ export const RestaurantAdmin: React.FC = () => {
 
       {/* ── TAB 3: MENU PRODUCTS ── */}
       {activeTab === 'menu' && (
-        <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+        <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
           <div className="card-header">
             <div className="card-title" style={{ color: 'white', fontWeight: 900, fontSize: '1.2rem' }}>
               <Utensils size={22} style={{ color: 'var(--primary)' }} /> Menú de {operatingTenant.name} ({tenantProducts.length} Platos)
@@ -873,8 +886,7 @@ export const RestaurantAdmin: React.FC = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value as any)}
+                  onChange={(e) => setNewCategory(e.target.value as 'Platos Principales' | 'Bebidas' | 'Postres' | 'Entradas')}
                 >
                   <option value="Platos Principales">Platos Principales</option>
                   <option value="Entradas">Entradas</option>
@@ -940,14 +952,26 @@ export const RestaurantAdmin: React.FC = () => {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className={`btn ${product.available ? 'btn-secondary' : 'btn-outline'}`}
-                      onClick={() => toggleProductAvailability(product.id)}
+                      onClick={() => {
+                        if (authMode === 'remote') {
+                          showToast('⚠️ La edición remota del catálogo estará disponible en una próxima fase.');
+                          return;
+                        }
+                        toggleProductAvailability(product.id);
+                      }}
                       style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: 800, borderRadius: '12px' }}
                     >
                       {product.available ? '🟢 Disponible' : '🔴 Agotado'}
                     </motion.button>
                     <button
                       className="btn btn-outline"
-                      onClick={() => deleteProduct(product.id)}
+                      onClick={() => {
+                        if (authMode === 'remote') {
+                          showToast('⚠️ La edición remota del catálogo estará disponible en una próxima fase.');
+                          return;
+                        }
+                        deleteProduct(product.id);
+                      }}
                       style={{ padding: '8px 12px', color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '12px' }}
                       title="Eliminar plato"
                     >
@@ -966,7 +990,7 @@ export const RestaurantAdmin: React.FC = () => {
         <div className="grid-2" style={{ gap: '1.75rem' }}>
           
           {/* QR Generator */}
-          <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
             <div className="card-header">
               <div className="card-title" style={{ color: 'white', fontWeight: 900 }}><QrCode size={22} style={{ color: 'var(--primary)' }} /> QR de Mesas para {operatingTenant.name}</div>
             </div>
@@ -1005,7 +1029,7 @@ export const RestaurantAdmin: React.FC = () => {
           </div>
 
           {/* Delivery Drivers */}
-          <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
             <div className="card-header">
               <div className="card-title" style={{ color: 'white', fontWeight: 900 }}><Truck size={22} style={{ color: 'var(--secondary)' }} /> Repartidores Propios ({tenantDrivers.length})</div>
               <motion.button

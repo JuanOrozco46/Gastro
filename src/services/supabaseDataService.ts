@@ -1,5 +1,13 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Tenant, Product, Post, RestaurantApplication } from '../types';
+import type {
+  DbRestaurant, DbProduct, DbPost
+} from './supabaseTypes';
+import {
+  mapDbRestaurantToTenant,
+  mapDbProductToProduct,
+  mapDbPostToPost
+} from './supabaseTypes';
 
 /**
  * Servicio de Sincronización en Tiempo Real con Supabase.
@@ -11,7 +19,7 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
   try {
     const { data, error } = await supabase
       .from('restaurants')
-      .select('*')
+      .select(`id, slug, name, category, description, address, phone, whatsapp, city_id, zone_id, status, is_open, delivery_modes, min_order, delivery_fee, delivery_radius_km, commission_rate`)
       .eq('status', 'active');
 
     if (error || !data) {
@@ -19,37 +27,23 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
       return [];
     }
 
-    return data.map((t: any) => ({
-      id: t.id,
-      slug: t.slug || t.id,
-      name: t.name,
-      category: t.category || 'General',
-      logoEmoji: t.logo_emoji || '🍽️',
-      bannerUrl: t.banner_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80',
-      description: t.description || '',
-      address: t.address || 'Armenia, Quindío',
-      deliveryTime: t.estimated_delivery_minutes || '20-30 min',
-      priceRange: t.price_range || '$$',
-      minOrder: t.min_order || 15000,
-      specialties: t.specialties || [],
-      promotionBadge: t.promotion_badge,
-      salesWeekly: t.sales_weekly || 0,
-      rating: t.rating || 5.0,
-      distanceKm: t.distance_km || 1.0,
-      isNew: t.is_new ?? true,
-      commissionRate: t.commission_rate || 0.03,
-      tablesCount: t.tables_count || 5,
-      isOpen: t.is_open ?? true,
-      cityId: t.city_id || 'city_armenia_quindio',
-      zoneId: t.zone_id || 'zone_armenia_centro',
-      status: t.status || 'active',
-      deliveryModes: t.delivery_modes || ['pickup', 'restaurant_delivery'],
-      phone: t.phone,
-      whatsapp: t.whatsapp,
-      deliveryFee: t.delivery_fee || 3000,
-      deliveryRadiusKm: t.delivery_radius_km || 5
-    }));
-  } catch (err) {
+    const validModes = ['pickup', 'restaurant_delivery', 'table_service'];
+    
+    return (data as unknown as DbRestaurant[]).map(mapDbRestaurantToTenant).filter(t => {
+      // Filter out tenants with no valid delivery modes or missing required fields
+      if (!t.name || !t.id || !t.cityId || !t.zoneId) {
+        console.warn(`⚠️ Omitiendo restaurante inválido (datos faltantes): ${t.id || 'desconocido'}`);
+        return false;
+      }
+      
+      const validDeliveryModes = (t.deliveryModes || []).filter(m => validModes.includes(m));
+      if (validDeliveryModes.length !== (t.deliveryModes || []).length) {
+        console.warn(`⚠️ Limpiando deliveryModes inválidos para restaurante: ${t.id}`);
+        t.deliveryModes = validDeliveryModes as any;
+      }
+      return true;
+    });
+  } catch (err: unknown) {
     console.warn('⚠️ Excepción al consultar Supabase:', err);
     return [];
   }
@@ -60,22 +54,30 @@ export async function fetchLiveProducts(): Promise<Product[]> {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select(`id, restaurant_id, name, description, category, price_cop, available`)
       .eq('available', true);
 
     if (error || !data) return [];
 
-    return data.map((p: any) => ({
-      id: p.id,
-      tenantId: p.tenant_id,
-      name: p.name,
-      desc: p.desc || '',
-      price: p.price,
-      category: p.category || 'General',
-      emoji: p.emoji || '🍽️',
-      available: p.available ?? true
-    }));
-  } catch {
+    const validCategories = ['Platos Principales', 'Bebidas', 'Postres', 'Entradas'];
+
+    return (data as unknown as DbProduct[]).map(mapDbProductToProduct).filter(p => {
+      if (!p.tenantId || !p.id || !p.name) {
+        console.warn(`⚠️ Omitiendo producto inválido (datos faltantes): ${p.id || 'desconocido'}`);
+        return false;
+      }
+      if (p.price < 0 || p.price === null || isNaN(p.price)) {
+        console.warn(`⚠️ Omitiendo producto con precio inválido: ${p.id}`);
+        return false;
+      }
+      if (!validCategories.includes(p.category)) {
+        console.warn(`⚠️ Omitiendo producto con categoría desconocida: ${p.category} (${p.id})`);
+        return false;
+      }
+      return true;
+    });
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción al consultar Supabase (Products):', err);
     return [];
   }
 }
@@ -85,35 +87,24 @@ export async function fetchLivePosts(): Promise<Post[]> {
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select('*')
+      .select(`id, restaurant_id, product_id, title, description, media_url, media_type, price_cop, is_published, created_at`)
       .order('created_at', { ascending: false });
 
     if (error || !data) return [];
 
-    return data.map((post: any) => ({
-      id: post.id,
-      tenantId: post.tenant_id,
-      tenantName: post.tenant_name || 'Restaurante Aliado',
-      tenantCategory: post.tenant_category || 'Gastronomía',
-      tenantLogoEmoji: post.tenant_logo_emoji || '🍽️',
-      tenantAddress: post.tenant_address || 'Armenia, Quindío',
-      dishName: post.dish_name,
-      dishEmoji: post.dish_emoji || '🍕',
-      desc: post.desc || '',
-      hashtags: post.hashtags || [],
-      price: post.price,
-      image: post.image,
-      mediaType: post.media_type || 'photo',
-      videoId: post.video_id,
-      videoDuration: post.video_duration,
-      likes: post.likes || 0,
-      isLiked: false,
-      commentsCount: post.comments_count || 0,
-      comments: [],
-      timeAgo: post.time_ago || 'Reciente',
-      productId: post.product_id || ''
-    }));
-  } catch {
+    return (data as unknown as DbPost[]).map(mapDbPostToPost).filter(p => {
+      if (!p.tenantId || !p.id || !p.dishName) {
+        console.warn(`⚠️ Omitiendo publicación inválida (datos faltantes): ${p.id || 'desconocido'}`);
+        return false;
+      }
+      if (p.price < 0 || p.price === null || isNaN(p.price)) {
+        console.warn(`⚠️ Omitiendo publicación con precio inválido: ${p.id}`);
+        return false;
+      }
+      return true;
+    });
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción al consultar Supabase (Posts):', err);
     return [];
   }
 }
@@ -140,7 +131,8 @@ export async function submitLiveApplication(appData: Omit<RestaurantApplication,
     }]);
 
     return !error;
-  } catch {
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción al insertar aplicacion en Supabase:', err);
     return false;
   }
 }

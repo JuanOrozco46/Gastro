@@ -52,13 +52,24 @@ VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-### Paso 5: Reiniciar el Servidor de Desarrollo
+### Paso 5: Desplegar Secretos de Edge Functions (Wompi)
+Para la integración de pasarela de pagos con Wompi, configura los siguientes secretos en el backend de Supabase (usando Supabase CLI o el Dashboard en Edge Functions Secrets):
+```bash
+# Variables de entorno requeridas en el backend para crear intención de pago y validar webhook
+supabase secrets set WOMPI_PUBLIC_KEY="pub_test_..." 
+supabase secrets set WOMPI_PRIVATE_KEY="prv_test_..." 
+supabase secrets set WOMPI_INTEGRITY_SECRET="test_integrity_..." 
+supabase secrets set WOMPI_EVENTS_SECRET="test_events_..." 
+supabase secrets set WEBHOOK_SECRET="mi_secreto_local_webhook"
+```
+
+### Paso 6: Reiniciar el Servidor de Desarrollo
 Ejecuta en tu terminal:
 ```bash
 npm run dev
 ```
 
-### Paso 6: Asignar el Primer Administrador de Plataforma
+### Paso 7: Asignar el Primer Administrador de Plataforma
 1. Registra tu usuario en Supabase Auth.
 2. En el Dashboard, ve a **Authentication** -> **Users** y copia el **User UID** asignado.
 3. Abre el **SQL Editor** y ejecuta:
@@ -103,11 +114,56 @@ Para verificar que las políticas RLS aíslan correctamente la información entr
 
 ---
 
-## 5. Plan de Migración por Módulos (Roadmap)
+## 5. Estado Actual y Plan de Migración por Módulos (Roadmap)
 
-1. **Módulo 1 (Completado)**: Fundación Supabase, cliente pasivo Vite, esquema PostgreSQL versionado, parche de seguridad `002_security_hardening.sql` y pruebas RLS.
-2. **Módulo 2 (Siguiente)**: Integración de Supabase Auth en `AppContext` para login/registro real de clientes, dueños y cocina.
-3. **Módulo 3**: Migración e integración del feed gastronómico, restaurantes por zonas de Armenia y catálogos de menú.
-4. **Módulo 4**: Creación atómica de pedidos mediante función RPC transaccional e integración de comanda KDS en tiempo real.
-5. **Módulo 5**: Supabase Storage para carga de fotos de platos, banners y logos de restaurantes.
-6. **Módulo 6**: Edge Functions de Supabase para procesamiento de pagos y confirmación webhooks sin exponer secretos en el cliente.
+### 📌 Estado Actual (Fase Preparatoria)
+- **Fuente de Verdad**: El frontend todavía usa `localStorage` como fuente principal a través de `AppContext`.
+- **Servicios Preparados**: Los servicios de Supabase (`Data`, `Auth`, `Order`, `Storage`) están preparados con tipos canónicos, pero no están conectados globalmente.
+- **Bloqueos Preventivos**:
+  - El checkout remoto (`createLiveOrder`) invoca la RPC transaccional (`create_order_with_items`) que valida los precios en servidor y crea la orden atómicamente, rechazando cualquier precio enviado desde el cliente. El flujo local por defecto sigue intacto.
+  - Los ítems de pedido (`order_items`) están bloqueados para escritura directa desde el navegador por diseño.
+  - Los pagos (`payments`) no pueden escribirse desde el navegador por políticas RLS.
+  - Storage remoto ahora falla explícitamente devolviendo errores amigables si hay un problema, sin fallbacks silenciosos engañosos si Supabase está activo.
+- **Seguridad**: Las claves secretas y Service Role Keys solo se usan en backend/Edge Functions.
+
+### 🗺️ Próximos Módulos / Fases
+1. **Fase 1 (Completado)**: Fundación Supabase, cliente pasivo Vite, esquema PostgreSQL versionado, pruebas RLS, y tipado estricto de servicios.
+2. **Fase 2 (Completado)**: Integración progresiva de Supabase Auth en `AppContext` y `LoginScreen`, manteniendo fallback local seguro.
+3. **Fase 3 (Completado)**: Lectura remota progresiva de restaurantes, productos y publicaciones desde Supabase con manejo de estados de carga y error (`isCatalogLoading`, `catalogError`), deshabilitando escrituras remotas.
+4. **Fase 4 (Completado)**: Integración progresiva del checkout con la RPC segura `create_order_with_items`.
+5. **Fase 5 (Completado)**: Actualización de estados del pedido con Supabase Realtime y KDS Panel remoto.
+6. **Fase 6 (Completado)**: Pasarela de pagos Wompi Sandbox, con carga asíncrona segura, Webhooks y cálculo de Checksum backend.
+
+---
+
+## 6. Estado Real de Pruebas (Matriz de Verificación)
+
+Con el fin de mantener un registro honesto del progreso del proyecto, este es el estatus exacto de las validaciones de la integración Wompi:
+
+### Pruebas Estáticas y de Arquitectura (Verificadas 100%)
+* ✅ **Construcción y Linter:** Cero (0) Warnings, Cero (0) Errores comprobado usando `oxlint` y `tsc -b && vite build`.
+* ✅ **Seguridad del Frontend:** Carga asíncrona de widget limpiada con `isMounted`, ningún secreto incrustado en VITE, deshabilitación de declaración de pago exitoso desde cliente.
+* ✅ **Cálculo de Checksum (Webhook):** Algoritmo programado de acuerdo con la norma Wompi `timestamp` + `signature.properties` + `eventsSecret` con SHA-256.
+* ✅ **Idempotencia (Edge Functions):** Flujo y bloqueos previniendo repetición de órdenes o colisiones de intentos si la orden ya está pagada.
+
+### Pruebas Simuladas Localmente (Flujo Demo - Verificado 100%)
+* ✅ **Compatibilidad:** El modo Demo Local por localStorage se mantiene 100% funcional. Las cuentas demo navegan por Checkout, Carrito y Modal de Pago falso sin fallos. 
+* ✅ **Fallback Visual:** La UI sabe manejar perfectamente los estados de "Pendiente" e informar reintentos dentro de `PaymentModal.tsx`.
+
+### Pruebas End-to-End en Nube (Fase 7 - Bloqueadas por Credenciales)
+Dado que **no se configuraron credenciales Sandbox Reales de Wompi ni se enlazó el proyecto de Supabase en `.env.local`**, el flujo E2E ha sido **BLOQUEADO**.
+
+**Matriz de Pruebas Fase 7:**
+
+| Prueba | Modo | Resultado | Evidencia | Pendiente |
+|---|---|---|---|---|
+| Construcción sin secretos (Lint/Build) | Local | **APROBADA** | 0 warnings, 0 errors, build OK (459ms). | Ninguno. |
+| Exclusión de .env.local | Git | **APROBADA** | `.env.local` y `*.local` presentes en `.gitignore`. | Ninguno. |
+| Validar falta de secrets VITE_* | Codebase | **APROBADA** | `grep` en `src/` confirma que solo existe `VITE_SUPABASE_URL` y `ANON_KEY`. | Ninguno. |
+| Pago Aprobado (Flujo Remoto) | Remoto | **NO EJECUTADA** | N/A (Faltan credenciales Supabase/Wompi). | Inyectar keys, ejecutar y validar webhook status. |
+| Pago Rechazado / Fallido | Remoto | **NO EJECUTADA** | N/A (Faltan credenciales Supabase/Wompi). | Probar transacciones declinadas. |
+| Reintento de Pago (Retry) | Remoto | **NO EJECUTADA** | N/A (Faltan credenciales Supabase/Wompi). | Probar llamada a `retryRemotePayment`. |
+| Webhook Duplicado / Firma Inválida | Remoto | **NO EJECUTADA** | N/A (Faltan credenciales Supabase/Wompi). | Simular POST a Edge Function con firmas inválidas. |
+| Supabase Realtime (KDS/MyOrders) | Remoto | **NO EJECUTADA** | N/A (Faltan credenciales Supabase/Wompi). | Verificar que la UI reacciona a los updates en PostgreSQL. |
+
+**Nota técnica:** Las migraciones 001 a 010 están validadas estáticamente, al igual que las Edge Functions. Sin embargo, **el sistema AÚN NO ESTÁ LISTO PARA PRODUCCIÓN** sin ejecutar el grupo de pruebas "NO EJECUTADA" con tokens de sandbox en un entorno live.

@@ -1,9 +1,14 @@
+export { isSupabaseConfigured } from '../lib/supabase';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { UserAccount } from '../types';
 
+export type SupabaseAuthMode = 'remote' | 'demo';
+export type AuthUser = UserAccount;
+export type AuthError = unknown;
+
 export interface AuthActionResult {
   success: boolean;
-  user?: UserAccount;
+  user?: AuthUser;
   error?: string;
 }
 
@@ -40,7 +45,7 @@ function translateAuthError(errMessage: string): string {
  * Consulta las tablas `public.profiles` y `public.restaurant_members`
  * para determinar el rol del usuario autenticado en la plataforma.
  */
-export async function fetchUserProfileAndRole(userId: string, email: string): Promise<UserAccount> {
+export async function resolveSupabaseUserProfile(userId: string, email: string): Promise<UserAccount> {
   if (!isSupabaseConfigured || !supabase) {
     return {
       email,
@@ -104,7 +109,7 @@ export async function fetchUserProfileAndRole(userId: string, email: string): Pr
       role: 'client_delivery',
       businessRole: 'customer'
     };
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn('⚠️ Error al resolver perfil de Supabase:', err);
     return {
       email,
@@ -118,7 +123,7 @@ export async function fetchUserProfileAndRole(userId: string, email: string): Pr
 /**
  * Inicia sesión con correo y contraseña en Supabase Auth.
  */
-export async function signInWithEmailPassword(email: string, pass: string): Promise<AuthActionResult> {
+export async function signInWithSupabase(email: string, pass: string): Promise<AuthActionResult> {
   if (!isSupabaseConfigured || !supabase) {
     return { success: false, error: 'Supabase no está configurado.' };
   }
@@ -133,17 +138,18 @@ export async function signInWithEmailPassword(email: string, pass: string): Prom
       return { success: false, error: translateAuthError(error?.message || '') };
     }
 
-    const userAccount = await fetchUserProfileAndRole(data.user.id, data.user.email || email);
+    const userAccount = await resolveSupabaseUserProfile(data.user.id, data.user.email || email);
     return { success: true, user: userAccount };
-  } catch (err: any) {
-    return { success: false, error: translateAuthError(err?.message || '') };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: translateAuthError(msg) };
   }
 }
 
 /**
  * Registra un nuevo usuario cliente en Supabase Auth y crea su perfil en `public.profiles`.
  */
-export async function signUpCustomer(email: string, pass: string, fullName: string): Promise<AuthActionResult> {
+export async function signUpWithSupabase(email: string, pass: string, fullName: string): Promise<AuthActionResult> {
   if (!isSupabaseConfigured || !supabase) {
     return { success: false, error: 'Supabase no está configurado.' };
   }
@@ -181,8 +187,9 @@ export async function signUpCustomer(email: string, pass: string, fullName: stri
     };
 
     return { success: true, user: userAccount };
-  } catch (err: any) {
-    return { success: false, error: translateAuthError(err?.message || '') };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: translateAuthError(msg) };
   }
 }
 
@@ -207,8 +214,9 @@ export async function signInWithGoogleOAuth(): Promise<{ success: boolean; error
     }
 
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: translateAuthError(err?.message || '') };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: translateAuthError(msg) };
   }
 }
 
@@ -230,20 +238,38 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
     }
 
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: translateAuthError(err?.message || '') };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: translateAuthError(msg) };
   }
 }
 
 /**
  * Cierra la sesión activa en Supabase Auth.
  */
-export async function signOutUser(): Promise<void> {
+export async function signOutFromSupabase(): Promise<void> {
   if (isSupabaseConfigured && supabase) {
     try {
       await supabase.auth.signOut();
-    } catch (err) {
+    } catch (err: unknown) {
       console.warn('⚠️ Error al cerrar sesión en Supabase:', err);
     }
   }
+}
+
+export async function getCurrentSupabaseSession() {
+  if (!isSupabaseConfigured || !supabase) return { data: { session: null } };
+  try {
+    return await supabase.auth.getSession();
+  } catch (err: unknown) {
+    console.warn('⚠️ Error al obtener sesión actual:', err);
+    return { data: { session: null } };
+  }
+}
+
+export function subscribeToSupabaseAuthChanges(callback: (event: string, session: any) => void) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: { subscription: { unsubscribe: () => {} } } };
+  }
+  return supabase.auth.onAuthStateChange(callback);
 }

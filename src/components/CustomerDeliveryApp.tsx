@@ -248,7 +248,8 @@ const PostCard: React.FC<PostCardProps> = ({
 export const CustomerDeliveryApp: React.FC = () => {
   const {
     cities, zones, tenants, posts, toggleLikePost, products,
-    addToCart, removeFromCart, cart, setCurrentTenantBySlug, orders
+    addToCart, removeFromCart, cart, setCurrentTenantBySlug, orders,
+    isCatalogLoading, catalogError
   } = useApp();
 
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -423,8 +424,8 @@ export const CustomerDeliveryApp: React.FC = () => {
       {/* ── Top Nav Bar ── */}
       <div className="gf-top-bar">
         <div className="gf-top-left">
-          <h2 className="gf-page-title">📸 Feed Gastronómico</h2>
-          <p className="gf-page-sub">Descubre, disfruta y pide directamente al restaurante</p>
+          <h2 className="gf-page-title">¿Qué se te antoja hoy?</h2>
+          <p className="gf-page-sub">Explora sabores cerca de ti en Armenia</p>
         </div>
         <div className="gf-tab-pills">
           <button className={`gf-tab-pill ${activeTab === 'feed' ? 'active' : ''}`} onClick={() => setActiveTab('feed')}>
@@ -445,7 +446,7 @@ export const CustomerDeliveryApp: React.FC = () => {
           {/* ── Zone Selector Bar ── */}
           <div 
             style={{
-              background: 'rgba(15, 23, 42, 0.75)',
+              background: 'var(--glass-light)',
               backdropFilter: 'blur(16px)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '20px',
@@ -459,7 +460,7 @@ export const CustomerDeliveryApp: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ 
-                  background: 'rgba(255, 85, 51, 0.15)', 
+                  background: 'var(--primary-glow)', 
                   color: 'var(--primary)', 
                   padding: '6px', 
                   borderRadius: '10px',
@@ -471,7 +472,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                 </div>
                 <div>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Ciudad Piloto
+                    Armenia
                   </span>
                   <strong style={{ fontSize: '0.9rem', color: 'white', display: 'block', fontWeight: 800 }}>
                     {activeCity ? `${activeCity.name}, Quindío` : 'Armenia, Quindío'}
@@ -495,7 +496,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                     fontSize: '0.82rem',
                     fontWeight: 800,
                     border: selectedZone === 'all' ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.1)',
-                    background: selectedZone === 'all' ? 'rgba(255, 85, 51, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    background: selectedZone === 'all' ? 'var(--primary-glass-border)' : 'rgba(255, 255, 255, 0.04)',
                     color: selectedZone === 'all' ? 'white' : 'var(--text-muted)',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
@@ -519,7 +520,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                         fontSize: '0.82rem',
                         fontWeight: 800,
                         border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.1)',
-                        background: isSelected ? 'rgba(255, 85, 51, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                        background: isSelected ? 'var(--primary-glass-border)' : 'rgba(255, 255, 255, 0.04)',
                         color: isSelected ? 'white' : 'var(--text-muted)',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
@@ -678,14 +679,52 @@ export const CustomerDeliveryApp: React.FC = () => {
 
             {/* Posts column */}
             <div className="gf-posts-column">
-              {tenants.length === 0 ? (
+              {isCatalogLoading ? (
                 <div 
                   style={{
                     textAlign: 'center',
                     padding: '3.5rem 2rem',
-                    background: 'rgba(15, 23, 42, 0.75)',
+                    background: 'var(--glass-light)',
                     backdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(255, 85, 51, 0.2)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '24px',
+                    color: 'var(--text-muted)',
+                    margin: '1rem 0'
+                  }}
+                >
+                  <div className="gf-spinner" style={{ margin: '0 auto 1rem', width: '32px', height: '32px', border: '3px solid var(--primary-glass-border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  <h3 style={{ fontSize: '1.2rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
+                    Cargando catálogo...
+                  </h3>
+                  <p style={{ fontSize: '0.88rem' }}>Estamos preparando las mejores opciones gastronómicas para ti.</p>
+                </div>
+              ) : catalogError ? (
+                <div 
+                  style={{
+                    textAlign: 'center',
+                    padding: '3.5rem 2rem',
+                    background: 'var(--glass-light)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    borderRadius: '24px',
+                    color: 'var(--text-muted)',
+                    margin: '1rem 0'
+                  }}
+                >
+                  <X size={48} style={{ color: '#EF4444', margin: '0 auto 1rem' }} />
+                  <h3 style={{ fontSize: '1.2rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
+                    Oops, algo salió mal
+                  </h3>
+                  <p style={{ fontSize: '0.88rem' }}>{catalogError}</p>
+                </div>
+              ) : tenants.length === 0 ? (
+                <div 
+                  style={{
+                    textAlign: 'center',
+                    padding: '3.5rem 2rem',
+                    background: 'var(--glass-light)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid var(--primary-glass-border)',
                     borderRadius: '24px',
                     color: 'var(--text-muted)',
                     margin: '1rem 0'
@@ -693,10 +732,10 @@ export const CustomerDeliveryApp: React.FC = () => {
                 >
                   <Building2 size={48} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
                   <h3 style={{ fontSize: '1.3rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
-                    🚀 GastroSync Armenia está listo para despegar
+                    🚀 Pronto en GastroSync Armenia
                   </h3>
                   <p style={{ fontSize: '0.88rem', maxWidth: '440px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
-                    Actualmente no hay restaurantes aliados activos registrados. Los administradores están revisando las nuevas solicitudes de vinculación.
+                    Aún no hay restaurantes aliados activos. Pronto podrás descubrir los mejores sabores de Armenia aquí.
                   </p>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
                     ¿Tienes un restaurante o negocio gastronómico en Armenia?
@@ -718,7 +757,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                   style={{
                     textAlign: 'center',
                     padding: '3.5rem 2rem',
-                    background: 'rgba(15, 23, 42, 0.75)',
+                    background: 'var(--glass-light)',
                     backdropFilter: 'blur(16px)',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
                     borderRadius: '24px',
@@ -838,8 +877,8 @@ export const CustomerDeliveryApp: React.FC = () => {
               {/* No ads banner */}
               <div className="gf-no-ads-card">
                 <div className="gf-no-ads-icon">🚫📢</div>
-                <p><strong>Sin anuncios pagados.</strong> Cada post que ves aquí es contenido real de restaurantes aliados. Sin algoritmos de pago, sin comisiones abusivas.</p>
-                <a href="#" className="gf-no-ads-link">¿Eres restaurante? Únete gratis <ExternalLink size={11} /></a>
+                <p><strong>Contenido real de restaurantes.</strong> Lo que ves aquí son publicaciones directas de los locales aliados en Armenia.</p>
+                <a href="#" className="gf-no-ads-link">¿Eres restaurante? Únete <ExternalLink size={11} /></a>
               </div>
 
             </aside>
@@ -856,7 +895,7 @@ export const CustomerDeliveryApp: React.FC = () => {
           <div className="my-orders-page-header">
             <div>
               <h2 className="feed-page-title">📦 Mis Pedidos</h2>
-              <p className="feed-page-subtitle">Seguimiento en tiempo real de tus pedidos activos.</p>
+              <p className="feed-page-subtitle">Sigue el estado de tus pedidos en tiempo real</p>
             </div>
             {activeOrdersCount > 0 && (
               <div className="active-orders-alert">

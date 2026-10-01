@@ -25,7 +25,7 @@ const ViewLoader: React.FC = () => (
     <div style={{
       width: '40px',
       height: '40px',
-      border: '3px solid rgba(255, 85, 51, 0.2)',
+      border: '3px solid var(--primary-glass-border)',
       borderTopColor: 'var(--primary)',
       borderRadius: '50%',
       animation: 'spin 0.8s linear infinite'

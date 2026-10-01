@@ -248,6 +248,8 @@ export interface Order {
   driverId?: string;
   paymentMethod?: PaymentMethod;
   transactionId?: string;
+  paymentId?: string;
+  paymentStatus?: string;
   // Extended domain fields for order fulfillment and delivery
   fulfillment?: OrderFulfillment;
   customerId?: string;

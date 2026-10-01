@@ -5,8 +5,9 @@ import { AppContext } from './AppContextObject';
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication } from '../services/supabaseDataService';
-import { signInWithEmailPassword, signUpCustomer, signInWithGoogleOAuth, sendPasswordResetEmail, signOutUser, fetchUserProfileAndRole } from '../services/supabaseAuthService';
-import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders } from '../services/supabaseOrderService';
+import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
+import { DEMO_ACCOUNTS } from './demoAccounts';
+import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment } from '../services/supabaseOrderService';
 
 // Internal typed authorization helpers
 const isRestaurantOwner = (user: UserAccount | null): boolean => {
@@ -178,6 +179,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [cities] = useState<City[]>(DEFAULT_CITIES);
   const [zones] = useState<Zone[]>(DEFAULT_ZONES);
 
+  const authMode: 'remote' | 'demo' = isSupabaseConfigured ? 'remote' : 'demo';
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(isSupabaseConfigured);
+  const [isCatalogLoading, setIsCatalogLoading] = useState<boolean>(isSupabaseConfigured);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  
+  const [remoteTenants, setRemoteTenants] = useState<Tenant[]>([]);
+  const remoteTenantsRef = React.useRef<Tenant[]>([]);
+  const [remoteProducts, setRemoteProducts] = useState<Product[]>([]);
+  const [remotePosts, setRemotePosts] = useState<Post[]>([]);
+
   const [tenants, setTenants] = useState<Tenant[]>(() => {
     try {
       const saved = localStorage.getItem('gs_tenants_v5');
@@ -188,6 +201,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [initialSession] = useState<UserAccount | null>(() => validateCachedSession());
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(initialSession);
+  const [userRole, setUserRole] = useState<UserRole>(initialSession ? initialSession.role : 'login');
 
   const [currentTenant, setCurrentTenant] = useState<Tenant>(() => {
     if (initialSession?.tenantId) {
@@ -212,10 +227,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
     loadRealTenants();
-  }, []);
-
-  const [currentUser, setCurrentUser] = useState<UserAccount | null>(initialSession);
-  const [userRole, setUserRole] = useState<UserRole>(initialSession ? initialSession.role : 'login');
+  }, [currentUser?.tenantId]);
 
   const [products, setProducts] = useState<Product[]>(() => {
     try {
@@ -250,47 +262,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try { localStorage.setItem('gs_posts_v5', JSON.stringify(posts)); } catch {}
   }, [posts]);
 
-  // Carga inicial desde Supabase cuando las credenciales de producción están configuradas
+  // Carga inicial de datos desde Supabase
   useEffect(() => {
-    if (isSupabaseConfigured) {
+    if (authMode === 'remote') {
+      let isSubscribed = true;
+
       Promise.all([
         fetchLiveTenants(),
         fetchLiveProducts(),
-        fetchLivePosts()
-      ]).then(([liveTenants, liveProducts, livePosts]) => {
-        setTenants(liveTenants);
-        setProducts(liveProducts);
-        setPosts(livePosts);
-        if (liveTenants.length > 0) {
-          setCurrentTenant(liveTenants[0]);
+        fetchLivePosts(),
+        getCurrentSupabaseSession()
+      ]).then(async ([liveTenants, liveProducts, livePosts, sessionResponse]) => {
+        if (!isSubscribed) return;
+        
+        setRemoteTenants(liveTenants);
+        remoteTenantsRef.current = liveTenants;
+        setRemoteProducts(liveProducts);
+        setRemotePosts(livePosts);
+        
+        setCurrentTenant(prev => {
+          if (prev.id === EMPTY_TENANT.id && liveTenants.length > 0) {
+            return liveTenants[0];
+          }
+          return prev;
+        });
+
+        if (sessionResponse.data.session?.user) {
+          const userAccount = await resolveSupabaseUserProfile(
+            sessionResponse.data.session.user.id,
+            sessionResponse.data.session.user.email || ''
+          );
+          if (userAccount && isSubscribed) {
+            setCurrentUser(userAccount);
+            setUserRole(userAccount.role);
+            if (userAccount.tenantId) {
+              const match = liveTenants.find(t => t.id === userAccount.tenantId);
+              if (match) setCurrentTenant(match);
+            }
+          } else if (isSubscribed) {
+            await signOutFromSupabase();
+          }
         }
       }).catch(err => {
+        if (!isSubscribed) return;
         console.warn('⚠️ No se pudieron cargar los datos en vivo de Supabase:', err);
+        setCatalogError('No fue posible cargar el catálogo remoto. Revisa tu conexión.');
+      }).finally(() => {
+        if (isSubscribed) {
+          setIsAuthLoading(false);
+          setIsCatalogLoading(false);
+        }
       });
-    }
-
-    if (isSupabaseConfigured && supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (session?.user) {
-          const userAccount = await fetchUserProfileAndRole(session.user.id, session.user.email || '');
+      
+      const { data: { subscription } } = subscribeToSupabaseAuthChanges(async (event, session) => {
+        if (session?.user && event !== 'INITIAL_SESSION') {
+          const userAccount = await resolveSupabaseUserProfile(session.user.id, session.user.email || '');
           setCurrentUser(userAccount);
           setUserRole(userAccount.role);
           if (userAccount.tenantId) {
-            const tenantMatch = tenants.find(t => t.id === userAccount.tenantId);
-            if (tenantMatch) setCurrentTenant(tenantMatch);
+            const match = remoteTenantsRef.current.find(t => t.id === userAccount.tenantId);
+            if (match) setCurrentTenant(match);
           }
         } else if (event === 'SIGNED_OUT') {
           setCurrentUser(null);
           setUserRole('login');
-          try { localStorage.removeItem('gs_demo_session_v1'); } catch {}
+          setRemoteTenants([]);
+          setRemoteProducts([]);
+          setRemotePosts([]);
         }
       });
 
       return () => {
+        isSubscribed = false;
         subscription.unsubscribe();
       };
     }
-  }, [tenants]);
+  }, [authMode]);
 
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
@@ -322,6 +369,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [equityWeight, setEquityWeight] = useState<number>(0.5);
   const [toast, setToast] = useState<string | null>(null);
 
+  const showToast = (message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 3200);
+  };
+
+  const playChime = () => {
+    try {
+      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+    } catch {
+      // AudioContext bloqueado o no soportado sin intervención previa del usuario
+    }
+  };
+
   const [restaurantApplications, setRestaurantApplications] = useState<RestaurantApplication[]>(() => {
     try {
       const saved = localStorage.getItem('gs_restaurant_applications_v1');
@@ -331,7 +406,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  const [provisionedOwnerAccounts, setProvisionedOwnerAccounts] = useState<ProvisionedOwnerAccount[]>(() =>
+  const [provisionedOwnerAccounts] = useState<ProvisionedOwnerAccount[]>(() =>
     validateAndGetProvisionedAccounts()
   );
 
@@ -398,11 +473,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentUser, currentTenant]);
 
   const loginWithCredentials = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
-    if (!isSupabaseConfigured) {
-      return { success: false, error: 'El servicio de autenticación no está disponible. Contacta al administrador.' };
+    if (authMode === 'demo') {
+      const account = DEMO_ACCOUNTS.find(a => a.email === email.trim().toLowerCase() && a.demoPassword === pass);
+      if (account) {
+        const userAccount: UserAccount = {
+          email: account.email,
+          name: account.name,
+          role: account.userRole,
+          businessRole: account.businessRole,
+          tenantId: account.tenantId
+        };
+        setCurrentUser(userAccount);
+        setUserRole(userAccount.role);
+        if (userAccount.tenantId) {
+          const tenantMatch = tenants.find(t => t.id === userAccount.tenantId);
+          if (tenantMatch) setCurrentTenant(tenantMatch);
+        }
+        try { localStorage.setItem('gs_demo_session_v1', JSON.stringify(userAccount)); } catch {}
+        showToast(`👋 ¡Bienvenid@ al modo Demo, ${userAccount.name}!`);
+        return { success: true };
+      }
+      return { success: false, error: 'Correo o contraseña demo incorrectos.' };
     }
 
-    const res = await signInWithEmailPassword(email, pass);
+    const res = await signInWithSupabase(email, pass);
     if (res.success && res.user) {
       setCurrentUser(res.user);
       setUserRole(res.user.role);
@@ -417,18 +511,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
-    if (!isSupabaseConfigured) {
-      return { success: false, error: 'El servicio de autenticación no está disponible.' };
+    if (authMode === 'demo') {
+      return { success: false, error: 'El servicio de autenticación con Google no está disponible en modo Demo.' };
     }
     return await signInWithGoogleOAuth();
   };
 
   const registerAccount = async (name: string, email: string, pass: string, _role?: UserRole): Promise<{ success: boolean; error?: string }> => {
-    if (!isSupabaseConfigured) {
-      return { success: false, error: 'El servicio de autenticación no está disponible.' };
+    if (authMode === 'demo') {
+      const userAccount: UserAccount = {
+        email: email.trim().toLowerCase(),
+        name: name.trim(),
+        role: 'client_delivery',
+        businessRole: 'customer'
+      };
+      setCurrentUser(userAccount);
+      setUserRole('client_delivery');
+      try { localStorage.setItem('gs_demo_session_v1', JSON.stringify(userAccount)); } catch {}
+      showToast(`🎉 ¡Cuenta demo creada exitosamente para ${userAccount.name}!`);
+      return { success: true };
     }
 
-    const res = await signUpCustomer(email, pass, name);
+    const res = await signUpWithSupabase(email, pass, name);
     if (res.success && res.user) {
       setCurrentUser(res.user);
       setUserRole('client_delivery');
@@ -439,8 +543,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const sendPasswordReset = async (email: string): Promise<{ success: boolean; error?: string }> => {
-    if (!isSupabaseConfigured) {
-      return { success: false, error: 'El servicio de autenticación no está disponible.' };
+    if (authMode === 'demo') {
+      return { success: false, error: 'La recuperación de contraseña no está disponible en modo Demo.' };
     }
 
     const res = await sendPasswordResetEmail(email);
@@ -449,6 +553,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true };
     }
     return { success: false, error: res.error || 'No se pudo enviar el correo de recuperación.' };
+  };
+
+  const logout = async () => {
+    if (authMode === 'remote') {
+      await signOutFromSupabase();
+    }
+    setUserRole('login');
+    setCurrentUser(null);
+    setCart([]);
+    try {
+      localStorage.removeItem('gs_demo_session_v1');
+      localStorage.removeItem('gs_cart_v5');
+    } catch {}
+    showToast('Sesión cerrada correctamente');
   };
 
   const toggleLikePost = (postId: string) => {
@@ -496,34 +614,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Perfil del restaurante actualizado con éxito');
   };
 
-  const showToast = (message: string) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3200);
-  };
-
-  const playChime = () => {
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
-
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.5);
-    } catch {
-      // AudioContext bloqueado o no soportado sin intervención previa del usuario
-    }
-  };
-
   const addToCart = (product: Product) => {
     if (product.available === false) {
       showToast(`⚠️ "${product.name}" no se encuentra disponible por el momento.`);
@@ -561,8 +651,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const clearCart = () => setCart([]);
 
-  const submitOrderWithPayment = (typeOrDetails: string | CheckoutDetails, method: PaymentMethod, transaction: Transaction) => {
-    if (cart.length === 0) return;
+  const retryRemotePayment = async (orderId: string): Promise<{ success: boolean; paymentId?: string; sandboxUrl?: string; wompiConfig?: any }> => {
+    setIsSubmittingOrder(true);
+    setOrderError(null);
+    const paymentRes = await createRemotePayment(orderId, 'wompi');
+    setIsSubmittingOrder(false);
+    if (!paymentRes.success) {
+      setOrderError(paymentRes.error || 'No fue posible reintentar el pago remoto.');
+      return { success: false };
+    }
+    return {
+      success: true,
+      paymentId: paymentRes.paymentId,
+      sandboxUrl: paymentRes.sandboxUrl,
+      wompiConfig: paymentRes.wompiConfig
+    };
+  };
+
+  const submitOrderWithPayment = async (typeOrDetails: string | CheckoutDetails, method: PaymentMethod, transaction?: Transaction): Promise<{ success: boolean; isRemote?: boolean; orderId?: string; paymentId?: string; sandboxUrl?: string; wompiConfig?: any }> => {
+    if (cart.length === 0) return { success: false };
+
+    if (authMode === 'remote' && !currentUser?.email) {
+      setOrderError('Debes iniciar sesión para realizar un pedido.');
+      return { success: false };
+    }
+
+    setIsSubmittingOrder(true);
+    setOrderError(null);
 
     const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
@@ -609,21 +724,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const calculatedTotal = subtotal + deliveryFeeApplied;
-
-    const platformFee = Math.round(calculatedTotal * currentTenant.commissionRate);
-    const restaurantPayout = calculatedTotal - platformFee;
-
-    const normalizedTransaction: Transaction = {
-      ...transaction,
-      amount: calculatedTotal,
-      tenantId: currentTenant.id,
-      orderId: transaction.orderId,
-      platformFee,
-      restaurantPayout
-    };
-
-    const newOrder: Order = {
-      id: normalizedTransaction.orderId,
+    
+    // Preparar el pedido base sin dependencias de demo
+    const baseOrder: Order = {
+      id: '',
       tenantId: currentTenant.id,
       type: typeString,
       items: cart.map(c => ({ id: c.product.id, name: c.product.name, qty: c.quantity, price: c.product.price })),
@@ -633,7 +737,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'pending',
       createdAt: Date.now(),
       paymentMethod: method,
-      transactionId: normalizedTransaction.id,
+      transactionId: '',
       fulfillment,
       customerId: currentUser?.email,
       customerName,
@@ -643,37 +747,86 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       restaurantNotes
     };
 
-    if (isSupabaseConfigured) {
-      createLiveOrder(newOrder, currentUser?.email).then(res => {
-        if (res.success && res.orderId) {
-          newOrder.id = res.orderId;
-          normalizedTransaction.orderId = res.orderId;
-        }
-      });
-    }
+    if (authMode === 'remote') {
+      const res = await createLiveOrder(baseOrder);
+      setIsSubmittingOrder(false);
+      
+      if (!res.success || !res.orderId) {
+        setOrderError('No fue posible confirmar el pedido. Revisa los datos e inténtalo nuevamente.');
+        return { success: false };
+      }
+      
+      const paymentRes = await createRemotePayment(res.orderId, 'sandbox');
+      setIsSubmittingOrder(false);
 
-    setOrders(prev => [newOrder, ...prev]);
-    setTransactions(prev => [normalizedTransaction, ...prev]);
-    clearCart();
-    playChime();
-    showToast(`¡Pedido (${typeString}) de $${calculatedTotal.toLocaleString('es-CO')} enviado a ${currentTenant.name}!`);
+      if (!paymentRes.success) {
+        setOrderError(paymentRes.error || 'El pedido se creó, pero falló la inicialización del pago remoto.');
+        return { success: false };
+      }
+
+      clearCart();
+      playChime();
+      showToast(`¡Pedido (${typeString}) enviado a ${currentTenant.name}! Completa el pago seguro en la URL provista.`);
+      
+      // En un futuro podríamos redirigir a paymentRes.sandboxUrl si está presente.
+      if (paymentRes.sandboxUrl) {
+        console.log('Redirecting to sandbox UI:', paymentRes.sandboxUrl);
+      }
+
+      return { 
+        success: true, 
+        isRemote: true, 
+        orderId: res.orderId, 
+        paymentId: paymentRes.paymentId, 
+        sandboxUrl: paymentRes.sandboxUrl,
+        wompiConfig: paymentRes.wompiConfig
+      };
+    } else {
+      // Demo Mode
+      if (!transaction) {
+        setIsSubmittingOrder(false);
+        return { success: false };
+      }
+      const platformFee = Math.round(calculatedTotal * currentTenant.commissionRate);
+      const restaurantPayout = calculatedTotal - platformFee;
+
+      const normalizedTransaction: Transaction = {
+        ...transaction,
+        amount: calculatedTotal,
+        tenantId: currentTenant.id,
+        orderId: transaction.orderId,
+        platformFee,
+        restaurantPayout
+      };
+
+      baseOrder.id = normalizedTransaction.orderId;
+      baseOrder.transactionId = normalizedTransaction.id;
+
+      setOrders(prev => [baseOrder, ...prev]);
+      setTransactions(prev => [normalizedTransaction, ...prev]);
+      clearCart();
+      playChime();
+      showToast(`¡Pedido (${typeString}) de $${calculatedTotal.toLocaleString('es-CO')} enviado a ${currentTenant.name}!`);
+      setIsSubmittingOrder(false);
+      return { success: true, isRemote: false };
+    }
   };
 
-  const updateOrderStatus = (orderId: string, status: OrderStatus) => {
+  const updateOrderStatus = async (orderId: string, status: OrderStatus): Promise<boolean> => {
     const targetOrder = orders.find(o => o.id === orderId);
-    if (!targetOrder) return;
+    if (!targetOrder) return false;
 
     const owner = isRestaurantOwner(currentUser);
     const staff = isRestaurantStaff(currentUser);
 
     if (!owner && !staff) {
       showToast('⚠️ No tienes autorización para modificar el estado de los pedidos.');
-      return;
+      return false;
     }
 
     if (currentUser?.tenantId !== targetOrder.tenantId) {
       showToast('⚠️ No tienes autorización para modificar pedidos de otro restaurante.');
-      return;
+      return false;
     }
 
     if (staff && !owner) {
@@ -684,7 +837,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (!isValidKitchenTransition) {
         showToast('⚠️ El personal de cocina sólo puede avanzar pedidos en fase de preparación.');
-        return;
+        return false;
       }
     }
 
@@ -698,19 +851,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (!validTransitions.includes(status)) {
         showToast(`⚠️ Transición no permitida de ${targetOrder.status} a ${status}.`);
-        return;
+        return false;
+      }
+    }
+
+    if (authMode === 'remote') {
+      const res = await updateLiveOrderStatus(orderId, status);
+      if (!res.success) {
+        showToast(res.error || 'No fue posible actualizar el pedido.');
+        return false;
       }
     }
 
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-
-    if (isSupabaseConfigured) {
-      updateLiveOrderStatus(orderId, status).catch(err => {
-        console.warn('⚠️ No se pudo actualizar el pedido en Supabase:', err);
-      });
-    }
-
     showToast(`Pedido #${orderId.slice(0, 8)} actualizado a ${status.toUpperCase()}`);
+    return true;
   };
 
   const toggleProductAvailability = (productId: string) => {
@@ -1072,8 +1227,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const activateApprovedRestaurant = async (
-    applicationId: string,
-    temporaryPassword?: string // Ignorado ahora que usamos Edge Functions
+    applicationId: string
   ): Promise<{ success: boolean; tenantId?: string; error?: string }> => {
     if (!isPlatformAdmin(currentUser)) {
       const err = '⚠️ No tienes autorización para activar restaurantes.';
@@ -1103,7 +1257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('⏳ Conectando con Supabase para crear restaurante y enviar invitación...');
     
     try {
-      const { data, error } = await supabase.functions.invoke('approve_restaurant', {
+      const { data, error } = await supabase!.functions.invoke('approve_restaurant', {
         body: { application: targetApp }
       });
 
@@ -1126,39 +1280,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       showToast(`🎉 ¡Restaurante "${targetApp.restaurantName}" creado! Invitación enviada a ${targetApp.ownerEmail}.`);
       return { success: true };
-    } catch (err: any) {
-      const msg = err.message || 'Error al procesar la activación en la nube.';
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al procesar la activación en la nube.';
       showToast(`⚠️ ${msg}`);
       return { success: false, error: msg };
     }
   };
 
-  const logout = async () => {
-    await signOutUser();
-    setUserRole('login');
-    setCurrentUser(null);
-    setCart([]);
-    try {
-      localStorage.removeItem('gs_demo_session_v1');
-      localStorage.removeItem('gs_cart_v5');
-    } catch {}
-    showToast('Sesión cerrada correctamente');
-  };
+  const activeTenants = authMode === 'remote' ? remoteTenants : tenants;
+  const activeProducts = authMode === 'remote' ? remoteProducts : products;
+  const activePosts = authMode === 'remote' ? remotePosts : posts;
 
   return (
     <AppContext.Provider value={{
       cities,
       zones,
-      tenants,
+      tenants: activeTenants,
       currentTenant,
-      products,
+      products: activeProducts,
       orders,
       transactions,
-      posts,
+      posts: activePosts,
       stories,
       cart,
       drivers,
       equityWeight,
+      authMode,
+      isAuthLoading,
+      isCatalogLoading,
+      catalogError,
+      isSubmittingOrder,
+      orderError,
+      remoteTenants,
+      remoteProducts,
+      remotePosts,
       userRole,
       currentUser,
       toast,
@@ -1182,6 +1337,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       removeFromCart,
       clearCart,
       submitOrderWithPayment,
+      retryRemotePayment,
       updateOrderStatus,
       toggleProductAvailability,
       addProduct,

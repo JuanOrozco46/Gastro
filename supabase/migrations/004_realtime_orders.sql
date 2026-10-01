@@ -48,13 +48,9 @@ CREATE POLICY "orders_update_policy" ON public.orders FOR UPDATE
 DROP POLICY IF EXISTS "order_items_insert_policy" ON public.order_items;
 DROP POLICY IF EXISTS "order_items_select_policy" ON public.order_items;
 
-CREATE POLICY "order_items_insert_policy" ON public.order_items FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.orders o
-      WHERE o.id = order_id AND (o.customer_id = auth.uid() OR auth.role() = 'authenticated')
-    )
-  );
+-- NOTA TÉCNICA: La creación directa de order_items desde el cliente está deshabilitada intencionalmente.
+-- Para prevenir inconsistencias y alteraciones de precios, la inserción debe realizarse 
+-- exclusivamente mediante una función RPC transaccional (ej. create_order_with_items) desde el backend.
 
 CREATE POLICY "order_items_select_policy" ON public.order_items FOR SELECT
   USING (

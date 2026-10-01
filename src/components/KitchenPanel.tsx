@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/useApp';
 import { getOperationalTenant, getFulfillmentBadgeText } from '../utils/tenantHelpers';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlusCircle, Clock, Flame, CheckCircle, PackageCheck, Power, Utensils, Sparkles, AlertCircle } from 'lucide-react';
+import { PlusCircle, Clock, Flame, CheckCircle, PackageCheck, Power, Utensils, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
+
+import type { OrderStatus } from '../types';
 
 export const KitchenPanel: React.FC = () => {
   const { tenants, currentUser, toggleTenantOpenStatus, orders, updateOrderStatus, products, triggerTestOrder } = useApp();
@@ -15,13 +17,15 @@ export const KitchenPanel: React.FC = () => {
 
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+
   if (!operatingTenant) {
     return (
       <div 
         style={{
           textAlign: 'center',
           padding: '4rem 2rem',
-          background: 'rgba(15, 23, 42, 0.85)',
+          background: 'var(--glass-medium)',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(239, 68, 68, 0.3)',
           borderRadius: '28px',
@@ -51,6 +55,12 @@ export const KitchenPanel: React.FC = () => {
   const preparingOrders = tenantOrders.filter(o => o.status === 'preparing');
   const readyOrders = tenantOrders.filter(o => o.status === 'ready');
 
+  const handleUpdate = async (orderId: string, status: OrderStatus) => {
+    setUpdatingOrderId(orderId);
+    await updateOrderStatus(orderId, status);
+    setUpdatingOrderId(null);
+  };
+
   const getElapsedTime = (createdAt: number) => {
     const mins = Math.floor((now - createdAt) / 60000);
     return mins === 0 ? 'Ahora mismo' : `Hace ${mins} min`;
@@ -68,7 +78,7 @@ export const KitchenPanel: React.FC = () => {
         className="card" 
         style={{ 
           marginBottom: '1.5rem', 
-          background: operatingTenant.isOpen ? 'rgba(15, 23, 42, 0.85)' : 'rgba(239, 68, 68, 0.12)', 
+          background: operatingTenant.isOpen ? 'var(--glass-medium)' : 'rgba(239, 68, 68, 0.12)', 
           borderColor: operatingTenant.isOpen ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.4)',
           backdropFilter: 'blur(20px)',
           boxShadow: operatingTenant.isOpen ? '0 10px 30px rgba(16, 185, 129, 0.1)' : '0 10px 30px rgba(239, 68, 68, 0.15)'
@@ -150,7 +160,7 @@ export const KitchenPanel: React.FC = () => {
                   fontSize: '0.82rem', 
                   fontWeight: 800,
                   borderRadius: '12px',
-                  background: 'rgba(255, 85, 51, 0.1)',
+                  background: 'var(--primary-light)',
                   borderColor: 'var(--primary-border)',
                   color: 'var(--primary)'
                 }} 
@@ -187,18 +197,18 @@ export const KitchenPanel: React.FC = () => {
                       exit={{ opacity: 0, scale: 0.8 }}
                       className="ticket-card pending"
                       style={{
-                        background: 'rgba(15, 23, 42, 0.9)',
-                        border: '1px solid rgba(255, 85, 51, 0.4)',
+                        background: 'var(--glass-dark)',
+                        border: '1px solid var(--primary-border)',
                         borderLeft: '6px solid var(--primary)',
                         borderRadius: '16px',
                         padding: '1.25rem',
                         marginBottom: '1rem',
-                        boxShadow: '0 8px 24px rgba(255, 85, 51, 0.15)'
+                        boxShadow: '0 8px 24px var(--primary-glow)'
                       }}
                     >
                       <div className="ticket-header" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
                         <span className="ticket-id" style={{ color: 'white', fontWeight: 900 }}>#{order.id}</span>
-                        <span className="ticket-type" style={{ background: 'rgba(255, 85, 51, 0.2)', color: 'var(--primary)', fontWeight: 800 }}>
+                        <span className="ticket-type" style={{ background: 'var(--primary-glass-border)', color: 'var(--primary)', fontWeight: 800 }}>
                           {getFulfillmentBadgeText(order.fulfillment, order.type)}
                         </span>
                       </div>
@@ -235,19 +245,23 @@ export const KitchenPanel: React.FC = () => {
                             whileTap={{ scale: 0.98 }}
                             className="btn btn-outline btn-full" 
                             style={{ borderRadius: '12px', fontWeight: 800, padding: '10px' }}
-                            onClick={() => updateOrderStatus(order.id, 'accepted')}
+                            disabled={updatingOrderId === order.id}
+                            onClick={() => handleUpdate(order.id, 'accepted')}
                           >
-                            <CheckCircle size={16} /> Aceptar Comanda
+                            {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} 
+                            {updatingOrderId === order.id ? ' Actualizando...' : ' Aceptar Comanda'}
                           </motion.button>
                         ) : (
                           <motion.button 
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                            whileHover={updatingOrderId === order.id ? {} : { scale: 1.02 }}
+                            whileTap={updatingOrderId === order.id ? {} : { scale: 0.98 }}
                             className="btn btn-primary btn-full" 
                             style={{ borderRadius: '12px', fontWeight: 800, padding: '10px' }}
-                            onClick={() => updateOrderStatus(order.id, 'preparing')}
+                            disabled={updatingOrderId === order.id}
+                            onClick={() => handleUpdate(order.id, 'preparing')}
                           >
-                            <Flame size={16} /> Empezar a Preparar
+                            {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <Flame size={16} />} 
+                            {updatingOrderId === order.id ? ' Actualizando...' : ' Empezar a Preparar'}
                           </motion.button>
                         )}
                       </div>
@@ -280,7 +294,7 @@ export const KitchenPanel: React.FC = () => {
                       exit={{ opacity: 0, scale: 0.8 }}
                       className="ticket-card preparing"
                       style={{
-                        background: 'rgba(15, 23, 42, 0.9)',
+                        background: 'var(--glass-dark)',
                         border: '1px solid rgba(245, 158, 11, 0.4)',
                         borderLeft: '6px solid var(--tertiary)',
                         borderRadius: '16px',
@@ -312,9 +326,11 @@ export const KitchenPanel: React.FC = () => {
                           whileTap={{ scale: 0.98 }}
                           className="btn btn-secondary btn-full" 
                           style={{ borderRadius: '12px', fontWeight: 800, padding: '10px' }}
-                          onClick={() => updateOrderStatus(order.id, 'ready')}
+                          disabled={updatingOrderId === order.id}
+                          onClick={() => handleUpdate(order.id, 'ready')}
                         >
-                          <CheckCircle size={16} /> Marcar Listo
+                          {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />}
+                          {updatingOrderId === order.id ? ' Actualizando...' : ' Marcar Listo'}
                         </motion.button>
                       </div>
                     </motion.div>
@@ -346,7 +362,7 @@ export const KitchenPanel: React.FC = () => {
                       exit={{ opacity: 0, scale: 0.8 }}
                       className="ticket-card ready"
                       style={{
-                        background: 'rgba(15, 23, 42, 0.9)',
+                        background: 'var(--glass-dark)',
                         border: '1px solid rgba(16, 185, 129, 0.4)',
                         borderLeft: '6px solid var(--secondary)',
                         borderRadius: '16px',
@@ -386,7 +402,7 @@ export const KitchenPanel: React.FC = () => {
         </div>
 
         {/* Real-time Menu Availability View for Kitchen */}
-        <div className="card" style={{ height: 'fit-content', background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255,255,255,0.1)' }}>
+        <div className="card" style={{ height: 'fit-content', background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255,255,255,0.1)' }}>
           <div className="card-header" style={{ marginBottom: '0.75rem' }}>
             <div className="card-title" style={{ color: 'white', fontSize: '1.05rem', fontWeight: 900 }}>
               <Utensils size={18} style={{ color: 'var(--primary)' }} /> Carta de {operatingTenant.name}

@@ -30,8 +30,19 @@ export async function uploadMediaFile(
     });
   }
 
+  // 2. Validación de archivo (Tamaño máximo 50MB y tipo MIME permitido)
+  const MAX_SIZE_BYTES = 50 * 1024 * 1024;
+  if (file.size > MAX_SIZE_BYTES) {
+    return { success: false, error: 'El archivo excede el tamaño máximo permitido de 50MB.' };
+  }
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'];
+  if (!allowedMimeTypes.includes(file.type)) {
+    return { success: false, error: 'El formato del archivo no está permitido.' };
+  }
+
+
   try {
-    const fileExt = file.name.split('.').pop() || 'png';
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'png';
     const cleanFolder = folder.replace(/[^a-zA-Z0-9_-]/g, '');
     const randomHash = Math.random().toString(36).substring(2, 8);
     const fileName = `${Date.now()}_${randomHash}.${fileExt}`;
@@ -46,15 +57,7 @@ export async function uploadMediaFile(
 
     if (uploadError) {
       console.warn('⚠️ Error al subir archivo a Supabase Storage:', uploadError);
-      // Fallback a Data URL si la cuota o permiso falla
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const result = e.target?.result as string;
-          resolve({ success: true, publicUrl: result });
-        };
-        reader.readAsDataURL(file);
-      });
+      return { success: false, error: 'Ocurrió un error al subir el archivo al servidor. Inténtalo de nuevo.' };
     }
 
     const { data } = supabase.storage
@@ -65,15 +68,9 @@ export async function uploadMediaFile(
       success: true,
       publicUrl: data.publicUrl
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.warn('⚠️ Excepción durante la subida a Supabase Storage:', err);
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        resolve({ success: true, publicUrl: result });
-      };
-      reader.readAsDataURL(file);
-    });
+    return { success: false, error: 'Ocurrió un error inesperado al subir el archivo.' };
   }
 }
+

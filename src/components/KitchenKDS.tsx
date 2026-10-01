@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/useApp';
 import { getOperationalTenant, getFulfillmentBadgeText } from '../utils/tenantHelpers';
-import { PlusCircle, Clock, Flame, CheckCircle, PackageCheck, Building2, AlertCircle } from 'lucide-react';
+import { PlusCircle, Clock, Flame, CheckCircle, PackageCheck, Building2, AlertCircle, Loader2 } from 'lucide-react';
 import type { OrderStatus } from '../types';
 
 export const KitchenKDS: React.FC = () => {
@@ -15,13 +15,15 @@ export const KitchenKDS: React.FC = () => {
 
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+
   if (!operatingTenant) {
     return (
       <div 
         style={{
           textAlign: 'center',
           padding: '4rem 2rem',
-          background: 'rgba(15, 23, 42, 0.85)',
+          background: 'var(--glass-medium)',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(239, 68, 68, 0.3)',
           borderRadius: '28px',
@@ -43,6 +45,12 @@ export const KitchenKDS: React.FC = () => {
 
   const isOwner = currentUser?.businessRole === 'restaurant_owner' || currentUser?.role === 'admin';
   const tenantOrders = orders.filter(o => o.tenantId === operatingTenant.id);
+
+  const handleUpdate = async (orderId: string, status: OrderStatus) => {
+    setUpdatingOrderId(orderId);
+    await updateOrderStatus(orderId, status);
+    setUpdatingOrderId(null);
+  };
 
   const pendingOrders = tenantOrders.filter(o => o.status === 'pending' || o.status === 'accepted');
   const preparingOrders = tenantOrders.filter(o => o.status === 'preparing');
@@ -117,27 +125,33 @@ export const KitchenKDS: React.FC = () => {
             {order.status === 'pending' && (
               <button
                 className="btn btn-outline btn-full"
-                onClick={() => updateOrderStatus(order.id, 'accepted')}
+                disabled={updatingOrderId === order.id}
+                onClick={() => handleUpdate(order.id, 'accepted')}
               >
-                <CheckCircle size={16} /> Aceptar Comanda
+                {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} 
+                {updatingOrderId === order.id ? ' Actualizando...' : ' Aceptar Comanda'}
               </button>
             )}
 
             {order.status === 'accepted' && (
               <button
                 className="btn btn-primary btn-full"
-                onClick={() => updateOrderStatus(order.id, 'preparing')}
+                disabled={updatingOrderId === order.id}
+                onClick={() => handleUpdate(order.id, 'preparing')}
               >
-                <Flame size={16} /> Empezar a Preparar
+                {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <Flame size={16} />} 
+                {updatingOrderId === order.id ? ' Actualizando...' : ' Empezar a Preparar'}
               </button>
             )}
 
             {order.status === 'preparing' && (
               <button
                 className="btn btn-secondary btn-full"
-                onClick={() => updateOrderStatus(order.id, 'ready')}
+                disabled={updatingOrderId === order.id}
+                onClick={() => handleUpdate(order.id, 'ready')}
               >
-                <CheckCircle size={16} /> Marcar Listo
+                {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} 
+                {updatingOrderId === order.id ? ' Actualizando...' : ' Marcar Listo'}
               </button>
             )}
 

@@ -35,7 +35,7 @@ export const Header: React.FC = () => {
           </div>
           <div className="logo-text">
             <h1 style={{ fontFamily: 'Outfit, sans-serif' }}>GastroSync</h1>
-            <p>Red Social Gastronómica</p>
+            <p>Armenia, Quindío</p>
           </div>
         </div>
 

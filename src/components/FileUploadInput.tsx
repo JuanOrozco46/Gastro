@@ -99,7 +99,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
           {label}
         </label>
         
-        <div style={{ display: 'flex', gap: '4px', background: 'rgba(15, 23, 42, 0.6)', padding: '2px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ display: 'flex', gap: '4px', background: 'var(--glass-overlay)', padding: '2px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
           <button
             type="button"
             onClick={() => setMode('upload')}
@@ -159,7 +159,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                 borderRadius: '16px',
                 padding: '1.5rem 1rem',
                 textAlign: 'center',
-                background: dragActive ? 'rgba(225, 29, 72, 0.08)' : 'rgba(15, 23, 42, 0.4)',
+                background: dragActive ? 'rgba(225, 29, 72, 0.08)' : 'var(--glass-overlay)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
               }}
@@ -215,7 +215,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                     padding: '6px 12px',
                     borderRadius: '8px',
                     border: 'none',
-                    background: 'rgba(15, 23, 42, 0.85)',
+                    background: 'var(--glass-medium)',
                     backdropFilter: 'blur(8px)',
                     color: '#ffffff',
                     fontSize: '0.75rem',
@@ -284,7 +284,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
               padding: '12px 14px 12px 42px',
               borderRadius: '12px',
               border: '1px solid rgba(255, 255, 255, 0.12)',
-              background: 'rgba(15, 23, 42, 0.6)',
+              background: 'var(--glass-overlay)',
               color: '#ffffff',
               fontSize: '0.88rem',
               outline: 'none'

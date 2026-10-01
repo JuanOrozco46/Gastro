@@ -6,6 +6,7 @@ import {
   RefreshCw, ChevronDown, ChevronUp, MapPin, Utensils
 } from 'lucide-react';
 import type { Order, OrderStatus, CustomerDeliveryAddress } from '../types';
+import { PaymentStatus } from './PaymentStatus';
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; icon: React.ReactNode; color: string; bg: string; step: number }> = {
   pending: {
@@ -118,9 +119,10 @@ interface OrderCardProps {
   order: Order;
   tenantName: string;
   tenantEmoji: string;
+  authMode: 'demo' | 'remote';
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji }) => {
+const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji, authMode }) => {
   const [expanded, setExpanded] = useState(false);
   const cfg = STATUS_CONFIG[order.status];
   const steps: OrderStatus[] = ['pending', 'preparing', 'ready', 'delivered'];
@@ -134,13 +136,13 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji })
       animate={{ opacity: 1, y: 0 }}
       className={`card ${order.status === 'delivered' ? 'order-delivered' : ''}`}
       style={{
-        background: 'rgba(15, 23, 42, 0.85)',
+        background: 'var(--glass-medium)',
         backdropFilter: 'blur(20px)',
-        border: order.status === 'delivered' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(255, 85, 51, 0.3)',
+        border: order.status === 'delivered' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid var(--primary-border)',
         borderRadius: '24px',
         padding: '1.5rem',
         marginBottom: '1.25rem',
-        boxShadow: order.status === 'delivered' ? '0 10px 30px rgba(0,0,0,0.3)' : '0 12px 36px rgba(255, 85, 51, 0.15)'
+        boxShadow: order.status === 'delivered' ? '0 10px 30px rgba(0,0,0,0.3)' : '0 12px 36px var(--primary-glow)'
       }}
     >
       {/* Order Header */}
@@ -150,8 +152,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji })
             width: '48px', 
             height: '48px', 
             borderRadius: '16px', 
-            background: 'rgba(255, 85, 51, 0.12)', 
-            border: '1px solid rgba(255, 85, 51, 0.2)',
+            background: 'var(--primary-glass)', 
+            border: '1px solid var(--primary-glass-border)',
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
@@ -275,6 +277,17 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji })
         </div>
       )}
 
+      {/* Payment Status para remotos */}
+      {authMode === 'remote' && order.paymentId && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <PaymentStatus 
+            orderId={order.id} 
+            paymentId={order.paymentId} 
+            authMode={authMode} 
+          />
+        </div>
+      )}
+
       {/* Items collapse toggle */}
       <button 
         style={{
@@ -350,7 +363,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji })
 };
 
 export const MyOrders: React.FC = () => {
-  const { orders, tenants } = useApp();
+  const { orders, tenants, authMode } = useApp();
 
   const clientOrders = orders
     .filter(o => 
@@ -375,7 +388,7 @@ export const MyOrders: React.FC = () => {
         style={{
           textAlign: 'center',
           padding: '4rem 2rem',
-          background: 'rgba(15, 23, 42, 0.8)',
+          background: 'var(--glass-medium)',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '32px',
@@ -416,6 +429,7 @@ export const MyOrders: React.FC = () => {
                   order={order}
                   tenantName={tenant?.name || 'Restaurante Aliado'}
                   tenantEmoji={tenant?.logoEmoji || '🍽️'}
+                  authMode={authMode}
                 />
               );
             })}
@@ -438,6 +452,7 @@ export const MyOrders: React.FC = () => {
                   order={order}
                   tenantName={tenant?.name || 'Restaurante Aliado'}
                   tenantEmoji={tenant?.logoEmoji || '🍽️'}
+                  authMode={authMode}
                 />
               );
             })}

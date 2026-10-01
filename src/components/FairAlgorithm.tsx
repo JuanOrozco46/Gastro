@@ -60,7 +60,7 @@ export const FairAlgorithm: React.FC = () => {
         {/* Left Column: Algorithm Controls & Visual Chart */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
           
-          <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '28px', padding: '1.75rem' }}>
+          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '28px', padding: '1.75rem' }}>
             <div className="card-header" style={{ marginBottom: '1.25rem' }}>
               <div className="card-title" style={{ fontSize: '1.2rem', fontWeight: 900, color: 'white' }}>
                 <Sliders size={20} style={{ color: 'var(--primary)' }} /> Parámetros de Equidad Interactivos
@@ -101,7 +101,7 @@ export const FairAlgorithm: React.FC = () => {
             </div>
           </div>
 
-          <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '28px' }}>
+          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '28px' }}>
             <div className="card-header">
               <div className="card-title" style={{ color: 'white', fontWeight: 900 }}>
                 <Scale size={20} style={{ color: '#10B981' }} /> ¿Por qué es Superior al Modelo Tradicional?
@@ -115,7 +115,7 @@ export const FairAlgorithm: React.FC = () => {
         </div>
 
         {/* Right Column: Ranked Restaurant List */}
-        <div className="card" style={{ background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '28px' }}>
+        <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '28px' }}>
           <div className="card-header" style={{ marginBottom: '1.25rem' }}>
             <div className="card-title" style={{ color: 'white', fontWeight: 900 }}>
               <ListOrdered size={20} style={{ color: '#F59E0B' }} /> Posicionamiento en Feed del Cliente

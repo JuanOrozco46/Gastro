@@ -2,18 +2,17 @@ import React, { useState } from 'react';
 import { useApp } from '../context/useApp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Lock, Mail, User, ShieldCheck,
+  Lock, Mail, User,
   Eye, EyeOff, Utensils,
-  Star, AlertCircle, Building2, CheckCircle2, X, KeyRound
+  AlertCircle, Building2, CheckCircle2, X, KeyRound
 } from 'lucide-react';
 import { PartnerApplicationModal } from './PartnerApplicationModal';
-import { isSupabaseConfigured } from '../lib/supabase';
 
 /* ── Animated feature cards shown on the left panel ────────── */
 const FEATURES = [
-  { icon: '📸', title: 'Red Social Gastronómica', desc: 'Posts en vivo de platos irresistibles con pedido en 1 clic' },
-  { icon: '🛵', title: 'Domicilio Directo sin Comisión', desc: '97% del valor real para el restaurante sin recargos abusivos' },
-  { icon: '📊', title: 'Gestión KDS en Tiempo Real', desc: 'Control de comandas, menú dinámico y analítica de ventas' },
+  { icon: '📸', title: 'Descubre sabores locales', desc: 'Fotos reales de platos que puedes pedir con un solo clic' },
+  { icon: '🛵', title: 'Pide directo al restaurante', desc: 'Tu pedido va directamente a la cocina, sin intermediarios' },
+  { icon: '🍽️', title: 'Restaurantes de Armenia', desc: 'Apoya el comercio local del Quindío con cada pedido' },
 ];
 
 /* ── Password strength validation ────────────────────────── */
@@ -50,7 +49,7 @@ function evaluatePasswordStrength(password: string): PasswordStrength {
 }
 
 export const LoginScreen: React.FC = () => {
-  const { loginWithCredentials, loginWithGoogle, registerAccount, sendPasswordReset } = useApp();
+  const { authMode, loginWithCredentials, loginWithGoogle, registerAccount, sendPasswordReset } = useApp();
   const [tab, setTab] = useState<'login' | 'register'>('login');
 
   const [email, setEmail] = useState('');
@@ -169,7 +168,7 @@ export const LoginScreen: React.FC = () => {
           left: '-60px',
           width: '300px',
           height: '300px',
-          background: 'radial-gradient(circle, rgba(200, 169, 126, 0.18) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(200, 90, 56, 0.18) 0%, transparent 70%)',
           pointerEvents: 'none'
         }} />
         <div style={{
@@ -222,22 +221,22 @@ export const LoginScreen: React.FC = () => {
           {/* Headline */}
           <div style={{ marginBottom: '2rem' }}>
             <h1 style={{ fontFamily: "var(--font-display)", fontSize: '2.3rem', fontWeight: 700, lineHeight: 1.2, color: 'white', letterSpacing: '-0.5px', marginBottom: '1rem' }}>
-              La plataforma<br />gastronómica<br />
+              Descubre qué<br />comer en<br />
               <span style={{
                 color: 'var(--primary)'
               }}>
-                sin comisiones abusivas.
+                Armenia, Quindío.
               </span>
             </h1>
             <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.95rem', lineHeight: 1.6 }}>
-              Conecta restaurantes independientes, chefs y comensales en un ecosistema directo, transparente y orgánico en Armenia, Quindío.
+              Antojos, restaurantes y pedidos directos en tu zona. Explora los sabores del Eje Cafetero.
             </p>
           </div>
 
           {/* Animated Feature Card */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(200, 169, 126, 0.2)',
+            border: '1px solid rgba(200, 90, 56, 0.2)',
             borderRadius: '16px',
             padding: '1.25rem 1.5rem',
             marginBottom: '2rem',
@@ -252,7 +251,7 @@ export const LoginScreen: React.FC = () => {
                 transition={{ duration: 0.3 }}
                 style={{ display: 'flex', alignItems: 'center', gap: '16px' }}
               >
-                <span style={{ fontSize: '1.8rem', background: 'rgba(200, 169, 126, 0.15)', padding: '10px', borderRadius: '12px' }}>
+                <span style={{ fontSize: '1.8rem', background: 'rgba(200, 90, 56, 0.15)', padding: '10px', borderRadius: '12px' }}>
                   {FEATURES[activeFeature].icon}
                 </span>
                 <div>
@@ -285,32 +284,20 @@ export const LoginScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Trust Stats */}
+          {/* Local context */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            gap: '12px',
             background: 'rgba(0, 0, 0, 0.35)',
             padding: '14px 20px',
             borderRadius: '14px',
             border: '1px solid rgba(200, 169, 126, 0.15)'
           }}>
+            <span style={{ fontSize: '1.5rem' }}>🇨🇴</span>
             <div>
-              <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)', display: 'block' }}>97%</span>
-              <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Pago Directo</span>
-            </div>
-            <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Star size={16} fill="var(--primary)" strokeWidth={0} />
-              <div>
-                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'white', display: 'block' }}>4.9/5</span>
-                <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Satisfacción</span>
-              </div>
-            </div>
-            <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }} />
-            <div>
-              <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#6B8C6A', display: 'block' }}>0%</span>
-              <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Comisión Extra</span>
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'white', display: 'block' }}>Armenia, Quindío</span>
+              <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Restaurantes locales · Pedidos directos</span>
             </div>
           </div>
         </div>
@@ -324,7 +311,7 @@ export const LoginScreen: React.FC = () => {
         className="login-form-panel"
       >
         {/* Connection Status */}
-        {!isSupabaseConfigured && (
+        {authMode === 'demo' && (
           <div style={{
             padding: '12px 14px',
             borderRadius: 'var(--radius-sm)',
@@ -339,11 +326,11 @@ export const LoginScreen: React.FC = () => {
             gap: '8px'
           }}>
             <AlertCircle size={18} style={{ flexShrink: 0, color: '#DC2626' }} />
-            <span><strong>Error de conexión:</strong> El servicio de autenticación no está configurado. Contacta al administrador de la plataforma.</span>
+            <span><strong>Modo Demo Local:</strong> El servicio remoto de autenticación no está configurado. Operando con cuentas locales.</span>
           </div>
         )}
 
-        {isSupabaseConfigured && (
+        {authMode === 'remote' && (
           <div style={{
             padding: '10px 14px',
             borderRadius: 'var(--radius-sm)',
@@ -357,8 +344,8 @@ export const LoginScreen: React.FC = () => {
             alignItems: 'center',
             gap: '8px'
           }}>
-            <ShieldCheck size={18} style={{ flexShrink: 0, color: '#059669' }} />
-            <span><strong>Conexión segura activa</strong> — Tu información está protegida con cifrado de extremo a extremo.</span>
+            <CheckCircle2 size={18} style={{ flexShrink: 0, color: '#059669' }} />
+            <span><strong>Conectado</strong> — Listo para explorar restaurantes y hacer pedidos.</span>
           </div>
         )}
 
@@ -646,10 +633,10 @@ export const LoginScreen: React.FC = () => {
               background: 'var(--neutral-dark)',
               color: '#FFFFFF',
               border: 'none',
-              cursor: loading || !isSupabaseConfigured ? 'not-allowed' : 'pointer',
-              opacity: loading || !isSupabaseConfigured ? 0.6 : 1
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1
             }}
-            disabled={loading || !isSupabaseConfigured}
+            disabled={loading}
           >
             {loading
               ? 'Validando...'
@@ -668,7 +655,7 @@ export const LoginScreen: React.FC = () => {
             whileTap={{ scale: 0.99 }}
             type="button"
             onClick={() => loginWithGoogle()}
-            disabled={!isSupabaseConfigured}
+            disabled={authMode === 'demo'}
             style={{
               width: '100%',
               padding: '12px',
@@ -682,8 +669,8 @@ export const LoginScreen: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '10px',
-              cursor: isSupabaseConfigured ? 'pointer' : 'not-allowed',
-              opacity: isSupabaseConfigured ? 1 : 0.5,
+              cursor: authMode === 'remote' ? 'pointer' : 'not-allowed',
+              opacity: authMode === 'remote' ? 1 : 0.5,
               boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
               transition: 'all 0.2s ease'
             }}
@@ -708,10 +695,10 @@ export const LoginScreen: React.FC = () => {
           textAlign: 'center'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-main)', fontWeight: 800, marginBottom: '6px', fontSize: '0.92rem' }}>
-            <Building2 size={18} style={{ color: 'var(--primary)' }} /> ¿Eres dueño de un Restaurante en Armenia?
+            <Building2 size={18} style={{ color: 'var(--primary)' }} /> ¿Tienes un restaurante en Armenia?
           </div>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.9rem', lineHeight: 1.5 }}>
-            Registra tu negocio y empieza a recibir pedidos directos. Configura tu menú digital, mesas QR y ventas sin comisiones abusivas.
+            Haz visible tu negocio y recibe pedidos directos. Configura tu menú digital y empieza a vender hoy.
           </p>
           <motion.button
             whileHover={{ scale: 1.01 }}
@@ -736,8 +723,7 @@ export const LoginScreen: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '1.1rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-          <ShieldCheck size={14} style={{ color: '#10B981' }} />
-          GastroSync Armenia — Plataforma Gastronómica Segura
+          🍽️ GastroSync · Armenia, Quindío
         </div>
 
         <PartnerApplicationModal

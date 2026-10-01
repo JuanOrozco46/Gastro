@@ -1,100 +1,88 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { Order, OrderStatus, OrderFulfillment } from '../types';
+import type { Order, OrderStatus } from '../types';
+import type { DbOrder } from './supabaseTypes';
+import { mapDbOrderToOrder } from './supabaseTypes';
 
 /**
  * Servicio de Pedidos en Tiempo Real con Supabase (PostgreSQL + WebSockets).
  * Sincroniza la creación, cambio de estado y transmisión en vivo de comanda KDS.
  */
 
-function mapDbFulfillmentToType(fulfillment: OrderFulfillment, tableNumber?: string): string {
-  if (fulfillment === 'table_service') {
-    return `Mesa #${tableNumber || '1'}`;
-  }
-  if (fulfillment === 'restaurant_delivery') {
-    return 'Domicilio';
-  }
-  return 'Recoger en local';
-}
-
-function mapTypeToDbFulfillment(type: string): OrderFulfillment {
-  const lower = type.toLowerCase();
-  if (lower.includes('mesa')) return 'table_service';
-  if (lower.includes('domicilio')) return 'restaurant_delivery';
-  return 'pickup';
+function isValidUUID(id: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
 }
 
 export async function createLiveOrder(
-  order: Omit<Order, 'id' | 'createdAt'>,
-  userId?: string
+  order: Omit<Order, 'id' | 'createdAt'>
 ): Promise<{ success: boolean; orderId?: string; error?: string }> {
   if (!isSupabaseConfigured || !supabase) {
     return { success: false, error: 'Supabase no está configurado.' };
   }
 
+  if (!order.items || order.items.length === 0) {
+    return { success: false, error: 'El pedido no puede estar vacío.' };
+  }
+
+  for (const item of order.items) {
+    if (!item.id || item.id.trim() === '') {
+      return { success: false, error: 'Un producto en el pedido tiene un ID inválido.' };
+    }
+    if (!Number.isInteger(item.qty) || item.qty <= 0) {
+      return { success: false, error: 'La cantidad de los productos debe ser un entero positivo.' };
+    }
+  }
+
   try {
-    const fulfillment: OrderFulfillment = order.fulfillment || mapTypeToDbFulfillment(order.type);
-
-    const { data: insertedOrder, error: orderErr } = await supabase
-      .from('orders')
-      .insert([
-        {
-          restaurant_id: order.tenantId,
-          customer_id: order.customerId || userId || null,
-          fulfillment,
-          status: order.status || 'pending',
-          customer_name: order.customerName || 'Cliente GastroSync',
-          customer_phone: order.customerPhone || '3000000000',
-          delivery_address: order.deliveryAddress ? JSON.stringify(order.deliveryAddress) : null,
-          table_number: order.tableNumber || null,
-          restaurant_notes: order.restaurantNotes || null,
-          subtotal_cop: order.subtotal || order.total,
-          delivery_fee_cop: order.deliveryFeeApplied || 0,
-          total_cop: order.total
-        }
-      ])
-      .select('id')
-      .single();
-
-    if (orderErr || !insertedOrder) {
-      console.warn('⚠️ Error al crear pedido en Supabase:', orderErr);
-      return { success: false, error: orderErr?.message || 'Error al registrar el pedido.' };
-    }
-
-    const orderId = insertedOrder.id;
-
-    if (order.items && order.items.length > 0) {
-      const itemsToInsert = order.items.map(item => ({
-        order_id: orderId,
-        product_name: item.name,
-        unit_price_cop: item.price,
+    const payload = {
+      p_restaurant_id: order.tenantId,
+      p_fulfillment: order.fulfillment || 'restaurant_delivery',
+      p_customer_name: order.customerName || 'Cliente',
+      p_customer_phone: order.customerPhone || '0000000000',
+      p_delivery_address: order.deliveryAddress || null,
+      p_table_number: order.tableNumber || null,
+      p_restaurant_notes: order.restaurantNotes || null,
+      p_items: order.items.map(item => ({
+        product_id: item.id,
         quantity: item.qty
-      }));
+      }))
+    };
 
-      const { error: itemsErr } = await supabase
-        .from('order_items')
-        .insert(itemsToInsert);
+    const { data, error } = await supabase.rpc('create_order_with_items', payload);
 
-      if (itemsErr) {
-        console.warn('⚠️ Advertencia al guardar ítems del pedido:', itemsErr);
-      }
+    if (error) {
+      console.warn('⚠️ Detalle técnico al crear pedido vía RPC:', error.message);
+      return { success: false, error: 'No fue posible procesar el pedido. Revisa los datos e inténtalo nuevamente.' };
     }
 
-    return { success: true, orderId };
-  } catch (err: any) {
-    console.warn('⚠️ Excepción al crear pedido en Supabase:', err);
-    return { success: false, error: err?.message || 'Error al conectar con la base de datos.' };
+    if (typeof data !== 'string' || data.trim() === '') {
+      console.warn('⚠️ La RPC devolvió un formato inesperado:', data);
+      return { success: false, error: 'No fue posible procesar el pedido. Revisa los datos e inténtalo nuevamente.' };
+    }
+
+    if (!isValidUUID(data)) {
+      console.warn('⚠️ La RPC devolvió un ID inválido:', data);
+      return { success: false, error: 'No fue posible procesar el pedido. Revisa los datos e inténtalo nuevamente.' };
+    }
+
+    return { success: true, orderId: data };
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción técnica en checkout:', err instanceof Error ? err.message : String(err));
+    return { success: false, error: 'No fue posible procesar el pedido. Revisa los datos e inténtalo nuevamente.' };
   }
 }
 
 export async function fetchLiveOrdersForRestaurant(tenantId: string): Promise<Order[]> {
-  if (!isSupabaseConfigured || !supabase) return [];
+  if (!isSupabaseConfigured || !supabase || !tenantId) return [];
 
   try {
     const { data: dbOrders, error } = await supabase
       .from('orders')
       .select(`
-        *,
-        order_items (*)
+        id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
+        order_items (
+          id, order_id, product_id, product_name, unit_price_cop, quantity
+        )
       `)
       .eq('restaurant_id', tenantId)
       .order('created_at', { ascending: false });
@@ -104,42 +92,8 @@ export async function fetchLiveOrdersForRestaurant(tenantId: string): Promise<Or
       return [];
     }
 
-    return dbOrders.map((o: any) => {
-      const fulfillment: OrderFulfillment = o.fulfillment || 'pickup';
-      const parsedAddress = o.delivery_address
-        ? typeof o.delivery_address === 'string'
-          ? JSON.parse(o.delivery_address)
-          : o.delivery_address
-        : undefined;
-
-      const items = (o.order_items || []).map((it: any) => ({
-        id: it.id,
-        name: it.product_name,
-        qty: it.quantity,
-        price: it.unit_price_cop
-      }));
-
-      return {
-        id: o.id,
-        tenantId: o.restaurant_id,
-        type: mapDbFulfillmentToType(fulfillment, o.table_number),
-        items,
-        subtotal: o.subtotal_cop,
-        deliveryFeeApplied: o.delivery_fee_cop,
-        total: o.total_cop,
-        status: o.status as OrderStatus,
-        createdAt: new Date(o.created_at).getTime(),
-        customerName: o.customer_name,
-        customerPhone: o.customer_phone,
-        fulfillment,
-        customerId: o.customer_id,
-        deliveryAddress: parsedAddress,
-        tableNumber: o.table_number,
-        restaurantNotes: o.restaurant_notes,
-        cancellationReason: o.cancellation_reason
-      };
-    });
-  } catch (err) {
+    return (dbOrders as unknown as DbOrder[]).map(mapDbOrderToOrder);
+  } catch (err: unknown) {
     console.warn('⚠️ Excepción al consultar pedidos:', err);
     return [];
   }
@@ -152,42 +106,19 @@ export async function fetchLiveOrdersForCustomer(customerId: string): Promise<Or
     const { data: dbOrders, error } = await supabase
       .from('orders')
       .select(`
-        *,
-        order_items (*)
+        id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
+        order_items (
+          id, order_id, product_id, product_name, unit_price_cop, quantity
+        )
       `)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false });
 
     if (error || !dbOrders) return [];
 
-    return dbOrders.map((o: any) => {
-      const fulfillment: OrderFulfillment = o.fulfillment || 'pickup';
-      const items = (o.order_items || []).map((it: any) => ({
-        id: it.id,
-        name: it.product_name,
-        qty: it.quantity,
-        price: it.unit_price_cop
-      }));
-
-      return {
-        id: o.id,
-        tenantId: o.restaurant_id,
-        type: mapDbFulfillmentToType(fulfillment, o.table_number),
-        items,
-        subtotal: o.subtotal_cop,
-        deliveryFeeApplied: o.delivery_fee_cop,
-        total: o.total_cop,
-        status: o.status as OrderStatus,
-        createdAt: new Date(o.created_at).getTime(),
-        customerName: o.customer_name,
-        customerPhone: o.customer_phone,
-        fulfillment,
-        customerId: o.customer_id,
-        tableNumber: o.table_number,
-        restaurantNotes: o.restaurant_notes
-      };
-    });
-  } catch {
+    return (dbOrders as unknown as DbOrder[]).map(mapDbOrderToOrder);
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción al consultar pedidos de cliente:', err);
     return [];
   }
 }
@@ -195,27 +126,30 @@ export async function fetchLiveOrdersForCustomer(customerId: string): Promise<Or
 export async function updateLiveOrderStatus(
   orderId: string,
   newStatus: OrderStatus
-): Promise<boolean> {
-  if (!isSupabaseConfigured || !supabase) return false;
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'Supabase no está configurado.' };
+  }
+
+  if (!isValidUUID(orderId)) {
+    return { success: false, error: 'ID de pedido inválido.' };
+  }
 
   try {
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', orderId);
+    const { error } = await supabase.rpc('update_order_status', {
+      p_order_id: orderId,
+      p_next_status: newStatus
+    });
 
     if (error) {
-      console.warn('⚠️ Error al actualizar estado de pedido en Supabase:', error);
-      return false;
+      console.warn('⚠️ Detalle técnico al actualizar estado de pedido vía RPC:', error.message);
+      return { success: false, error: 'No fue posible actualizar el pedido. La transición no es válida o no tienes permisos.' };
     }
 
-    return true;
-  } catch (err) {
-    console.warn('⚠️ Excepción al actualizar estado:', err);
-    return false;
+    return { success: true };
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción técnica en actualización de pedido:', err instanceof Error ? err.message : String(err));
+    return { success: false, error: 'No fue posible actualizar el pedido.' };
   }
 }
 
@@ -227,7 +161,7 @@ export function subscribeToRestaurantOrders(
   tenantId: string,
   onOrderChange: () => void
 ) {
-  if (!isSupabaseConfigured || !supabase) return () => {};
+  if (!isSupabaseConfigured || !supabase || !tenantId) return () => {};
 
   const channel = supabase
     .channel(`kds_orders_${tenantId}`)
@@ -282,4 +216,63 @@ export function subscribeToCustomerOrders(
       supabase.removeChannel(channel);
     }
   };
+}
+export interface RemotePaymentResponse {
+  success: boolean;
+  paymentId?: string;
+  sandboxUrl?: string;
+  error?: string;
+  wompiConfig?: {
+    paymentId: string;
+    orderId: string;
+    providerReference: string;
+    amountInCents: number;
+    currency: string;
+    publicKey: string;
+    signature: string;
+  };
+}
+
+/**
+ * Invoca la Edge Function create-payment para inicializar un pago remoto seguro.
+ */
+export async function createRemotePayment(
+  orderId: string,
+  provider: string = 'wompi'
+): Promise<RemotePaymentResponse> {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'Supabase no configurado' };
+
+  try {
+    const { data, error } = await supabase.functions.invoke('create-payment', {
+      body: { orderId, provider }
+    });
+
+    if (error) {
+      console.warn('⚠️ Error al invocar create-payment:', error);
+      return { success: false, error: 'No fue posible iniciar el pago.' };
+    }
+
+    if (!data.success) {
+      console.warn('⚠️ Respuesta de error desde create-payment:', data.error);
+      return { success: false, error: data.error || 'No fue posible iniciar el pago.' };
+    }
+
+    return { 
+      success: true, 
+      paymentId: data.paymentId, 
+      sandboxUrl: data.sandboxUrl,
+      wompiConfig: data.signature ? {
+        paymentId: data.paymentId,
+        orderId: data.orderId,
+        providerReference: data.providerReference,
+        amountInCents: data.amountInCents,
+        currency: data.currency,
+        publicKey: data.publicKey,
+        signature: data.signature
+      } : undefined
+    };
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción al invocar create-payment:', err);
+    return { success: false, error: 'Error técnico al conectar con el servidor de pagos.' };
+  }
 }

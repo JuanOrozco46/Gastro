@@ -31,26 +31,30 @@ CREATE POLICY "gastro_media_select_public" ON storage.objects FOR SELECT
   USING (bucket_id = 'gastro-media');
 
 -- Inserción: Usuarios autenticados pueden subir archivos al bucket gastro-media
+-- Se asume que la ruta del archivo incluye el ID del restaurante en la primera carpeta o el uid del usuario
 CREATE POLICY "gastro_media_insert_authenticated" ON storage.objects FOR INSERT
   WITH CHECK (
     bucket_id = 'gastro-media'
     AND auth.role() = 'authenticated'
   );
 
--- Actualización: Usuarios autenticados pueden reemplazar sus archivos
+-- Actualización: Usuarios autenticados solo pueden reemplazar sus propios archivos
 CREATE POLICY "gastro_media_update_authenticated" ON storage.objects FOR UPDATE
   USING (
     bucket_id = 'gastro-media'
     AND auth.role() = 'authenticated'
+    AND owner = auth.uid()
   )
   WITH CHECK (
     bucket_id = 'gastro-media'
     AND auth.role() = 'authenticated'
+    AND owner = auth.uid()
   );
 
--- Eliminación: Usuarios autenticados pueden eliminar archivos
+-- Eliminación: Usuarios autenticados solo pueden eliminar sus propios archivos
 CREATE POLICY "gastro_media_delete_authenticated" ON storage.objects FOR DELETE
   USING (
     bucket_id = 'gastro-media'
     AND auth.role() = 'authenticated'
+    AND owner = auth.uid()
   );

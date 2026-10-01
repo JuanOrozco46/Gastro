@@ -23,7 +23,7 @@ export const TableQRView: React.FC = () => {
     >
       {/* Table Banner Header */}
       <div style={{
-        background: 'rgba(15, 23, 42, 0.85)',
+        background: 'var(--glass-medium)',
         backdropFilter: 'blur(20px)',
         border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '28px',
@@ -93,7 +93,7 @@ export const TableQRView: React.FC = () => {
                   gap: '16px', 
                   alignItems: 'center', 
                   padding: '1.25rem',
-                  background: 'rgba(15, 23, 42, 0.75)',
+                  background: 'var(--glass-light)',
                   backdropFilter: 'blur(16px)',
                   borderColor: 'rgba(255, 255, 255, 0.09)',
                   borderRadius: '20px'
@@ -103,8 +103,8 @@ export const TableQRView: React.FC = () => {
                   width: '64px', 
                   height: '64px', 
                   borderRadius: '16px', 
-                  background: 'rgba(255, 85, 51, 0.12)', 
-                  border: '1px solid rgba(255, 85, 51, 0.2)',
+                  background: 'var(--primary-glass)', 
+                  border: '1px solid var(--primary-glass-border)',
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
@@ -143,7 +143,7 @@ export const TableQRView: React.FC = () => {
             position: 'sticky', 
             top: '100px', 
             height: 'fit-content',
-            background: 'rgba(15, 23, 42, 0.85)',
+            background: 'var(--glass-medium)',
             backdropFilter: 'blur(20px)',
             borderColor: 'rgba(255, 255, 255, 0.1)',
             borderRadius: '24px',

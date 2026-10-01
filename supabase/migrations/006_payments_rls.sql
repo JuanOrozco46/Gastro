@@ -22,14 +22,7 @@ CREATE POLICY "payments_select_policy" ON public.payments FOR SELECT
     )
   );
 
--- Inserción de registro de pago para pedidos activos
-CREATE POLICY "payments_insert_policy" ON public.payments FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.orders o
-      WHERE o.id = order_id AND (
-        o.customer_id = auth.uid()
-        OR auth.role() = 'authenticated'
-      )
-    )
-  );
+-- Nota técnica: La inserción directa de pagos desde el navegador está deshabilitada por seguridad.
+-- Los pagos reales se crearán desde una Edge Function utilizando el service role.
+-- La service role key nunca se expone en Vite.
+-- El cliente no puede declarar arbitrariamente amount_cop, platform_fee_cop o restaurant_payout_cop.

@@ -21,7 +21,6 @@ export const SuperAdminView: React.FC = () => {
 
   // Activation State
   const [activatingAppId, setActivatingAppId] = useState<string | null>(null);
-  const [tempPasswordInput, setTempPasswordInput] = useState<string>('');
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activationSuccessInfo, setActivationSuccessInfo] = useState<{
     restaurantName: string;
@@ -36,7 +35,7 @@ export const SuperAdminView: React.FC = () => {
         style={{
           textAlign: 'center',
           padding: '4rem 2rem',
-          background: 'rgba(15, 23, 42, 0.85)',
+          background: 'var(--glass-medium)',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(239, 68, 68, 0.3)',
           borderRadius: '28px',
@@ -169,7 +168,7 @@ export const SuperAdminView: React.FC = () => {
         <div>
           {/* Status Counter Bar */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div className="card" onClick={() => setStatusFilter('all')} style={{ cursor: 'pointer', border: statusFilter === 'all' ? '1px solid var(--primary)' : undefined, background: 'rgba(15, 23, 42, 0.85)' }}>
+            <div className="card" onClick={() => setStatusFilter('all')} style={{ cursor: 'pointer', border: statusFilter === 'all' ? '1px solid var(--primary)' : undefined, background: 'var(--glass-medium)' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700 }}>Total Solicitudes</div>
               <strong style={{ fontSize: '1.5rem', color: 'white', fontWeight: 900 }}>{restaurantApplications.length}</strong>
             </div>
@@ -236,7 +235,7 @@ export const SuperAdminView: React.FC = () => {
 
           {/* Applications List */}
           {filteredApps.length === 0 ? (
-            <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem', background: 'rgba(15, 23, 42, 0.85)', color: 'var(--text-muted)' }}>
+            <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem', background: 'var(--glass-medium)', color: 'var(--text-muted)' }}>
               <FileText size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
               <h4 style={{ color: 'white', margin: '0 0 6px', fontWeight: 800 }}>No hay solicitudes registradas en este estado</h4>
               <p style={{ fontSize: '0.85rem', margin: 0 }}>
@@ -260,7 +259,7 @@ export const SuperAdminView: React.FC = () => {
                       exit={{ opacity: 0, y: -10 }}
                       className="card"
                       style={{
-                        background: 'rgba(15, 23, 42, 0.95)',
+                        background: 'var(--glass-dark)',
                         backdropFilter: 'blur(20px)',
                         border: '1px solid rgba(255, 255, 255, 0.12)',
                         borderRadius: '20px',

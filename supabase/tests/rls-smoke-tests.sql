@@ -121,3 +121,181 @@
 --   'approved', 'Auto Aprobado'
 -- );
 -- RESULTADO ESPERADO: Error RLS (applications_insert_public exige status='submitted' y review_note NULL).
+
+-- ----------------------------------------------------------------------------
+-- ESCENARIO 7: VALIDACIONES DEL CHECKOUT REMOTO (create_order_with_items)
+-- ----------------------------------------------------------------------------
+-- NOTA CRÍTICA DE PRUEBA: Estas pruebas no deben ejecutarse como superusuario 'postgres'
+-- o 'service_role' porque estos roles pueden omitir las restricciones de seguridad.
+-- Para probar adecuadamente, establece el rol en 'anon' o 'authenticated' según el caso.
+
+-- Prueba 1: Llamada desde anon (espera fallo)
+-- SET LOCAL role = 'anon';
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, NULL, NULL, '[]');
+-- RESULTADO ESPERADO: Error de permisos de ejecución o 'Usuario no autenticado'.
+
+-- Prueba 2: Llamada desde authenticated con p_items NULL (espera fallo)
+-- SET LOCAL role = 'authenticated';
+-- SET LOCAL request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, NULL, NULL, NULL);
+-- RESULTADO ESPERADO: Error 'p_items debe ser un array JSON'.
+
+-- Prueba 3: p_items como objeto en vez de array (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, NULL, NULL, '{"product_id": "1"}');
+-- RESULTADO ESPERADO: Error 'p_items debe ser un array JSON'.
+
+-- Prueba 4: Array vacío (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, NULL, NULL, '[]');
+-- RESULTADO ESPERADO: Error 'El pedido debe contener al menos un producto'.
+
+-- Prueba 5: Producto duplicado (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, NULL, NULL, '[{"product_id": "123", "quantity": 1}, {"product_id": "123", "quantity": 2}]');
+-- RESULTADO ESPERADO: Error 'Producto duplicado en el pedido...'.
+
+-- Prueba 6: Cantidad decimal (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, NULL, NULL, '[{"product_id": "123", "quantity": 1.5}]');
+-- RESULTADO ESPERADO: Error 'quantity debe ser un número entero'.
+
+-- Prueba 7: Cantidad 100 o superior (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, NULL, NULL, '[{"product_id": "123", "quantity": 100}]');
+-- RESULTADO ESPERADO: Error 'Cantidad superior al límite...'.
+
+-- Prueba 8: Domicilio (restaurant_delivery) sin dirección (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'restaurant_delivery', 'Juan', '123', NULL, NULL, NULL, '[{"product_id": "123", "quantity": 1}]');
+-- RESULTADO ESPERADO: Error 'restaurant_delivery requiere p_delivery_address...'.
+
+-- Prueba 9: Servicio a mesa (table_service) sin número (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'table_service', 'Juan', '123', NULL, NULL, NULL, '[{"product_id": "123", "quantity": 1}]');
+-- RESULTADO ESPERADO: Error 'table_service requiere p_table_number'.
+
+-- Prueba 10: Pickup con mesa (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, 'Mesa 4', NULL, '[{"product_id": "123", "quantity": 1}]');
+-- RESULTADO ESPERADO: Error 'pickup no debe incluir número de mesa'.
+
+-- Prueba 11: Modalidad no soportada por el restaurante (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'table_service', 'Juan', '123', NULL, '4', NULL, '[{"product_id": "123", "quantity": 1}]');
+-- RESULTADO ESPERADO: Error 'Modalidad de entrega no soportada por el restaurante'.
+
+-- Prueba 12: Restaurante cerrado o inactivo (espera fallo)
+-- SELECT public.create_order_with_items('22222222-2222-2222-2222-222222222222', 'pickup', 'Juan', '123', NULL, NULL, NULL, '[{"product_id": "123", "quantity": 1}]');
+-- RESULTADO ESPERADO: Error 'Restaurante no disponible o inactivo'.
+
+-- Prueba 13: Subtotal debajo de min_order (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, NULL, NULL, '[{"product_id": "123", "quantity": 1}]');
+-- RESULTADO ESPERADO: Error 'El subtotal no alcanza el pedido mínimo del restaurante'.
+
+-- Prueba 14: Precio alterado en payload (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, NULL, NULL, '[{"product_id": "123", "quantity": 1, "price": 100}]');
+-- RESULTADO ESPERADO: Error 'No se permiten campos de precio en los ítems...'.
+
+-- Prueba 15: Error de un ítem sin pedido parcial
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'pickup', 'Juan', '123', NULL, NULL, NULL, '[{"product_id": "1", "quantity": 1}, {"product_id": "2", "quantity": 0}]');
+-- RESULTADO ESPERADO: Transacción completa cancelada (Rollback), nada se inserta.
+
+-- Prueba 16: Domicilio con objeto vacío (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'restaurant_delivery', 'Juan', '123', '{}', NULL, NULL, '[{"product_id": "123", "quantity": 1}]');
+-- RESULTADO ESPERADO: Error 'La dirección de entrega debe contener addressLine'.
+
+-- Prueba 17: Domicilio sin addressLine (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'restaurant_delivery', 'Juan', '123', '{"notes": "Cerca al parque"}', NULL, NULL, '[{"product_id": "123", "quantity": 1}]');
+-- RESULTADO ESPERADO: Error 'La dirección de entrega debe contener addressLine'.
+
+-- Prueba 18: Domicilio con addressLine vacío (espera fallo)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'restaurant_delivery', 'Juan', '123', '{"addressLine": "   "}', NULL, NULL, '[{"product_id": "123", "quantity": 1}]');
+-- RESULTADO ESPERADO: Error 'addressLine no puede estar vacío'.
+
+-- Prueba 19: Domicilio válido (espera éxito)
+-- SELECT public.create_order_with_items('11111111-1111-1111-1111-111111111111', 'restaurant_delivery', 'Juan', '123', '{"addressLine": "Calle 123", "label": "Casa"}', NULL, NULL, '[{"product_id": "123", "quantity": 1}]');
+-- RESULTADO ESPERADO: UUID de la nueva orden insertada.
+
+-- =========================================================================
+-- PARTE 5: FASE 5A - Pruebas RPC update_order_status (KDS Remoto)
+-- Ejecutar estas consultas como roles específicos para validar la RLS y lógica
+-- =========================================================================
+
+-- Prueba 20: Cliente intentando actualizar un pedido (espera fallo)
+-- SET ROLE authenticated; -- Asumir sesión de cliente
+-- SELECT public.update_order_status('UUID_DEL_PEDIDO', 'accepted');
+-- RESULTADO ESPERADO: Error 'No tienes permisos administrativos para actualizar pedidos.'
+
+-- Prueba 21: Staff actualizando pending -> accepted (espera éxito)
+-- SET ROLE authenticated; -- Asumir sesión de staff
+-- SELECT public.update_order_status('UUID_DEL_PEDIDO', 'accepted');
+-- RESULTADO ESPERADO: true
+
+-- Prueba 22: Staff intentando cancelar un pedido (espera fallo)
+-- SET ROLE authenticated; -- Asumir sesión de staff
+-- SELECT public.update_order_status('UUID_DEL_PEDIDO', 'cancelled');
+-- RESULTADO ESPERADO: Error 'Transición de estado no permitida para personal de cocina.'
+
+-- Prueba 23: Staff intentando marcar delivered (espera fallo)
+-- SET ROLE authenticated; -- Asumir sesión de staff
+-- SELECT public.update_order_status('UUID_DEL_PEDIDO', 'delivered');
+-- RESULTADO ESPERADO: Error 'Transición de estado no permitida para personal de cocina.'
+
+-- Prueba 24: Propietario actualizando estados permitidos (espera éxito)
+-- SET ROLE authenticated; -- Asumir sesión de owner
+-- SELECT public.update_order_status('UUID_DEL_PEDIDO', 'out_for_delivery');
+-- RESULTADO ESPERADO: true
+
+-- Prueba 25: Propietario intentando transición inválida como pending -> ready (espera fallo)
+-- SET ROLE authenticated; -- Asumir sesión de owner
+-- SELECT public.update_order_status('UUID_DEL_PEDIDO', 'ready');
+-- RESULTADO ESPERADO: Error 'Transición de estado no válida para el propietario.'
+
+-- Prueba 26: Usuario de otro restaurante intentando actualizar (espera fallo)
+-- SET ROLE authenticated; -- Asumir sesión de owner/staff de otro tenant
+-- SELECT public.update_order_status('UUID_DEL_PEDIDO', 'accepted');
+-- RESULTADO ESPERADO: Error 'No tienes autorización para modificar pedidos de este restaurante.'
+
+-- Prueba 27: Usuario no autenticado intentando actualizar (espera fallo)
+-- SET ROLE anon; 
+-- SELECT public.update_order_status('UUID_DEL_PEDIDO', 'accepted');
+-- RESULTADO ESPERADO: Error de permisos (no puede ejecutar la función)
+
+-- Prueba 28: Pedido inexistente (espera fallo)
+-- SET ROLE authenticated;
+-- SELECT public.update_order_status('00000000-0000-0000-0000-000000000000', 'accepted');
+-- RESULTADO ESPERADO: Error 'El pedido especificado no existe.'
+
+-- Prueba 29: Transición inválida para staff accepted -> ready (espera fallo)
+-- SET ROLE authenticated;
+-- SELECT public.update_order_status('UUID_DEL_PEDIDO', 'ready');
+-- RESULTADO ESPERADO: Error 'Transición de estado no permitida para personal de cocina.'
+
+-- Prueba 30: Pedido cancelado intentando reabrirse (espera fallo)
+-- SET ROLE authenticated;
+-- SELECT public.update_order_status('UUID_PEDIDO_CANCELADO', 'pending');
+-- RESULTADO ESPERADO: Error 'No se puede cambiar el estado de un pedido finalizado o cancelado.'
+
+-- =========================================================================
+-- PARTE 6: FASE 5B - Pruebas RLS para Pagos (Payments)
+-- Garantizar que React no puede insertar, actualizar o eliminar pagos.
+-- =========================================================================
+
+-- Prueba 31: Cliente intentando insertar un pago desde frontend (espera fallo)
+-- SET ROLE authenticated;
+-- INSERT INTO public.payments (order_id, provider, provider_reference, amount_cop, platform_fee_cop, restaurant_payout_cop, status)
+-- VALUES ('UUID_ORDEN', 'sandbox', 'ref_123', 10000, 300, 9700, 'pending');
+-- RESULTADO ESPERADO: Error de RLS (new row violates row-level security policy)
+
+-- Prueba 32: Cliente intentando actualizar un pago existente para 'approved' (espera fallo)
+-- SET ROLE authenticated;
+-- UPDATE public.payments SET status = 'approved' WHERE id = 'UUID_PAGO';
+-- RESULTADO ESPERADO: Error (0 rows affected o permiso denegado por falta de política de UPDATE)
+
+-- Prueba 33: Cliente intentando borrar un pago (espera fallo)
+-- SET ROLE authenticated;
+-- DELETE FROM public.payments WHERE id = 'UUID_PAGO';
+-- RESULTADO ESPERADO: Error (0 rows affected o permiso denegado por falta de política de DELETE)
+
+-- Prueba 34: Consulta de pagos propios por el cliente (espera éxito)
+-- SET ROLE authenticated; -- Asumiendo auth.uid() es el dueño del pedido
+-- SELECT * FROM public.payments;
+-- RESULTADO ESPERADO: Devuelve únicamente los pagos asociados a sus órdenes.
+
+-- Prueba 35: Consulta de pagos de otro cliente (espera vacío)
+-- SET ROLE authenticated; -- Asumiendo auth.uid() NO es el dueño de la orden ni restaurante
+-- SELECT * FROM public.payments WHERE id = 'UUID_PAGO_AJENO';
+-- RESULTADO ESPERADO: 0 rows (invisible)
+

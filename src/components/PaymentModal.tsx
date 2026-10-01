@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/useApp';
-import { PaymentService } from '../services/paymentService';
+import { PaymentSimulatorService } from '../services/paymentService';
 import type { PaymentMethod, OrderFulfillment, CheckoutDetails } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShieldCheck, CheckCircle2, AlertCircle, ShoppingBag, Bike, Utensils } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, ShoppingBag, Bike, Utensils } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { PaymentStatus } from './PaymentStatus';
+import { WompiCheckout } from './WompiCheckout';
+import type { WompiCheckoutConfig } from './WompiCheckout';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -13,11 +16,13 @@ interface PaymentModalProps {
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'Recoger en local' }) => {
-  const { cart, currentTenant, currentUser, submitOrderWithPayment } = useApp();
+  const { cart, currentTenant, currentUser, submitOrderWithPayment, retryRemotePayment, authMode, isSubmittingOrder, orderError } = useApp();
   const [method, setMethod] = useState<PaymentMethod>('apple_pay');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [wompiConfig, setWompiConfig] = useState<WompiCheckoutConfig | null>(null);
+  const [pendingPaymentInfo, setPendingPaymentInfo] = useState<{orderId: string, paymentId: string, sandboxUrl?: string} | null>(null);
 
   // Available delivery modes for this restaurant
   const allowedModes: OrderFulfillment[] = (currentTenant.deliveryModes && currentTenant.deliveryModes.length > 0)
@@ -122,8 +127,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       }
     }
 
-    setLoading(true);
-
     const checkoutDetails: CheckoutDetails = {
       fulfillment,
       customerName: customerName.trim(),
@@ -137,35 +140,57 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       restaurantNotes: restaurantNotes.trim() || undefined
     };
 
-    const transaction = await PaymentService.processPayment({
-      orderId: tempOrderId,
-      tenantId: currentTenant.id,
-      totalAmount: total,
-      commissionRate: currentTenant.commissionRate,
-      paymentMethod: method,
-      cardDetails: method === 'card' ? {
-        number: cardNumber,
-        holder: cardHolder,
-        expMonth: cardExp.split('/')[0] || '12',
-        expYear: cardExp.split('/')[1] || '28',
-        cvc: cardCvc
-      } : undefined
-    });
+    let successResult = false;
 
-    setLoading(false);
-    setSuccess(true);
+    if (authMode === 'remote') {
+      // In remote mode, we do not simulate a local transaction to avoid saving dummy payments
+      const res = await submitOrderWithPayment(checkoutDetails, method);
+      if (res.success && res.orderId && res.paymentId) {
+        if (res.wompiConfig) {
+          setWompiConfig(res.wompiConfig);
+        } else {
+          setPendingPaymentInfo({ 
+            orderId: res.orderId, 
+            paymentId: res.paymentId, 
+            sandboxUrl: res.sandboxUrl 
+          });
+        }
+        return; // Detenemos la ejecución para mostrar el modal de Wompi o el estatus
+      }
+    } else {
+      setLoading(true);
+      const transaction = await PaymentSimulatorService.processPayment({
+        orderId: tempOrderId,
+        tenantId: currentTenant.id,
+        totalAmount: total,
+        commissionRate: currentTenant.commissionRate,
+        paymentMethod: method,
+        cardDetails: method === 'card' ? {
+          number: cardNumber,
+          holder: cardHolder,
+          expMonth: cardExp.split('/')[0] || '12',
+          expYear: cardExp.split('/')[1] || '28',
+          cvc: cardCvc
+        } : undefined
+      });
+      setLoading(false);
+      const res = await submitOrderWithPayment(checkoutDetails, method, transaction);
+      successResult = res.success;
+    }
 
-    confetti({
-      particleCount: 120,
-      spread: 80,
-      origin: { y: 0.6 }
-    });
+    if (successResult) {
+      setSuccess(true);
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
 
-    setTimeout(() => {
-      submitOrderWithPayment(checkoutDetails, method, transaction);
-      setSuccess(false);
-      onClose();
-    }, 1800);
+      setTimeout(() => {
+        setSuccess(false);
+        onClose();
+      }, 1800);
+    }
   };
 
   return (
@@ -195,7 +220,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
             maxWidth: '540px', 
             maxHeight: '90vh',
             overflowY: 'auto',
-            background: 'rgba(15, 23, 42, 0.95)', 
+            background: 'var(--glass-dark)', 
             backdropFilter: 'blur(24px)',
             border: '1px solid rgba(255, 255, 255, 0.12)', 
             borderRadius: '28px', 
@@ -226,7 +251,55 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
             <X size={18} />
           </button>
 
-          {success ? (
+          {wompiConfig ? (
+            <WompiCheckout
+              config={wompiConfig}
+              onWidgetClosed={() => {
+                setPendingPaymentInfo({ 
+                  orderId: wompiConfig.orderId, 
+                  paymentId: wompiConfig.paymentId 
+                });
+                setWompiConfig(null);
+              }}
+              onCancel={() => {
+                setPendingPaymentInfo({ 
+                  orderId: wompiConfig.orderId, 
+                  paymentId: wompiConfig.paymentId 
+                });
+                setWompiConfig(null);
+              }}
+            />
+          ) : pendingPaymentInfo ? (
+            <PaymentStatus
+              orderId={pendingPaymentInfo.orderId}
+              paymentId={pendingPaymentInfo.paymentId}
+              authMode={authMode}
+              sandboxUrl={pendingPaymentInfo.sandboxUrl}
+              onClose={() => {
+                setPendingPaymentInfo(null);
+                onClose();
+              }}
+              onRetry={async () => {
+                setFormError(null);
+                const currentOrderId = pendingPaymentInfo.orderId;
+                setPendingPaymentInfo(null); 
+                const res = await retryRemotePayment(currentOrderId);
+                if (res.success && res.paymentId) {
+                  if (res.wompiConfig) {
+                    setWompiConfig(res.wompiConfig);
+                  } else {
+                    setPendingPaymentInfo({
+                      orderId: currentOrderId,
+                      paymentId: res.paymentId,
+                      sandboxUrl: res.sandboxUrl
+                    });
+                  }
+                } else {
+                  setFormError('No fue posible iniciar el reintento de pago.');
+                }
+              }}
+            />
+          ) : success ? (
             <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
               <motion.div 
                 initial={{ scale: 0 }}
@@ -266,7 +339,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
               </div>
 
               {/* Validation Alert */}
-              {formError && (
+              {(formError || orderError) && (
                 <div style={{
                   padding: '10px 14px',
                   borderRadius: '12px',
@@ -281,7 +354,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                   marginBottom: '1.25rem'
                 }}>
                   <AlertCircle size={18} style={{ color: '#EF4444', flexShrink: 0 }} />
-                  <span>{formError}</span>
+                  <span>{formError || orderError}</span>
                 </div>
               )}
 
@@ -299,7 +372,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                         padding: '10px 14px',
                         borderRadius: '14px',
                         border: fulfillment === 'pickup' ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.1)',
-                        background: fulfillment === 'pickup' ? 'rgba(255, 85, 51, 0.15)' : 'rgba(255,255,255,0.03)',
+                        background: fulfillment === 'pickup' ? 'var(--primary-glow)' : 'rgba(255,255,255,0.03)',
                         color: 'white',
                         textAlign: 'left',
                         cursor: 'pointer',
@@ -324,7 +397,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                         padding: '10px 14px',
                         borderRadius: '14px',
                         border: fulfillment === 'restaurant_delivery' ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.1)',
-                        background: fulfillment === 'restaurant_delivery' ? 'rgba(255, 85, 51, 0.15)' : 'rgba(255,255,255,0.03)',
+                        background: fulfillment === 'restaurant_delivery' ? 'var(--primary-glow)' : 'rgba(255,255,255,0.03)',
                         color: 'white',
                         textAlign: 'left',
                         cursor: 'pointer',
@@ -351,7 +424,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                         padding: '10px 14px',
                         borderRadius: '14px',
                         border: fulfillment === 'table_service' ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.1)',
-                        background: fulfillment === 'table_service' ? 'rgba(255, 85, 51, 0.15)' : 'rgba(255,255,255,0.03)',
+                        background: fulfillment === 'table_service' ? 'var(--primary-glow)' : 'rgba(255,255,255,0.03)',
                         color: 'white',
                         textAlign: 'left',
                         cursor: 'pointer',
@@ -555,11 +628,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
               {/* Commission Transparency Note */}
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: '12px', border: '1px dashed rgba(255,255,255,0.12)', marginBottom: '1.25rem', fontSize: '0.78rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Liquidación al Restaurante (97%):</span>
+                  <span style={{ color: 'var(--text-muted)' }}>Para el restaurante (97%):</span>
                   <strong style={{ color: '#10B981' }}>${restaurantPayout.toLocaleString('es-CO')} COP</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Comisión Ética GastroSync (3%):</span>
+                  <span style={{ color: 'var(--text-muted)' }}>Comisión GastroSync (3%):</span>
                   <strong style={{ color: '#F59E0B' }}>${platformFee.toLocaleString('es-CO')} COP</strong>
                 </div>
               </div>
@@ -570,14 +643,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                 type="submit"
                 className="btn btn-secondary btn-full"
                 style={{ padding: '14px', fontSize: '0.98rem', fontWeight: 900, borderRadius: '14px' }}
-                disabled={loading}
+                disabled={loading || isSubmittingOrder}
               >
-                {loading ? 'Procesando Pago Seguro...' : `Pagar $${total.toLocaleString('es-CO')} COP`}
+                {(loading || isSubmittingOrder) ? 'Procesando...' : `Pagar $${total.toLocaleString('es-CO')} COP`}
               </motion.button>
 
               <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                <ShieldCheck size={14} style={{ color: '#10B981' }} />
-                Pago seguro cifrado 256-bit SSL · Registrado en PostgreSQL
+                🔒 Pago procesado de forma segura
               </div>
             </form>
           )}

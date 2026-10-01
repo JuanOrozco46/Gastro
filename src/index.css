@@ -1,11 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  /* GastroSync Editorial Identity */
-  --primary: #C8A97E;
-  --primary-hover: #B5915F;
-  --primary-light: rgba(200, 169, 126, 0.12);
-  --primary-border: rgba(200, 169, 126, 0.35);
+  /* GastroSync — Warm Gastronomy Identity */
+  --primary: #C85A38;
+  --primary-hover: #A84830;
+  --primary-light: rgba(200, 90, 56, 0.10);
+  --primary-border: rgba(200, 90, 56, 0.30);
+  --primary-glass: rgba(200, 90, 56, 0.12);
+  --primary-glass-border: rgba(200, 90, 56, 0.20);
+  --primary-glass-strong: rgba(200, 90, 56, 0.20);
+  --primary-glow: rgba(200, 90, 56, 0.15);
 
   --secondary: #6B8C6A;
   --secondary-hover: #547053;
@@ -14,17 +18,25 @@
   --tertiary: #8B6F47;
   --tertiary-light: rgba(139, 111, 71, 0.1);
 
-  /* Neutrals — warm, not cool */
-  --neutral-bg: #FAFAF8;
+  /* Neutrals — warm cream tones */
+  --neutral-bg: #FAF7F2;
   --neutral-surface: #FFFFFF;
-  --neutral-surface-alt: #F4F3F0;
-  --neutral-border: #E8E5E0;
-  --neutral-border-strong: #D0CBC3;
-  --neutral-dark: #141210;
+  --neutral-surface-alt: #F5F0E8;
+  --neutral-border: #E8E2D8;
+  --neutral-border-strong: #D0C8BC;
+  --neutral-dark: #2C2520;
 
-  --text-main: #141210;
-  --text-muted: #6B6560;
-  --text-light: #B0ABA5;
+  /* Glass surfaces — warm brown, not cold slate */
+  --glass-dark: rgba(44, 37, 32, 0.92);
+  --glass-medium: rgba(44, 37, 32, 0.82);
+  --glass-light: rgba(44, 37, 32, 0.72);
+  --glass-overlay: rgba(44, 37, 32, 0.60);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-border-active: rgba(200, 90, 56, 0.30);
+
+  --text-main: #2C2520;
+  --text-muted: #78706A;
+  --text-light: #B0A89E;
 
   --radius-sm: 8px;
   --radius-md: 10px;
@@ -32,8 +44,9 @@
   --radius-xl: 18px;
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Playfair Display', Georgia, serif;
-  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
-  --shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.1);
+  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.08);
 }
 
 * {
@@ -402,7 +415,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .kds-column {
-  background: rgba(15, 23, 42, 0.75);
+  background: var(--glass-light);
   backdrop-filter: blur(14px);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(255, 255, 255, 0.09);
@@ -3412,7 +3425,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .gf-search-clear:hover {
-  background: rgba(255, 85, 51, 0.2);
+  background: var(--primary-glass-border);
   color: var(--primary);
 }
 
@@ -3440,7 +3453,7 @@ input:focus, select:focus, textarea:focus {
 
 .gf-toggle-advanced.open {
   border-color: var(--primary);
-  background: rgba(255, 85, 51, 0.1);
+  background: var(--primary-light);
   color: var(--primary);
 }
 
@@ -3580,8 +3593,8 @@ input:focus, select:focus, textarea:focus {
 }
 
 .gf-clear-all-btn {
-  background: rgba(255, 85, 51, 0.1);
-  border: 1px solid rgba(255, 85, 51, 0.2);
+  background: var(--primary-light);
+  border: 1px solid var(--primary-glass-border);
   color: var(--primary);
   padding: 4px 12px;
   border-radius: 8px;
@@ -3596,7 +3609,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .gf-clear-all-btn:hover {
-  background: rgba(255, 85, 51, 0.2);
+  background: var(--primary-glass-border);
   border-color: var(--primary);
 }
 
@@ -3613,8 +3626,8 @@ input:focus, select:focus, textarea:focus {
   gap: 4px;
   padding: 3px 10px;
   border-radius: 8px;
-  background: rgba(255, 85, 51, 0.1);
-  border: 1px solid rgba(255, 85, 51, 0.2);
+  background: var(--primary-light);
+  border: 1px solid var(--primary-glass-border);
   color: var(--primary);
   font-size: 0.72rem;
   font-weight: 700;
@@ -5499,7 +5512,7 @@ textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--primary, #ff5533);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(255, 85, 51, 0.25);
+  box-shadow: 0 0 0 4px var(--primary-glass-strong);
 }
 
 /* Safe Area Insets para dispositivos móviles con Notch (iOS Safari & Android) */
