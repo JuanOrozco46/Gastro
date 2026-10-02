@@ -17,7 +17,7 @@ export const RestaurantAdmin: React.FC = () => {
     tenants, currentUser, toggleTenantOpenStatus,
     products, toggleProductAvailability, addProduct, deleteProduct,
     drivers, addDriver,
-    posts, createPost, deletePost, transactions,
+    posts, createPost, deletePost,
     orders, updateOrderStatus, authMode, showToast
   } = useApp();
 
@@ -83,15 +83,11 @@ export const RestaurantAdmin: React.FC = () => {
   // Filtered data for active operating tenant ONLY
   const tenantProducts = products.filter(p => p.tenantId === operatingTenant.id);
   const tenantPosts = posts.filter(p => p.tenantId === operatingTenant.id);
-  const tenantTx = transactions.filter(t => t.tenantId === operatingTenant.id);
   const tenantDrivers = drivers.filter(d => d.tenantId === operatingTenant.id);
   const tenantOrders = orders.filter(o => o.tenantId === operatingTenant.id).sort((a, b) => b.createdAt - a.createdAt);
 
   const activeOrders = tenantOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
   const pastOrders = tenantOrders.filter(o => o.status === 'delivered' || o.status === 'cancelled');
-
-  const totalSalesCOP = tenantTx.reduce((acc, t) => acc + t.amount, 0) || (tenantOrders.reduce((acc, o) => acc + o.total, 0) || 3470000);
-  const totalSavedCommission = Math.round(totalSalesCOP * 0.27);
 
   const handleAddProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,23 +253,6 @@ export const RestaurantAdmin: React.FC = () => {
             borderTop: '1px dashed rgba(255, 255, 255, 0.12)' 
           }}
         >
-          <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '14px 18px', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
-              Ventas Acumuladas
-            </span>
-            <strong style={{ display: 'block', fontSize: '1.3rem', color: 'white', fontWeight: 900, marginTop: '4px' }}>
-              ${totalSalesCOP.toLocaleString('es-CO')} COP
-            </strong>
-          </div>
-
-          <div style={{ background: 'rgba(16, 185, 129, 0.12)', padding: '14px 18px', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-            <span style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 800, textTransform: 'uppercase' }}>
-              Ahorro vs 30% (+27%)
-            </span>
-            <strong style={{ display: 'block', fontSize: '1.3rem', color: '#10B981', fontWeight: 900, marginTop: '4px' }}>
-              +${totalSavedCommission.toLocaleString('es-CO')} COP
-            </strong>
-          </div>
 
           <div style={{ background: 'rgba(56, 189, 248, 0.12)', padding: '14px 18px', borderRadius: '16px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
             <span style={{ fontSize: '0.75rem', color: '#38BDF8', fontWeight: 800, textTransform: 'uppercase' }}>
