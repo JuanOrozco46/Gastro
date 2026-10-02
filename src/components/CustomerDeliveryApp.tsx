@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { toggleRemoteSave } from '../services/supabaseDataService';
-import type { Post } from '../types';
+import type { Post, Tenant } from '../types';
 
 /* ── Format numbers ──────────────────────────────────────── */
 const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
@@ -289,7 +289,12 @@ export const CustomerDeliveryApp: React.FC = () => {
   }, [selectedZone]);
 
   const tenantMap = useMemo(() => {
-    return new Map(tenants.map(t => [t.id, t]));
+    const map = new Map<string, Tenant>();
+    tenants.forEach(t => {
+      map.set(t.id, t);
+      map.set(t.slug, t);
+    });
+    return map;
   }, [tenants]);
 
   const zoneFilteredPosts = useMemo(() => {
@@ -416,8 +421,10 @@ export const CustomerDeliveryApp: React.FC = () => {
         const matchTenant = p.tenantName.toLowerCase().includes(q);
         const matchCategory = p.tenantCategory.toLowerCase().includes(q);
         const matchHash = p.hashtags?.some(h => h.toLowerCase().includes(q)) ?? false;
-        const matchZone = zoneName.includes(q);
-        const matchCity = cityName.includes(q);
+        
+        const qTerms = q.split(/\s+/).filter(t => t.length > 2);
+        const matchZone = zoneName.includes(q) || qTerms.some(term => zoneName.includes(term));
+        const matchCity = cityName.includes(q) || qTerms.some(term => cityName.includes(term));
 
         return matchDish || matchDesc || matchTenant || matchCategory || matchHash || matchZone || matchCity;
       });
