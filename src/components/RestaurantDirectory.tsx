@@ -63,8 +63,10 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
           const matchProduct = products.some(
             p => p.tenantId === t.id && p.name.toLowerCase().includes(q)
           );
-          const matchZone = zoneName.includes(q);
-          const matchCity = cityName.includes(q);
+          
+          const qTerms = q.split(/\s+/).filter(term => term.length > 2);
+          const matchZone = zoneName.includes(q) || qTerms.some(term => zoneName.includes(term));
+          const matchCity = cityName.includes(q) || qTerms.some(term => cityName.includes(term));
 
           return matchName || matchCategory || matchDesc || matchAddress || matchSpecialty || matchProduct || matchZone || matchCity;
         }
