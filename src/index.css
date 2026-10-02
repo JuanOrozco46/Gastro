@@ -266,6 +266,7 @@ main {
 .badge-primary { background: var(--primary-light); color: var(--primary-hover); border: 1px solid var(--primary-border); }
 .badge-secondary { background: var(--secondary-light); color: var(--secondary-hover); border: 1px solid rgba(107, 140, 106, 0.3); }
 .badge-tertiary { background: var(--tertiary-light); color: var(--tertiary); border: 1px solid rgba(139, 111, 71, 0.25); }
+.badge-success { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); }
 
 /* Buttons (Matching Design Spec: Primary, Secondary, Inverted, Outlined) */
 .btn {
@@ -404,8 +405,14 @@ input:focus, select:focus, textarea:focus {
 /* KDS Kitchen View Components */
 .kds-columns {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.2rem;
+}
+
+@media (max-width: 1400px) {
+  .kds-columns {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 900px) {
@@ -442,6 +449,8 @@ input:focus, select:focus, textarea:focus {
   animation: slideIn 0.3s ease-out;
 }
 
+.ticket-card.pending { border-left-color: #3B82F6; }
+.ticket-card.accepted { border-left-color: #10B981; }
 .ticket-card.preparing { border-left-color: var(--tertiary); }
 .ticket-card.ready { border-left-color: var(--secondary); }
 

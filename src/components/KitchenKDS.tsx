@@ -48,11 +48,18 @@ export const KitchenKDS: React.FC = () => {
 
   const handleUpdate = async (orderId: string, status: OrderStatus) => {
     setUpdatingOrderId(orderId);
-    await updateOrderStatus(orderId, status);
+    const success = await updateOrderStatus(orderId, status);
     setUpdatingOrderId(null);
+    
+    if (!success) {
+      // El toast ya se muestra en updateOrderStatus con el error específico
+      console.warn(`Failed to update order ${orderId} to ${status}`);
+    }
   };
 
-  const pendingOrders = tenantOrders.filter(o => o.status === 'pending' || o.status === 'accepted');
+  // Filtrar pedidos por estado para cada columna del KDS
+  const newOrders = tenantOrders.filter(o => o.status === 'pending');
+  const acceptedOrders = tenantOrders.filter(o => o.status === 'accepted');
   const preparingOrders = tenantOrders.filter(o => o.status === 'preparing');
   const readyOrders = tenantOrders.filter(o => o.status === 'ready');
 
@@ -129,7 +136,7 @@ export const KitchenKDS: React.FC = () => {
                 onClick={() => handleUpdate(order.id, 'accepted')}
               >
                 {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} 
-                {updatingOrderId === order.id ? ' Actualizando...' : ' Aceptar Comanda'}
+                {updatingOrderId === order.id ? ' Aceptando...' : ' Aceptar Pedido'}
               </button>
             )}
 
@@ -140,7 +147,7 @@ export const KitchenKDS: React.FC = () => {
                 onClick={() => handleUpdate(order.id, 'preparing')}
               >
                 {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <Flame size={16} />} 
-                {updatingOrderId === order.id ? ' Actualizando...' : ' Empezar a Preparar'}
+                {updatingOrderId === order.id ? ' Iniciando...' : ' Iniciar Preparación'}
               </button>
             )}
 
@@ -151,15 +158,39 @@ export const KitchenKDS: React.FC = () => {
                 onClick={() => handleUpdate(order.id, 'ready')}
               >
                 {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} 
-                {updatingOrderId === order.id ? ' Actualizando...' : ' Marcar Listo'}
+                {updatingOrderId === order.id ? ' Finalizando...' : ' Marcar Listo'}
               </button>
             )}
 
             {order.status === 'ready' && (
-              <div style={{ background: 'rgba(16,185,129,0.15)', padding: '8px', borderRadius: '10px', textAlign: 'center', fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>
-                <PackageCheck size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                Listo para despacho
-              </div>
+              <>
+                <div style={{ 
+                  background: 'rgba(16,185,129,0.15)', 
+                  padding: '8px', 
+                  borderRadius: '10px', 
+                  textAlign: 'center', 
+                  fontSize: '0.78rem', 
+                  color: '#10B981', 
+                  fontWeight: 700,
+                  marginBottom: '8px'
+                }}>
+                  <PackageCheck size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                  Listo para entregar
+                </div>
+                {isOwner && (
+                  <button
+                    className="btn btn-success btn-full"
+                    disabled={updatingOrderId === order.id}
+                    onClick={() => handleUpdate(order.id, order.fulfillment === 'restaurant_delivery' ? 'out_for_delivery' : 'delivered')}
+                    style={{ background: 'var(--success)', color: 'white' }}
+                  >
+                    {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <PackageCheck size={16} />} 
+                    {updatingOrderId === order.id 
+                      ? ' Despachando...' 
+                      : order.fulfillment === 'restaurant_delivery' ? ' Despachar (Domicilio)' : ' Entregar al Cliente'}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -188,28 +219,37 @@ export const KitchenKDS: React.FC = () => {
       </div>
 
       <div className="kds-columns">
-        {/* Pending Column */}
+        {/* Column 1: New Orders (Pending) */}
         <div className="kds-column">
           <div className="kds-column-header">
-            <span>🔥 NUEVOS PEDIDOS</span>
-            <span className="badge badge-primary">{pendingOrders.length}</span>
+            <span>🆕 NUEVOS</span>
+            <span className="badge badge-primary">{newOrders.length}</span>
           </div>
-          {renderTicketList(pendingOrders, 'pending')}
+          {renderTicketList(newOrders, 'pending')}
         </div>
 
-        {/* Preparing Column */}
+        {/* Column 2: Accepted Orders (Ready to cook) */}
         <div className="kds-column">
           <div className="kds-column-header">
-            <span>🍳 EN PREPARACIÓN</span>
+            <span>✅ ACEPTADOS</span>
+            <span className="badge badge-success">{acceptedOrders.length}</span>
+          </div>
+          {renderTicketList(acceptedOrders, 'accepted')}
+        </div>
+
+        {/* Column 3: Preparing (Cooking) */}
+        <div className="kds-column">
+          <div className="kds-column-header">
+            <span>🍳 PREPARANDO</span>
             <span className="badge badge-tertiary">{preparingOrders.length}</span>
           </div>
           {renderTicketList(preparingOrders, 'preparing')}
         </div>
 
-        {/* Ready Column */}
+        {/* Column 4: Ready for Dispatch */}
         <div className="kds-column">
           <div className="kds-column-header">
-            <span>✅ LISTOS PARA DESPACHO</span>
+            <span>📦 LISTOS</span>
             <span className="badge badge-secondary">{readyOrders.length}</span>
           </div>
           {renderTicketList(readyOrders, 'ready')}
