@@ -498,9 +498,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const res = await signInWithSupabase(email, pass);
     if (res.success && res.user) {
-      setCurrentUser(res.user);
-      setUserRole(res.user.role);
-      
       let updatedTenants = tenants;
       if (isSupabaseConfigured) {
         const liveTenants = await fetchLiveTenants();
@@ -511,6 +508,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           updatedTenants = liveTenants;
         }
       }
+
+      setCurrentUser(res.user);
+      setUserRole(res.user.role);
 
       if (res.user.tenantId) {
         const tenantMatch = updatedTenants.find(t => t.id === res.user!.tenantId);
