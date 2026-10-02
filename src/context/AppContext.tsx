@@ -189,6 +189,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const [remoteTenants, setRemoteTenants] = useState<Tenant[]>([]);
   const remoteTenantsRef = React.useRef<Tenant[]>([]);
+  const likingPostsRef = React.useRef<Set<string>>(new Set());
   const [remoteProducts, setRemoteProducts] = useState<Product[]>([]);
   const [remotePosts, setRemotePosts] = useState<Post[]>([]);
 
@@ -607,29 +608,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleLikePost = async (postId: string) => {
-    if (authMode === 'remote') {
-      if (!currentUser?.id) {
-        showToast('⚠️ Inicia sesión para dar like.');
+    if (likingPostsRef.current.has(postId)) return;
+    likingPostsRef.current.add(postId);
+    try {
+      if (authMode === 'remote') {
+        if (!currentUser?.id) {
+          showToast('⚠️ Inicia sesión para dar like.');
+          return;
+        }
+        const ok = await toggleRemoteLike(postId, currentUser.id);
+        if (!ok) {
+          console.error('⚠️ Falló toggleRemoteLike para el post:', postId);
+          showToast('❌ Error al procesar like.');
+          return;
+        }
+        setRemotePosts(prev => prev.map(p => {
+          if (p.id === postId) {
+            const nextLiked = !p.isLiked;
+            return { ...p, isLiked: nextLiked, likes: nextLiked ? p.likes + 1 : p.likes - 1 };
+          }
+          return p;
+        }));
         return;
       }
-      await toggleRemoteLike(postId, currentUser.id);
-      setRemotePosts(prev => prev.map(p => {
+      // Modo demo
+      setPosts(prev => prev.map(p => {
         if (p.id === postId) {
           const nextLiked = !p.isLiked;
           return { ...p, isLiked: nextLiked, likes: nextLiked ? p.likes + 1 : p.likes - 1 };
         }
         return p;
       }));
-      return;
+    } finally {
+      likingPostsRef.current.delete(postId);
     }
-    // Modo demo
-    setPosts(prev => prev.map(p => {
-      if (p.id === postId) {
-        const nextLiked = !p.isLiked;
-        return { ...p, isLiked: nextLiked, likes: nextLiked ? p.likes + 1 : p.likes - 1 };
-      }
-      return p;
-    }));
   };
 
   const setCurrentTenantBySlug = (slug: string) => {
@@ -1068,20 +1080,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     if (authMode === 'remote') {
-      const ok = await addRemoteComment(postId, currentUser.id, text);
-      if (!ok) {
+      const newComment = await addRemoteComment(postId, currentUser.id, text);
+      if (!newComment) {
         showToast('❌ No se pudo guardar el comentario.');
         return;
       }
-      const newComment = {
-        id: `c_${Date.now()}`,
-        postId,
-        userName: currentUser.name,
-        userAvatar: '🥑',
-        text,
-        timeAgo: 'Justo ahora',
-        likes: 0
-      };
       setRemotePosts(prev => prev.map(p => {
         if (p.id === postId) {
           const updatedComments = [newComment, ...(p.comments || [])];

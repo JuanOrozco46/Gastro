@@ -114,31 +114,63 @@ export async function fetchLiveProducts(): Promise<Product[]> {
   }
 }
 
-export async function addRemoteComment(postId: string, userId: string, text: string): Promise<boolean> {
-  if (!isSupabaseConfigured || !supabase) return false;
+export async function fetchRemoteComments(postId: string) {
+  if (!isSupabaseConfigured || !supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('post_comments')
+      .select('id, post_id, user_id, content, created_at, profiles(full_name)')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+    return data.map((c: any) => ({
+      id: c.id,
+      postId: c.post_id,
+      userName: c.profiles?.full_name || 'Usuario',
+      userAvatar: '🥑',
+      text: c.content,
+      timeAgo: formatTimeAgo(c.created_at),
+      likes: 0
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function addRemoteComment(postId: string, userId: string, text: string) {
+  if (!isSupabaseConfigured || !supabase) return null;
   
   const trimmed = text.trim();
   if (!trimmed || trimmed.length === 0 || trimmed.length > 500) {
     console.warn('⚠️ Comentario inválido: vacío o supera 500 caracteres');
-    return false;
+    return null;
   }
   
   try {
-    const { error } = await supabase.from('post_comments').insert([{ 
+    const { data, error } = await supabase.from('post_comments').insert([{ 
       post_id: postId, 
       user_id: userId, 
       content: trimmed 
-    }]);
+    }]).select('id, post_id, user_id, content, created_at, profiles(full_name)').single();
     
-    if (error) {
-      console.error('⚠️ Error al insertar comentario:', error.message);
-      return false;
+    if (error || !data) {
+      console.error('⚠️ Error al insertar comentario:', error?.message);
+      return null;
     }
     
-    return true;
+    return {
+      id: data.id,
+      postId: data.post_id,
+      userName: (data.profiles as any)?.full_name || 'Usuario',
+      userAvatar: '🥑',
+      text: data.content,
+      timeAgo: formatTimeAgo(data.created_at),
+      likes: 0
+    };
   } catch (err) {
     console.error('⚠️ Excepción al insertar comentario:', err);
-    return false;
+    return null;
   }
 }
 
@@ -155,6 +187,14 @@ export async function deleteRemoteComment(commentId: string, userId: string): Pr
 export async function toggleRemoteLike(postId: string, userId: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
+    // Intentar usar RPC atómico primero (migración 014)
+    const { error: rpcError } = await supabase.rpc('toggle_post_like', { p_post_id: postId });
+    if (!rpcError) {
+      return true; // Éxito con RPC
+    }
+    
+    console.warn('⚠️ Falló RPC toggle_post_like, usando fallback read-then-write:', rpcError.message);
+
     // Check if like exists
     const { data, error: selectError } = await supabase
       .from('post_likes')
@@ -180,7 +220,6 @@ export async function toggleRemoteLike(postId: string, userId: string): Promise<
         console.error('⚠️ Error al remover like:', deleteError.message);
         return false;
       }
-      
       return true;
     } else {
       // Like: insert new like
@@ -192,7 +231,6 @@ export async function toggleRemoteLike(postId: string, userId: string): Promise<
         console.error('⚠️ Error al insertar like:', insertError.message);
         return false;
       }
-      
       return true;
     }
   } catch (err) {
@@ -256,11 +294,12 @@ export async function fetchLivePosts(): Promise<Post[]> {
         .select('post_id', { count: 'exact', head: false })
         .in('post_id', postIds),
       
-      // Get comments count per post
+      // Get full comments per post
       supabase
         .from('post_comments')
-        .select('post_id', { count: 'exact', head: false })
-        .in('post_id', postIds),
+        .select('id, post_id, user_id, content, created_at, profiles(full_name)')
+        .in('post_id', postIds)
+        .order('created_at', { ascending: false }),
       
       // Get current user's likes (if authenticated)
       currentUserId
@@ -272,9 +311,13 @@ export async function fetchLivePosts(): Promise<Post[]> {
         : Promise.resolve({ data: [], error: null })
     ]);
 
-    // Build lookup maps for counts
+    if (likesData.error) console.error('⚠️ Error cargando likes:', likesData.error.message);
+    if (commentsData.error) console.error('⚠️ Error cargando comentarios:', commentsData.error.message);
+    if (userLikesData.error) console.error('⚠️ Error cargando user likes:', userLikesData.error.message);
+
+    // Build lookup maps for counts and comments
     const likesMap = new Map<string, number>();
-    const commentsMap = new Map<string, number>();
+    const commentsMap = new Map<string, any[]>();
     const userLikesSet = new Set<string>();
 
     if (likesData.data) {
@@ -286,8 +329,17 @@ export async function fetchLivePosts(): Promise<Post[]> {
 
     if (commentsData.data) {
       commentsData.data.forEach((comment: any) => {
-        const count = commentsMap.get(comment.post_id) || 0;
-        commentsMap.set(comment.post_id, count + 1);
+        const postComments = commentsMap.get(comment.post_id) || [];
+        postComments.push({
+          id: comment.id,
+          postId: comment.post_id,
+          userName: comment.profiles?.full_name || 'Usuario',
+          userAvatar: '🥑',
+          text: comment.content,
+          timeAgo: formatTimeAgo(comment.created_at),
+          likes: 0
+        });
+        commentsMap.set(comment.post_id, postComments);
       });
     }
 
@@ -319,8 +371,8 @@ export async function fetchLivePosts(): Promise<Post[]> {
         mediaType: dbPost.media_type,
         likes: likesMap.get(dbPost.id) || 0,
         isLiked: userLikesSet.has(dbPost.id),
-        commentsCount: commentsMap.get(dbPost.id) || 0,
-        comments: [],
+        comments: commentsMap.get(dbPost.id) || [],
+        commentsCount: (commentsMap.get(dbPost.id) || []).length,
         timeAgo: formatTimeAgo(dbPost.created_at),
         productId: dbPost.product_id || dbPost.id,
         hasValidProduct: !!dbPost.product_id, // Flag to indicate if product exists in catalog
