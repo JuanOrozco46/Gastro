@@ -116,10 +116,28 @@ export async function fetchLiveProducts(): Promise<Product[]> {
 
 export async function addRemoteComment(postId: string, userId: string, text: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
+  
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length === 0 || trimmed.length > 500) {
+    console.warn('⚠️ Comentario inválido: vacío o supera 500 caracteres');
+    return false;
+  }
+  
   try {
-    const { error } = await supabase.from('post_comments').insert([{ post_id: postId, user_id: userId, content: text }]);
-    return !error;
-  } catch {
+    const { error } = await supabase.from('post_comments').insert([{ 
+      post_id: postId, 
+      user_id: userId, 
+      content: trimmed 
+    }]);
+    
+    if (error) {
+      console.error('⚠️ Error al insertar comentario:', error.message);
+      return false;
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('⚠️ Excepción al insertar comentario:', err);
     return false;
   }
 }
@@ -137,15 +155,48 @@ export async function deleteRemoteComment(commentId: string, userId: string): Pr
 export async function toggleRemoteLike(postId: string, userId: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
-    const { data } = await supabase.from('post_likes').select('id').eq('post_id', postId).eq('user_id', userId).single();
-    if (data) {
-      const { error } = await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', userId);
-      return !error;
-    } else {
-      const { error } = await supabase.from('post_likes').insert([{ post_id: postId, user_id: userId }]);
-      return !error;
+    // Check if like exists
+    const { data, error: selectError } = await supabase
+      .from('post_likes')
+      .select('id')
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (selectError) {
+      console.error('⚠️ Error al verificar like:', selectError.message);
+      return false;
     }
-  } catch {
+    
+    if (data) {
+      // Unlike: remove existing like
+      const { error: deleteError } = await supabase
+        .from('post_likes')
+        .delete()
+        .eq('post_id', postId)
+        .eq('user_id', userId);
+      
+      if (deleteError) {
+        console.error('⚠️ Error al remover like:', deleteError.message);
+        return false;
+      }
+      
+      return true;
+    } else {
+      // Like: insert new like
+      const { error: insertError } = await supabase
+        .from('post_likes')
+        .insert([{ post_id: postId, user_id: userId }]);
+      
+      if (insertError) {
+        console.error('⚠️ Error al insertar like:', insertError.message);
+        return false;
+      }
+      
+      return true;
+    }
+  } catch (err) {
+    console.error('⚠️ Excepción al togglear like:', err);
     return false;
   }
 }
@@ -169,9 +220,24 @@ export async function toggleRemoteSave(postId: string, userId: string): Promise<
 export async function fetchLivePosts(): Promise<Post[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
+    const currentUserId = (await supabase.auth.getUser()).data.user?.id;
+
+    // Fetch posts with aggregated counts and user's like status
     const { data, error } = await supabase
       .from('posts')
-      .select(`id, restaurant_id, product_id, title, description, media_url, media_type, price_cop, is_published, created_at`)
+      .select(`
+        id, 
+        restaurant_id, 
+        product_id, 
+        title, 
+        description, 
+        media_url, 
+        media_type, 
+        price_cop, 
+        is_published, 
+        created_at,
+        restaurants!inner(name, category, slug, status)
+      `)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -180,7 +246,90 @@ export async function fetchLivePosts(): Promise<Post[]> {
     }
     if (!data) return [];
 
-    return (data as unknown as DbPost[]).map(mapDbPostToPost).filter(p => {
+    // Fetch all likes count and user's likes in parallel
+    const postIds = data.map((p: any) => p.id);
+    
+    const [likesData, commentsData, userLikesData] = await Promise.all([
+      // Get likes count per post
+      supabase
+        .from('post_likes')
+        .select('post_id', { count: 'exact', head: false })
+        .in('post_id', postIds),
+      
+      // Get comments count per post
+      supabase
+        .from('post_comments')
+        .select('post_id', { count: 'exact', head: false })
+        .in('post_id', postIds),
+      
+      // Get current user's likes (if authenticated)
+      currentUserId
+        ? supabase
+            .from('post_likes')
+            .select('post_id')
+            .eq('user_id', currentUserId)
+            .in('post_id', postIds)
+        : Promise.resolve({ data: [], error: null })
+    ]);
+
+    // Build lookup maps for counts
+    const likesMap = new Map<string, number>();
+    const commentsMap = new Map<string, number>();
+    const userLikesSet = new Set<string>();
+
+    if (likesData.data) {
+      likesData.data.forEach((like: any) => {
+        const count = likesMap.get(like.post_id) || 0;
+        likesMap.set(like.post_id, count + 1);
+      });
+    }
+
+    if (commentsData.data) {
+      commentsData.data.forEach((comment: any) => {
+        const count = commentsMap.get(comment.post_id) || 0;
+        commentsMap.set(comment.post_id, count + 1);
+      });
+    }
+
+    if (userLikesData.data) {
+      userLikesData.data.forEach((like: any) => {
+        userLikesSet.add(like.post_id);
+      });
+    }
+
+    return data.map((dbPost: any) => {
+      const restaurant = dbPost.restaurants;
+      
+      if (!restaurant || restaurant.status !== 'active') {
+        return null;
+      }
+
+      const post: Post = {
+        id: dbPost.id,
+        tenantId: dbPost.restaurant_id,
+        tenantName: restaurant.name,
+        tenantCategory: restaurant.category,
+        tenantLogoEmoji: '🍽️',
+        dishName: dbPost.title,
+        dishEmoji: '🍽️',
+        desc: dbPost.description || '',
+        price: dbPost.price_cop,
+        image: dbPost.media_url || '',
+        mediaUrl: dbPost.media_url || undefined,
+        mediaType: dbPost.media_type,
+        likes: likesMap.get(dbPost.id) || 0,
+        isLiked: userLikesSet.has(dbPost.id),
+        commentsCount: commentsMap.get(dbPost.id) || 0,
+        comments: [],
+        timeAgo: formatTimeAgo(dbPost.created_at),
+        productId: dbPost.product_id || dbPost.id,
+        status: dbPost.is_published ? 'published' : 'draft',
+        createdAt: new Date(dbPost.created_at).getTime()
+      };
+
+      return post;
+    }).filter((p): p is Post => {
+      if (!p) return false;
       if (!p.tenantId || !p.id || !p.dishName) {
         console.warn(`⚠️ Omitiendo publicación inválida (datos faltantes): ${p.id || 'desconocido'}`);
         return false;
@@ -195,6 +344,24 @@ export async function fetchLivePosts(): Promise<Post[]> {
     console.warn('⚠️ Excepción al consultar Supabase (Posts):', err);
     return [];
   }
+}
+
+function formatTimeAgo(timestamp: string): string {
+  const now = Date.now();
+  const then = new Date(timestamp).getTime();
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins < 1) return 'Justo ahora';
+  if (diffMins < 60) return `Hace ${diffMins} min`;
+  
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `Hace ${diffHours}h`;
+  
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `Hace ${diffDays}d`;
+  
+  return `Hace ${Math.floor(diffDays / 7)}sem`;
 }
 
 export async function submitLiveApplication(appData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>): Promise<RestaurantApplication | null> {

@@ -248,7 +248,8 @@ export const CustomerDeliveryApp: React.FC = () => {
   const {
     cities, zones, tenants, posts, toggleLikePost, products,
     addToCart, removeFromCart, cart, setCurrentTenantBySlug, orders,
-    isCatalogLoading, catalogError, showToast, currentUser, authMode
+    isCatalogLoading, catalogError, showToast, currentUser, authMode,
+    remotePosts
   } = useApp();
 
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -297,8 +298,11 @@ export const CustomerDeliveryApp: React.FC = () => {
     return map;
   }, [tenants]);
 
+  // Use remotePosts when in remote mode for accurate like/comment counts
+  const activePosts = authMode === 'remote' ? remotePosts : posts;
+
   const zoneFilteredPosts = useMemo(() => {
-    return posts.reduce<Post[]>((acc, post) => {
+    return activePosts.reduce<Post[]>((acc, post) => {
       const tenant = tenantMap.get(post.tenantId);
       if (!tenant || tenant.status !== 'active' || !activeCity || tenant.cityId !== activeCity.id) {
         return acc;
@@ -314,7 +318,7 @@ export const CustomerDeliveryApp: React.FC = () => {
       });
       return acc;
     }, []);
-  }, [posts, tenantMap, selectedZone, activeCity]);
+  }, [activePosts, tenantMap, selectedZone, activeCity]);
 
   const activeTenantsInZoneCount = useMemo(() => {
     return tenants.filter(t => {
@@ -350,8 +354,16 @@ export const CustomerDeliveryApp: React.FC = () => {
     } else {
       setCurrentTenantBySlug(tenantIdOrSlug);
     }
+    
+    // Find product in catalog
     const prod = products.find(p => p.id === productId);
-    if (prod) addToCart(prod);
+    if (!prod) {
+      showToast('⚠️ Este producto no está disponible en el catálogo actual.');
+      console.warn(`Producto no encontrado: ${productId}`);
+      return;
+    }
+    
+    addToCart(prod);
   }, [tenants, products, addToCart, setCurrentTenantBySlug, showToast]);
 
   const toggleSave = async (id: string) => {
@@ -942,7 +954,7 @@ export const CustomerDeliveryApp: React.FC = () => {
               {/* Trending */}
               <div className="gf-trending-card">
                 <div className="gf-card-section-title"><TrendingUp size={15} /> En Tendencia</div>
-                {posts.slice().sort((a, b) => b.likes - a.likes).slice(0, 4).map((p, i) => (
+                {activePosts.slice().sort((a, b) => b.likes - a.likes).slice(0, 4).map((p, i) => (
                   <div key={p.id} className="gf-trending-row">
                     <span className="gf-trend-rank">#{i + 1}</span>
                     <span className="gf-trend-emoji">{p.dishEmoji}</span>

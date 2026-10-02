@@ -183,6 +183,20 @@ export function mapDbRestaurantToTenant(db: DbRestaurant): Tenant {
 }
 
 export function mapDbProductToProduct(db: DbProduct): Product {
+  // Determinar emoji basado en categoría
+  let emoji = '🍽️';
+  const category = db.category.toLowerCase();
+  
+  if (category.includes('plato') || category.includes('principal')) {
+    emoji = '🍽️';
+  } else if (category.includes('bebida')) {
+    emoji = '🥤';
+  } else if (category.includes('postre')) {
+    emoji = '🍰';
+  } else if (category.includes('entrada')) {
+    emoji = '🥗';
+  }
+  
   return {
     id: db.id,
     tenantId: db.restaurant_id,
@@ -192,7 +206,7 @@ export function mapDbProductToProduct(db: DbProduct): Product {
     price: db.price_cop,
     available: db.available,
     image: db.image_url || undefined,
-    emoji: '🍽️'
+    emoji: emoji
   };
 }
 
