@@ -65,6 +65,7 @@ export interface DbProduct {
   category: string;
   price_cop: number;
   available: boolean;
+  image_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -190,6 +191,7 @@ export function mapDbProductToProduct(db: DbProduct): Product {
     category: db.category as Product['category'],
     price: db.price_cop,
     available: db.available,
+    image: db.image_url || undefined,
     emoji: '🍽️'
   };
 }

@@ -4,7 +4,7 @@ import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications, updateLiveApplicationStatus } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment } from '../services/supabaseOrderService';
@@ -880,7 +880,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const toggleProductAvailability = (productId: string) => {
+  const toggleProductAvailability = async (productId: string) => {
     const target = products.find(p => p.id === productId);
     if (!target) return;
 
@@ -889,9 +889,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    const updated = !target.available;
+
+    if (authMode === 'remote') {
+      const success = await updateLiveProduct(productId, { available: updated });
+      if (!success) {
+        showToast('⚠️ Error al actualizar disponibilidad en el servidor.');
+        return;
+      }
+      setRemoteProducts(prev => prev.map(p => p.id === productId ? { ...p, available: updated } : p));
+    }
+
     setProducts(prev => prev.map(p => {
       if (p.id === productId) {
-        const updated = !p.available;
         showToast(`${p.name}: ${updated ? 'Disponible' : 'AGOTADO'}`);
         return { ...p, available: updated };
       }
@@ -899,12 +909,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const addProduct = (newProd: Omit<Product, 'id' | 'tenantId'>) => {
+  const addProduct = async (newProd: Omit<Product, 'id' | 'tenantId'>) => {
     if (!isRestaurantOwner(currentUser) || !currentUser?.tenantId) {
       showToast('⚠️ No tienes autorización para agregar productos al menú.');
       return;
     }
     const targetTenantId = currentUser.tenantId;
+    
+    if (authMode === 'remote') {
+      const savedProd = await createLiveProduct(targetTenantId, newProd.name, newProd.desc, newProd.category, newProd.price, newProd.available, newProd.image);
+      if (!savedProd) {
+        showToast('⚠️ Error al crear producto en el servidor.');
+        return;
+      }
+      setRemoteProducts(prev => [savedProd, ...prev]);
+      setProducts(prev => [savedProd, ...prev]);
+      showToast(`Producto creado exitosamente: ${savedProd.name}`);
+      return;
+    }
+
     const prod: Product = { ...newProd, id: `p${Date.now()}`, tenantId: targetTenantId };
     setProducts(prev => [prod, ...prev]);
     showToast(`Producto creado: ${prod.name}`);
@@ -998,7 +1021,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('💬 Comentario publicado');
   };
 
-  const createPost = (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => {
+  const createPost = async (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => {
     if (!isRestaurantOwner(currentUser) || !currentUser?.tenantId) {
       showToast('⚠️ No tienes autorización para publicar contenido.');
       return;
@@ -1009,6 +1032,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('⚠️ Restaurante no encontrado.');
       return;
     }
+
+    if (authMode === 'remote') {
+      const savedPost = await createLivePost(targetTenantId, postData.dishName, postData.desc, postData.price, postData.image || '', postData.mediaType || 'photo');
+      if (!savedPost) {
+        showToast('⚠️ Error al crear publicación en el servidor.');
+        return;
+      }
+      const fullPost = {
+        ...savedPost,
+        tenantName: targetTenant.name,
+        tenantCategory: targetTenant.category,
+        tenantLogoEmoji: targetTenant.logoEmoji || '🍽️',
+        tenantAddress: targetTenant.address,
+        dishName: postData.dishName,
+        dishEmoji: postData.dishEmoji || '🍽️'
+      };
+      setRemotePosts(prev => [fullPost, ...prev]);
+      setPosts(prev => [fullPost, ...prev]);
+      showToast('✨ ¡Tu publicación ya está en vivo en el Feed!');
+      return;
+    }
+
     const newPost: Post = {
       ...postData,
       id: `post_${Date.now()}`,
@@ -1029,7 +1074,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('✨ ¡Tu publicación ya está en vivo en el Feed!');
   };
 
-  const deletePost = (postId: string) => {
+  const deletePost = async (postId: string) => {
     const target = posts.find(p => p.id === postId);
     if (!target) return;
 
@@ -1037,6 +1082,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('⚠️ No tienes autorización para eliminar publicaciones de este restaurante.');
       return;
     }
+
+    if (authMode === 'remote') {
+      const success = await deleteLivePost(postId);
+      if (!success) {
+        showToast('⚠️ Error al eliminar publicación en el servidor.');
+        return;
+      }
+      setRemotePosts(prev => prev.filter(p => p.id !== postId));
+    }
+
     setPosts(prev => prev.filter(p => p.id !== postId));
     showToast('🗑️ Publicación eliminada correctamente');
   };
@@ -1057,7 +1112,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`🛵 Repartidor ${newDriver.name} registrado`);
   };
 
-  const deleteProduct = (productId: string) => {
+  const deleteProduct = async (productId: string) => {
     const target = products.find(p => p.id === productId);
     if (!target) return;
 
@@ -1065,6 +1120,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('⚠️ No tienes autorización para eliminar productos de este restaurante.');
       return;
     }
+
+    if (authMode === 'remote') {
+      const success = await deleteLiveProduct(productId);
+      if (!success) {
+        showToast('⚠️ Error al eliminar producto en el servidor.');
+        return;
+      }
+      setRemoteProducts(prev => prev.filter(p => p.id !== productId));
+    }
+
     setProducts(prev => prev.filter(p => p.id !== productId));
     showToast('🗑️ Producto eliminado del menú');
   };

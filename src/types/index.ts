@@ -143,17 +143,24 @@ export interface Post {
   desc: string;
   hashtags?: string[];
   price: number;
-  image: string;           // thumbnail (always present)
+  image: string;           // thumbnail or photo URL
   mediaType: 'photo' | 'video';
-  videoId?: string;        // YouTube video ID for video posts
-  videoUrl?: string;       // Direct video URL or Data URL for uploaded videos
-  videoDuration?: string;  // e.g. "0:45"
+  mediaPath?: string;      // Path in Supabase Storage
+  mediaUrl?: string;       // Public/Signed URL of the media
+  thumbnailPath?: string;  // Path to thumbnail in Supabase Storage
+  legacyExternalYoutubeId?: string; // Marker for old YouTube posts
+  width?: number;
+  height?: number;
+  duration?: number;
+  status?: 'draft' | 'published';
+  createdAt?: number;
+  updatedAt?: number;
   likes: number;
   isLiked: boolean;
   commentsCount: number;
   comments?: PostComment[];
   viewCount?: number;
-  ordersFromPost?: number; // how many orders came from this post
+  ordersFromPost?: number;
   timeAgo: string;
   productId: string;
 }
@@ -164,7 +171,8 @@ export interface StoryItem {
   tenantName: string;
   tenantEmoji: string;
   image: string;
-  videoId?: string;
+  mediaUrl?: string;
+  legacyExternalYoutubeId?: string;
   dishName: string;
   price: number;
   productId: string;

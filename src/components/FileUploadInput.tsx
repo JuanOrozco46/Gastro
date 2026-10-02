@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, X, Film, Image as ImageIcon, CheckCircle, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { Upload, X, Film, Image as ImageIcon, CheckCircle, Loader2 } from 'lucide-react';
 import { uploadMediaFile } from '../services/supabaseStorageService';
 import { isSupabaseConfigured } from '../lib/supabase';
 
@@ -11,6 +11,7 @@ interface FileUploadInputProps {
   maxSizeMB?: number;
   placeholder?: string;
   folder?: string;
+  tenantId?: string;
 }
 
 export const FileUploadInput: React.FC<FileUploadInputProps> = ({
@@ -19,10 +20,9 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
   value,
   onChange,
   maxSizeMB = 50,
-  placeholder = 'Subir archivo o ingresar URL...',
-  folder = 'dishes'
+  folder = 'dishes',
+  tenantId
 }) => {
-  const [mode, setMode] = useState<'upload' | 'url'>('upload');
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -35,9 +35,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
       : 'image/*,video/*';
 
   const isVideo = value.startsWith('data:video/') || 
-    /\.(mp4|webm|ogg|mov)$/i.test(value) || 
-    value.includes('youtube.com') || 
-    value.includes('youtu.be');
+    /\.(mp4|webm|ogg|mov)$/i.test(value);
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -53,7 +51,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
 
     setIsProcessing(true);
     try {
-      const res = await uploadMediaFile(file, folder);
+      const res = await uploadMediaFile(file, folder, tenantId);
       if (res.success && res.publicUrl) {
         onChange(res.publicUrl, fileType);
       } else {
@@ -98,47 +96,9 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
           {accept === 'video' ? <Film size={16} style={{ color: '#F59E0B' }} /> : <ImageIcon size={16} style={{ color: '#10B981' }} />}
           {label}
         </label>
-        
-        <div style={{ display: 'flex', gap: '4px', background: 'var(--glass-overlay)', padding: '2px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <button
-            type="button"
-            onClick={() => setMode('upload')}
-            style={{
-              padding: '4px 10px',
-              borderRadius: '6px',
-              border: 'none',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              background: mode === 'upload' ? 'var(--primary, #E11D48)' : 'transparent',
-              color: mode === 'upload' ? '#ffffff' : '#94a3b8',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            Subir Archivo
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('url')}
-            style={{
-              padding: '4px 10px',
-              borderRadius: '6px',
-              border: 'none',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              background: mode === 'url' ? 'var(--primary, #E11D48)' : 'transparent',
-              color: mode === 'url' ? '#ffffff' : '#94a3b8',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            URL Externa
-          </button>
-        </div>
       </div>
 
-      {mode === 'upload' ? (
-        <div>
+      <div>
           <input
             ref={fileInputRef}
             type="file"
@@ -265,33 +225,6 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
             </div>
           )}
         </div>
-      ) : (
-        <div style={{ position: 'relative' }}>
-          <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }}>
-            <LinkIcon size={16} />
-          </div>
-          <input
-            type="url"
-            value={value}
-            onChange={(e) => {
-              const val = e.target.value;
-              const type = (val.includes('youtube.com') || val.includes('youtu.be') || /\.(mp4|webm)$/i.test(val)) ? 'video' : 'photo';
-              onChange(val, type);
-            }}
-            placeholder={placeholder}
-            style={{
-              width: '100%',
-              padding: '12px 14px 12px 42px',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              background: 'var(--glass-overlay)',
-              color: '#ffffff',
-              fontSize: '0.88rem',
-              outline: 'none'
-            }}
-          />
-        </div>
-      )}
 
       {error && (
         <p style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '6px', fontWeight: 600 }}>

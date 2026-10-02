@@ -13,7 +13,8 @@ export interface StorageUploadResult {
  */
 export async function uploadMediaFile(
   file: File,
-  folder: string = 'general'
+  folder: string = 'general',
+  tenantId?: string
 ): Promise<StorageUploadResult> {
   // 1. Fallback a Data URL local si Supabase no está configurado
   if (!isSupabaseConfigured || !supabase) {
@@ -46,7 +47,7 @@ export async function uploadMediaFile(
     const cleanFolder = folder.replace(/[^a-zA-Z0-9_-]/g, '');
     const randomHash = Math.random().toString(36).substring(2, 8);
     const fileName = `${Date.now()}_${randomHash}.${fileExt}`;
-    const filePath = `${cleanFolder}/${fileName}`;
+    const filePath = tenantId ? `${tenantId}/${cleanFolder}/${fileName}` : `${cleanFolder}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('gastro-media')

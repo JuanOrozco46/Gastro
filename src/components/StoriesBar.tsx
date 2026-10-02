@@ -156,13 +156,17 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
 
                 {/* Media Content */}
                 <div className="gf-story-media-container">
-                  {currentItem.videoId ? (
-                    <iframe
-                      src={`https://www.youtube.com/embed/${currentItem.videoId}?autoplay=1&rel=0&modestbranding=1&controls=0`}
-                      title={currentItem.dishName}
-                      allow="autoplay; encrypted-media"
-                      style={{ width: '100%', height: '100%', border: 0 }}
+                  {currentItem.mediaUrl ? (
+                    <video
+                      src={currentItem.mediaUrl}
+                      autoPlay
+                      muted
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
+                  ) : currentItem.legacyExternalYoutubeId ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#111', color: '#94a3b8', flexDirection: 'column', padding: '20px', textAlign: 'center' }}>
+                      <p>Este reel antiguo ya no está disponible en GastroSync.</p>
+                    </div>
                   ) : (
                     <img src={currentItem.image} alt={currentItem.dishName} className="gf-story-media-img" />
                   )}

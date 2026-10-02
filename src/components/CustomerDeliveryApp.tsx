@@ -38,22 +38,19 @@ const VideoModal: React.FC<{ post: Post; onClose: () => void; onOrder: () => voi
       <button className="video-modal-close" onClick={onClose}><X size={20} /></button>
 
       <div className="video-modal-player">
-        {post.videoUrl ? (
+        {post.mediaUrl ? (
           <video
-            src={post.videoUrl}
+            src={post.mediaUrl}
             controls
             autoPlay
             style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
           />
+        ) : post.legacyExternalYoutubeId ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#111', color: '#94a3b8', flexDirection: 'column', gap: '10px' }}>
+            <p>Este video antiguo ya no está disponible en la plataforma.</p>
+          </div>
         ) : (
-          <iframe
-            src={`https://www.youtube.com/embed/${post.videoId || 'Hm86TKO0ZTA'}?autoplay=1&rel=0&modestbranding=1`}
-            title={post.dishName}
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            style={{ width: '100%', height: '100%', borderRadius: '0' }}
-          />
+          <img src={post.image} alt={post.dishName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         )}
       </div>
 
@@ -139,8 +136,8 @@ const PostCard: React.FC<PostCardProps> = ({
             <div className="gf-play-btn">
               <Play size={24} fill="white" />
             </div>
-            {post.videoDuration && (
-              <span className="gf-video-duration">{post.videoDuration}</span>
+            {post.duration && (
+              <span className="gf-video-duration">0:{post.duration}</span>
             )}
           </button>
         )}

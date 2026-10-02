@@ -50,7 +50,6 @@ export const RestaurantAdmin: React.FC = () => {
   const [postDesc, setPostDesc] = useState('');
   const [postHashtags, setPostHashtags] = useState('#GastroSync #ComidaArtesanal #SaborLocal');
   const [postMediaType, setPostMediaType] = useState<'photo' | 'video'>('video');
-  const [postVideoId, setPostVideoId] = useState('');
   const [postImage, setPostImage] = useState('');
   const [postMediaUrl, setPostMediaUrl] = useState('');
 
@@ -89,15 +88,11 @@ export const RestaurantAdmin: React.FC = () => {
   const activeOrders = tenantOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
   const pastOrders = tenantOrders.filter(o => o.status === 'delivered' || o.status === 'cancelled');
 
-  const handleAddProductSubmit = (e: React.FormEvent) => {
+  const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (authMode === 'remote') {
-      showToast('⚠️ La edición remota del catálogo estará disponible en una próxima fase.');
-      return;
-    }
     if (!newName || !newPrice) return;
 
-    addProduct({
+    await addProduct({
       name: newName,
       desc: newDesc || 'Deliciosa opción preparada con ingredientes frescos.',
       price: parseFloat(newPrice),
@@ -128,12 +123,8 @@ export const RestaurantAdmin: React.FC = () => {
     setShowAddDriverForm(false);
   };
 
-  const handleCreatePostSubmit = (e: React.FormEvent) => {
+  const handleCreatePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (authMode === 'remote') {
-      showToast('⚠️ La edición remota del catálogo estará disponible en una próxima fase.');
-      return;
-    }
     if (!postDishName || !postDesc || !postPrice) return;
 
     const hashtagsArr = postHashtags
@@ -148,9 +139,7 @@ export const RestaurantAdmin: React.FC = () => {
       ? postMediaUrl
       : (postImage || operatingTenant.bannerUrl || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=900&q=85');
 
-    const finalVideoUrl = postMediaType === 'video' && postMediaUrl ? postMediaUrl : undefined;
-
-    createPost({
+    await createPost({
       tenantId: operatingTenant.id,
       tenantName: operatingTenant.name,
       tenantCategory: operatingTenant.category,
@@ -163,9 +152,8 @@ export const RestaurantAdmin: React.FC = () => {
       price: parseFloat(postPrice),
       image: finalImage,
       mediaType: postMediaType,
-      videoId: postMediaType === 'video' ? (postVideoId || undefined) : undefined,
-      videoUrl: finalVideoUrl,
-      videoDuration: postMediaType === 'video' ? '0:45' : undefined,
+      mediaUrl: postMediaUrl,
+      duration: postMediaType === 'video' ? 45 : undefined,
       productId
     });
 
@@ -173,7 +161,6 @@ export const RestaurantAdmin: React.FC = () => {
     setPostDesc('');
     setPostMediaUrl('');
     setPostImage('');
-    setPostVideoId('');
   };
 
   const applyStoryPreset = (type: string) => {
@@ -567,38 +554,23 @@ export const RestaurantAdmin: React.FC = () => {
                     onChange={e => setPostMediaType(e.target.value as 'photo' | 'video')}
                     style={{ width: '100%' }}
                   >
-                    <option value="video">▶ Video / Reel (YouTube ID)</option>
+                    <option value="video">▶ Video Corto (Reel)</option>
                     <option value="photo">🖼️ Foto de Alta Calidad</option>
                   </select>
                 </div>
               </div>
 
               <FileUploadInput
-                label={postMediaType === 'video' ? "Archivo de Video o URL del Reel" : "Foto del Plato"}
+                label={postMediaType === 'video' ? "Archivo de Video" : "Foto del Plato"}
                 accept={postMediaType === 'video' ? 'video' : 'image'}
                 value={postMediaUrl}
                 onChange={(val, type) => {
                   setPostMediaUrl(val);
                   setPostMediaType(type);
                 }}
-                placeholder={postMediaType === 'video' ? "Subir archivo MP4/WebM o ingresar enlace YouTube/URL..." : "Subir foto del plato o ingresar URL..."}
                 folder="posts"
+                tenantId={operatingTenant.id}
               />
-
-              {postMediaType === 'video' && !postMediaUrl.startsWith('data:video') && (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Opcional - ID de Video en YouTube (e.g. Hm86TKO0ZTA):
-                  </label>
-                  <input
-                    type="text"
-                    value={postVideoId}
-                    onChange={e => setPostVideoId(e.target.value)}
-                    placeholder="Hm86TKO0ZTA"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-              )}
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
@@ -805,6 +777,7 @@ export const RestaurantAdmin: React.FC = () => {
                 onChange={(val) => setNewProductImage(val)}
                 placeholder="Seleccionar foto o pegar enlace de la imagen..."
                 folder="dishes"
+                tenantId={operatingTenant.id}
               />
 
               <motion.button 

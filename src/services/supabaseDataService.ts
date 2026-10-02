@@ -255,3 +255,134 @@ export async function updateLiveApplicationStatus(
   }
 }
 
+export async function uploadMediaFile(
+  tenantId: string,
+  folder: 'products' | 'posts' | 'thumbnails',
+  file: File
+): Promise<string | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  try {
+    const ext = file.name.split('.').pop() || '';
+    const uuid = crypto.randomUUID();
+    const filePath = `${tenantId}/${folder}/${uuid}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('gastro-media')
+      .upload(filePath, file, { upsert: false });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('gastro-media')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  } catch (err) {
+    console.warn('⚠️ Error uploading media file:', err);
+    return null;
+  }
+}
+
+export async function deleteMediaFile(publicUrl: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !publicUrl) return false;
+  try {
+    const baseUrl = supabase.storage.from('gastro-media').getPublicUrl('').data.publicUrl;
+    if (!publicUrl.startsWith(baseUrl)) return true;
+
+    const filePath = publicUrl.replace(baseUrl + '/', '');
+    const { error } = await supabase.storage.from('gastro-media').remove([filePath]);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn('⚠️ Error deleting media file:', err);
+    return false;
+  }
+}
+
+export async function createLiveProduct(tenantId: string, name: string, desc: string, category: string, price: number, available: boolean, imageUrl?: string): Promise<Product | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  try {
+    const { data, error } = await supabase.from('products').insert({
+      restaurant_id: tenantId,
+      name,
+      description: desc || null,
+      category,
+      price_cop: price,
+      available,
+      image_url: imageUrl || null
+    }).select().single();
+
+    if (error || !data) throw error;
+    return mapDbProductToProduct(data as unknown as DbProduct);
+  } catch (err) {
+    console.warn('⚠️ Error creating live product:', err);
+    return null;
+  }
+}
+
+export async function updateLiveProduct(productId: string, updates: Partial<{ name: string; desc: string; category: string; price: number; available: boolean; imageUrl: string }>): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const dbUpdates: any = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.desc !== undefined) dbUpdates.description = updates.desc || null;
+    if (updates.category !== undefined) dbUpdates.category = updates.category;
+    if (updates.price !== undefined) dbUpdates.price_cop = updates.price;
+    if (updates.available !== undefined) dbUpdates.available = updates.available;
+    if (updates.imageUrl !== undefined) dbUpdates.image_url = updates.imageUrl || null;
+
+    const { error } = await supabase.from('products').update(dbUpdates).eq('id', productId);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn('⚠️ Error updating live product:', err);
+    return false;
+  }
+}
+
+export async function deleteLiveProduct(productId: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn('⚠️ Error deleting live product:', err);
+    return false;
+  }
+}
+
+export async function createLivePost(tenantId: string, title: string, desc: string, price: number, mediaUrl: string, mediaType: 'photo' | 'video'): Promise<Post | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  try {
+    const { data, error } = await supabase.from('posts').insert({
+      restaurant_id: tenantId,
+      title,
+      description: desc || null,
+      price_cop: price,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      is_published: true
+    }).select().single();
+
+    if (error || !data) throw error;
+    const post = mapDbPostToPost(data as unknown as DbPost);
+    // Tenant info is needed in Post but mapDbPostToPost sets placeholders.
+    return post;
+  } catch (err) {
+    console.warn('⚠️ Error creating live post:', err);
+    return null;
+  }
+}
+
+export async function deleteLivePost(postId: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { error } = await supabase.from('posts').delete().eq('id', postId);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn('⚠️ Error deleting live post:', err);
+    return false;
+  }
+}
