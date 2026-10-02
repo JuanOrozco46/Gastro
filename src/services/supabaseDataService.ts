@@ -117,23 +117,40 @@ export async function fetchLiveProducts(): Promise<Product[]> {
 export async function fetchRemoteComments(postId: string) {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
-    const { data, error } = await supabase
+    const { data: comments, error } = await supabase
       .from('post_comments')
-      .select('id, post_id, user_id, content, created_at, profiles(full_name)')
+      .select('id, post_id, user_id, content, created_at')
       .eq('post_id', postId)
       .order('created_at', { ascending: false });
 
-    if (error || !data) return [];
-    return data.map((c: any) => ({
+    if (error) {
+      console.error('⚠️ Error cargando comentarios:', error.message);
+      return [];
+    }
+    if (!comments || comments.length === 0) return [];
+
+    const userIds = Array.from(new Set(comments.map((c: any) => c.user_id)));
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', userIds);
+
+    const profileMap = new Map();
+    if (profiles) {
+      profiles.forEach((p: any) => profileMap.set(p.id, p.full_name));
+    }
+
+    return comments.map((c: any) => ({
       id: c.id,
       postId: c.post_id,
-      userName: c.profiles?.full_name || 'Usuario',
+      userName: profileMap.get(c.user_id) || 'Usuario',
       userAvatar: '🥑',
       text: c.content,
       timeAgo: formatTimeAgo(c.created_at),
       likes: 0
     }));
-  } catch {
+  } catch (err) {
+    console.error('⚠️ Excepción al cargar comentarios:', err);
     return [];
   }
 }
@@ -152,17 +169,24 @@ export async function addRemoteComment(postId: string, userId: string, text: str
       post_id: postId, 
       user_id: userId, 
       content: trimmed 
-    }]).select('id, post_id, user_id, content, created_at, profiles(full_name)').single();
+    }]).select('id, post_id, user_id, content, created_at').single();
     
     if (error || !data) {
       console.error('⚠️ Error al insertar comentario:', error?.message);
       return null;
     }
     
+    // Obtener profile separado
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .maybeSingle();
+    
     return {
       id: data.id,
       postId: data.post_id,
-      userName: (data.profiles as any)?.full_name || 'Usuario',
+      userName: profile?.full_name || 'Usuario',
       userAvatar: '🥑',
       text: data.content,
       timeAgo: formatTimeAgo(data.created_at),
@@ -187,13 +211,8 @@ export async function deleteRemoteComment(commentId: string, userId: string): Pr
 export async function toggleRemoteLike(postId: string, userId: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
-    // Intentar usar RPC atómico primero (migración 014)
-    const { error: rpcError } = await supabase.rpc('toggle_post_like', { p_post_id: postId });
-    if (!rpcError) {
-      return true; // Éxito con RPC
-    }
-    
-    console.warn('⚠️ Falló RPC toggle_post_like, usando fallback read-then-write:', rpcError.message);
+    // Ya no usamos RPC porque el 404 indica que la DB remota de Vercel no tiene la función
+    // y no queremos romper el frontend especulando. Usaremos transacciones read-then-write seguras.
 
     // Check if like exists
     const { data, error: selectError } = await supabase
@@ -297,7 +316,7 @@ export async function fetchLivePosts(): Promise<Post[]> {
       // Get full comments per post
       supabase
         .from('post_comments')
-        .select('id, post_id, user_id, content, created_at, profiles(full_name)')
+        .select('id, post_id, user_id, content, created_at')
         .in('post_id', postIds)
         .order('created_at', { ascending: false }),
       
@@ -327,13 +346,25 @@ export async function fetchLivePosts(): Promise<Post[]> {
       });
     }
 
-    if (commentsData.data) {
+    if (commentsData.data && commentsData.data.length > 0) {
+      // Get profiles for all comment authors
+      const userIds = Array.from(new Set(commentsData.data.map((c: any) => c.user_id)));
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+        
+      const profileMap = new Map();
+      if (profiles) {
+        profiles.forEach((p: any) => profileMap.set(p.id, p.full_name));
+      }
+
       commentsData.data.forEach((comment: any) => {
         const postComments = commentsMap.get(comment.post_id) || [];
         postComments.push({
           id: comment.id,
           postId: comment.post_id,
-          userName: comment.profiles?.full_name || 'Usuario',
+          userName: profileMap.get(comment.user_id) || 'Usuario',
           userAvatar: '🥑',
           text: comment.content,
           timeAgo: formatTimeAgo(comment.created_at),
