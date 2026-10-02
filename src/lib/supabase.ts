@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { debugSupabaseConfig } from '../utils/debugSupabase';
 
 /**
  * Supabase se activa en un módulo posterior de migración multiusuario.
@@ -18,10 +19,16 @@ export const isSupabaseConfigured: boolean = Boolean(
 );
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(supabaseUrl!.trim(), supabasePublishableKey!.trim())
+  ? createClient(supabaseUrl!.trim(), supabasePublishableKey!.trim(), {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    })
   : null;
 
 if (import.meta.env.DEV) {
+  debugSupabaseConfig();
   if (isSupabaseConfigured) {
     console.info('⚡ [GastroSync] Supabase configurado y listo para sincronización remota.');
   } else {
