@@ -36,7 +36,7 @@ export interface AppContextType {
   addTenant: (tenantData: Omit<Tenant, 'id' | 'slug' | 'salesWeekly' | 'rating' | 'distanceKm' | 'isNew' | 'commissionRate' | 'tablesCount' | 'isOpen'>) => Tenant;
   updateTenant: (tenantId: string, updates: Partial<Tenant>) => void;
   toggleLikePost: (postId: string) => void;
-  addComment: (postId: string, text: string, userName?: string) => void;
+  addComment: (postId: string, text: string, userName?: string) => Promise<boolean>;
   deleteComment: (postId: string, commentId: string) => void;
   createPost: (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => Promise<void> | void;
   deletePost: (postId: string) => Promise<void> | void;

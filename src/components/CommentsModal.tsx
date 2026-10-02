@@ -13,11 +13,13 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ post, tenant, onCl
   const { addComment, deleteComment, currentUser } = useApp();
   const [commentText, setCommentText] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim()) return;
-    addComment(post.id, commentText.trim());
-    setCommentText('');
+    const success = await addComment(post.id, commentText.trim());
+    if (success) {
+      setCommentText('');
+    }
   };
 
   const comments = post.comments || [];

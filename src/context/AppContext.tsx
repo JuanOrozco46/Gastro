@@ -1085,16 +1085,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Simulado pedido pagado #${newId} para ${targetTenant.name}`);
   };
 
-  const addComment = async (postId: string, text: string, _userName = 'Tú (Cliente)') => {
+  const addComment = async (postId: string, text: string, _userName = 'Tú (Cliente)'): Promise<boolean> => {
     if (!currentUser?.id) {
       showToast('⚠️ Inicia sesión para comentar.');
-      return;
+      return false;
     }
     if (authMode === 'remote') {
       const newComment = await addRemoteComment(postId, currentUser.id, text);
       if (!newComment) {
         showToast('❌ No se pudo guardar el comentario.');
-        return;
+        return false;
       }
       setRemotePosts(prev => prev.map(p => {
         if (p.id === postId) {
@@ -1104,7 +1104,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return p;
       }));
       showToast('💬 Comentario publicado');
-      return;
+      return true;
     }
     // Modo demo
     setPosts(prev => prev.map(p => {
@@ -1124,6 +1124,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return p;
     }));
     showToast('💬 Comentario publicado');
+    return true;
   };
 
   const deleteComment = async (postId: string, commentId: string) => {

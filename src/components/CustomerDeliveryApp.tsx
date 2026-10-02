@@ -286,7 +286,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'feed' | 'directory' | 'orders'>('feed');
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [videoPost, setVideoPost] = useState<Post | null>(null);
-  const [selectedCommentsPost, setSelectedCommentsPost] = useState<Post | null>(null);
+  const [selectedCommentsPostId, setSelectedCommentsPostId] = useState<string | null>(null);
   const [selectedTenantProfile, setSelectedTenantProfile] = useState<string | null>(null);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -892,7 +892,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                     onPlayVideo={setVideoPost}
                     saved={savedPosts.has(post.id)}
                     onSave={toggleSave}
-                    onOpenComments={setSelectedCommentsPost}
+                    onOpenComments={(post) => setSelectedCommentsPostId(post.id)}
                     onOpenProfile={setSelectedTenantProfile}
                     onShare={handleShare}
                   />
@@ -1044,12 +1044,18 @@ export const CustomerDeliveryApp: React.FC = () => {
       )}
 
       {/* ── Comments Modal ── */}
-      {selectedCommentsPost && (
-        <CommentsModal
-          post={selectedCommentsPost}
-          tenant={tenants.find(t => t.id === selectedCommentsPost.tenantId)}
-          onClose={() => setSelectedCommentsPost(null)}
-        />
+      {selectedCommentsPostId && (
+        (() => {
+          const selectedCommentsPost = activePosts.find(p => p.id === selectedCommentsPostId);
+          if (!selectedCommentsPost) return null;
+          return (
+            <CommentsModal
+              post={selectedCommentsPost}
+              tenant={tenants.find(t => t.id === selectedCommentsPost.tenantId)}
+              onClose={() => setSelectedCommentsPostId(null)}
+            />
+          );
+        })()
       )}
 
       {/* ── Restaurant Profile Modal ── */}
