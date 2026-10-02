@@ -356,11 +356,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (match) setCurrentTenant(match);
           }
         } else if (event === 'SIGNED_OUT') {
+          // Solo limpiamos datos de sesión del usuario.
+          // Los posts, tenants y productos son públicos y deben mantenerse visibles.
           setCurrentUser(null);
           setUserRole('login');
-          setRemoteTenants([]);
-          setRemoteProducts([]);
-          setRemotePosts([]);
         }
       });
 
@@ -507,13 +506,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (res.success && res.user) {
       let updatedTenants = tenants;
       if (isSupabaseConfigured) {
-        const liveTenants = await fetchLiveTenants();
+        const [liveTenants, livePosts, liveProducts] = await Promise.all([
+          fetchLiveTenants(),
+          fetchLivePosts(),
+          fetchLiveProducts()
+        ]);
         if (liveTenants.length > 0) {
           setTenants(liveTenants);
           setRemoteTenants(liveTenants);
           remoteTenantsRef.current = liveTenants;
           updatedTenants = liveTenants;
         }
+        setRemotePosts(livePosts);
+        setRemoteProducts(liveProducts);
       }
 
       setCurrentUser(res.user);
