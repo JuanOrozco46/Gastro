@@ -506,6 +506,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const liveTenants = await fetchLiveTenants();
         if (liveTenants.length > 0) {
           setTenants(liveTenants);
+          setRemoteTenants(liveTenants);
+          remoteTenantsRef.current = liveTenants;
           updatedTenants = liveTenants;
         }
       }
