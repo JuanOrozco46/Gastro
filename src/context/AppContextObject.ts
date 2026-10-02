@@ -32,7 +32,7 @@ export interface AppContextType {
   registerAccount: (name: string, email: string, pass: string, role?: UserRole) => Promise<{ success: boolean; error?: string }> | void;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   setCurrentTenantBySlug: (slug: string) => void;
-  toggleTenantOpenStatus: (tenantId: string) => void;
+  toggleTenantOpenStatus: (tenantId: string) => Promise<void>;
   addTenant: (tenantData: Omit<Tenant, 'id' | 'slug' | 'salesWeekly' | 'rating' | 'distanceKm' | 'isNew' | 'commissionRate' | 'tablesCount' | 'isOpen'>) => Tenant;
   updateTenant: (tenantId: string, updates: Partial<Tenant>) => void;
   toggleLikePost: (postId: string) => void;

@@ -36,6 +36,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
   const filteredTenants = useMemo(() => {
     return tenants
       .filter(t => {
+        if (t.status !== 'active') return false;
         if (selectedZone && selectedZone !== 'all' && t.zoneId !== selectedZone) {
           return false;
         }
@@ -79,7 +80,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
 
   // Tenant featured hero
   const featuredTenant = useMemo(() => {
-    return tenants.find(t => t.isOpen && t.rating >= 4.8) || tenants[0];
+    return tenants.find(t => t.status === 'active' && t.isOpen && t.rating >= 4.8) || tenants.find(t => t.status === 'active');
   }, [tenants]);
 
   // Get products for modal tenant

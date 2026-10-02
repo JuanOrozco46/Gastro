@@ -24,6 +24,29 @@ interface FinancialAnalyticsProps {
 
 type Period = 'today' | 'last_7_days' | 'this_month' | 'last_month' | 'custom';
 
+const MetricCard = ({ title, value, icon, color, tooltip }: any) => (
+  <div style={{
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '16px', padding: '20px', position: 'relative', overflow: 'hidden'
+  }}>
+    <div style={{ position: 'absolute', top: '-15px', right: '-15px', opacity: 0.1, color: color }}>
+      {icon}
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+      <span style={{ color: color }}>{icon}</span>
+      <h4 style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700 }}>{title}</h4>
+    </div>
+    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'white' }}>
+      {value}
+    </div>
+    {tooltip && (
+      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '8px 0 0', lineHeight: 1.4 }}>
+        {tooltip}
+      </p>
+    )}
+  </div>
+);
+
 export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId }) => {
   const { authMode, orders } = useApp();
   
@@ -143,31 +166,17 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
   }, [authMode, period, startDate, endDate, tenantId, orders]);
 
   useEffect(() => {
+    /*
+     * Justificación:
+     * 1. El efecto es necesario para sincronizar el estado del componente (data) con el backend de Supabase al montar o cambiar el periodo.
+     * 2. No produce un bucle infinito porque 'fetchMetrics' está memoizado con useCallback y sus dependencias (period, fechas, tenant) son estables.
+     * 3. No puede derivarse durante el render porque requiere una petición asíncrona a la red (RPC).
+     */
+    // eslint-disable-next-line react/set-state-in-effect
     fetchMetrics();
   }, [fetchMetrics]);
 
-  const MetricCard = ({ title, value, icon, color, tooltip }: any) => (
-    <div style={{
-      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-      borderRadius: '16px', padding: '20px', position: 'relative', overflow: 'hidden'
-    }}>
-      <div style={{ position: 'absolute', top: '-15px', right: '-15px', opacity: 0.1, color: color }}>
-        {icon}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-        <span style={{ color: color }}>{icon}</span>
-        <h4 style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700 }}>{title}</h4>
-      </div>
-      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'white' }}>
-        {value}
-      </div>
-      {tooltip && (
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '8px 0 0', lineHeight: 1.4 }}>
-          {tooltip}
-        </p>
-      )}
-    </div>
-  );
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -285,7 +294,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
                     color="#EF4444"
                   />
                   <MetricCard 
-                    title="Reembolsos Estimados" 
+                    title="Aprobados Cancelados" 
                     value={`$${metrics.refunds.toLocaleString('es-CO')}`} 
                     icon={<TrendingDown size={24} />} 
                     color="#EF4444"

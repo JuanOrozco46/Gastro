@@ -95,6 +95,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
     setFormError(null);
 
     // Validations
+    if (!currentTenant.isOpen) {
+      setFormError('El restaurante está cerrado temporalmente. No se pueden procesar pedidos.');
+      return;
+    }
+
     if (cart.length === 0) {
       setFormError('El carrito está vacío.');
       return;

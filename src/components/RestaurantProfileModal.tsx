@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/useApp';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { X, Star, MapPin, Clock, ShoppingBag, Eye, Heart, ShieldCheck, Phone, Navigation, Play } from 'lucide-react';
 
 interface RestaurantProfileModalProps {
@@ -17,6 +18,33 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
   const [activeTab, setActiveTab] = useState<'content' | 'menu' | 'info'>('content');
 
   const tenant = tenants.find(t => t.id === tenantId) || tenants[0];
+  const [liveIsOpen, setLiveIsOpen] = useState(tenant.isOpen);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  
+  useEffect(() => {
+    let mounted = true;
+    const checkLiveStatus = async () => {
+      if (!isSupabaseConfigured || !supabase || !tenant.id) return;
+      setIsCheckingStatus(true);
+      try {
+        const { data, error } = await supabase.from('restaurants').select('is_open').eq('id', tenant.id).single();
+        if (mounted) {
+          if (!error && data) {
+            setLiveIsOpen(data.is_open);
+          } else {
+            console.warn('Could not fetch live status, keeping local state.', error);
+          }
+        }
+      } catch (err) {
+        if (mounted) console.warn('Error fetching live status', err);
+      } finally {
+        if (mounted) setIsCheckingStatus(false);
+      }
+    };
+    checkLiveStatus();
+    return () => { mounted = false; };
+  }, [tenant.id]);
+
   const tenantProducts = products.filter(p => p.tenantId === tenant.id);
   const tenantPosts = posts.filter(p => p.tenantId === tenant.id);
 
@@ -41,7 +69,18 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
         {/* Info Header */}
         <div className="gf-profile-header-info">
           <div className="gf-profile-title-row">
-            <h2>{tenant.name}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <h2>{tenant.name}</h2>
+              {isCheckingStatus ? (
+                <span style={{ background: 'var(--glass-medium)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600 }}>
+                  Verificando estado...
+                </span>
+              ) : !liveIsOpen && (
+                <span style={{ background: '#EF4444', color: 'white', padding: '2px 8px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800 }}>
+                  CERRADO TEMPORALMENTE
+                </span>
+              )}
+            </div>
             <span className="gf-profile-category-pill">{tenant.category}</span>
           </div>
 

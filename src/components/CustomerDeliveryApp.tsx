@@ -11,7 +11,7 @@ import {
   Heart, MessageCircle, Share2, ShoppingBag, Bike,
   TrendingUp, Star, MapPin, Trash2, Plus, Minus,
   Package, Play, Eye, X, ExternalLink, ChevronRight,
-  Bookmark, Zap, Search, SlidersHorizontal, CheckCircle2, Building2
+  Bookmark, Zap, Search, SlidersHorizontal, CheckCircle2, Building2, Clock
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import type { Post } from '../types';
@@ -246,7 +246,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const {
     cities, zones, tenants, posts, toggleLikePost, products,
     addToCart, removeFromCart, cart, setCurrentTenantBySlug, orders,
-    isCatalogLoading, catalogError
+    isCatalogLoading, catalogError, showToast
   } = useApp();
 
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -290,16 +290,22 @@ export const CustomerDeliveryApp: React.FC = () => {
   }, [tenants]);
 
   const zoneFilteredPosts = useMemo(() => {
-    return posts.filter(post => {
+    return posts.reduce<Post[]>((acc, post) => {
       const tenant = tenantMap.get(post.tenantId);
       if (!tenant || tenant.status !== 'active' || tenant.cityId !== activeCity.id) {
-        return false;
+        return acc;
       }
-      if (selectedZone === 'all') {
-        return true;
+      if (selectedZone !== 'all' && tenant.zoneId !== selectedZone) {
+        return acc;
       }
-      return tenant.zoneId === selectedZone;
-    });
+      acc.push({
+        ...post,
+        tenantName: tenant.name,
+        tenantCategory: tenant.category,
+        tenantLogoEmoji: tenant.logoEmoji || '🍽️'
+      });
+      return acc;
+    }, []);
   }, [posts, tenantMap, selectedZone, activeCity.id]);
 
   const activeTenantsInZoneCount = useMemo(() => {
@@ -317,6 +323,9 @@ export const CustomerDeliveryApp: React.FC = () => {
 
   const cartTotal = cart.reduce((s, i) => s + (i.product?.price || 0) * i.quantity, 0);
   const cartQty   = cart.reduce((s, i) => s + i.quantity, 0);
+  const cartTenantId = cart[0]?.product?.tenantId;
+  const cartTenant = cartTenantId ? tenantMap.get(cartTenantId) : null;
+  const isCartTenantOpen = cartTenant?.isOpen ?? true;
   const activeOrdersCount = orders.filter(o =>
     o && o.status !== 'delivered' &&
     o.type && (o.type.toLowerCase().includes('domicilio') || o.type.toLowerCase().includes('mesa'))
@@ -325,13 +334,17 @@ export const CustomerDeliveryApp: React.FC = () => {
   const handleOrder = useCallback((productId: string, tenantIdOrSlug: string) => {
     const targetTenant = tenants.find(t => t.id === tenantIdOrSlug || t.slug === tenantIdOrSlug);
     if (targetTenant) {
+      if (!targetTenant.isOpen) {
+        showToast('❌ Este restaurante está cerrado temporalmente y no acepta pedidos.');
+        return;
+      }
       setCurrentTenantBySlug(targetTenant.slug);
     } else {
       setCurrentTenantBySlug(tenantIdOrSlug);
     }
     const prod = products.find(p => p.id === productId);
     if (prod) addToCart(prod);
-  }, [tenants, products, addToCart, setCurrentTenantBySlug]);
+  }, [tenants, products, addToCart, setCurrentTenantBySlug, showToast]);
 
   const toggleSave = (id: string) =>
     setSavedPosts(prev => {
@@ -848,9 +861,15 @@ export const CustomerDeliveryApp: React.FC = () => {
                       <span>Total</span>
                       <strong>${cartTotal.toLocaleString('es-CO')} COP</strong>
                     </div>
-                    <button className="gf-checkout-btn" onClick={() => setIsPaymentOpen(true)}>
-                      <Bike size={17} /> Pagar a Domicilio
-                    </button>
+                    {isCartTenantOpen ? (
+                      <button className="gf-checkout-btn" onClick={() => setIsPaymentOpen(true)}>
+                        <Bike size={17} /> Pagar a Domicilio
+                      </button>
+                    ) : (
+                      <button className="gf-checkout-btn" disabled style={{ background: 'rgba(255, 255, 255, 0.1)', cursor: 'not-allowed', color: 'var(--text-muted)' }}>
+                        <Clock size={17} /> Restaurante Cerrado
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

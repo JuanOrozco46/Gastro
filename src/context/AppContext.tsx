@@ -4,7 +4,7 @@ import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment } from '../services/supabaseOrderService';
@@ -600,21 +600,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const toggleTenantOpenStatus = (tenantId: string) => {
+  const toggleTenantOpenStatus = async (tenantId: string) => {
     if (!isRestaurantOwner(currentUser) || !hasOwnershipOfTenant(currentUser, tenantId)) {
       showToast('⚠️ No tienes autorización para administrar este restaurante.');
       return;
     }
+
+    const tenant = tenants.find(t => t.id === tenantId);
+    if (!tenant) return;
+
+    if (tenant.status !== 'active') {
+      showToast('⚠️ Solo puedes cambiar el estado de restaurantes activos.');
+      return;
+    }
+
+    const nextStatus = !tenant.isOpen;
+
+    if (authMode === 'remote') {
+      const success = await updateLiveRestaurantOpenStatus(tenantId, nextStatus);
+      if (!success) {
+        showToast('❌ No pudimos actualizar el estado del restaurante.');
+        return;
+      }
+    }
+
     setTenants(prev => prev.map(t => {
       if (t.id === tenantId) {
-        const nextStatus = !t.isOpen;
         showToast(`${t.name}: ${nextStatus ? '¡ABIERTO Y RECIBIENDO PEDIDOS!' : 'CERRADO TEMPORALMENTE'}`);
         return { ...t, isOpen: nextStatus };
       }
       return t;
     }));
     if (currentTenant.id === tenantId) {
-      setCurrentTenant(prev => ({ ...prev, isOpen: !prev.isOpen }));
+      setCurrentTenant(prev => ({ ...prev, isOpen: nextStatus }));
     }
   };
 

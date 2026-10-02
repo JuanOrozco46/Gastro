@@ -255,6 +255,21 @@ export async function updateLiveApplicationStatus(
   }
 }
 
+export async function updateLiveRestaurantOpenStatus(tenantId: string, isOpen: boolean): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { error } = await supabase
+      .from('restaurants')
+      .update({ is_open: isOpen })
+      .eq('id', tenantId);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn('⚠️ Error updating restaurant open status:', err);
+    return false;
+  }
+}
+
 export async function uploadMediaFile(
   tenantId: string,
   folder: 'products' | 'posts' | 'thumbnails',
