@@ -14,6 +14,7 @@ import {
   Bookmark, Zap, Search, SlidersHorizontal, CheckCircle2, Building2, Clock
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
+import { toggleRemoteSave } from '../services/supabaseDataService';
 import type { Post } from '../types';
 
 /* ── Format numbers ──────────────────────────────────────── */
@@ -86,10 +87,11 @@ interface PostCardProps {
   onSave: (id: string) => void;
   onOpenComments: (post: Post) => void;
   onOpenProfile: (tenantId: string) => void;
+  onShare: (post: Post) => void;
 }
 
 const PostCard: React.FC<PostCardProps> = ({
-  post, onLike, onOrder, onPlayVideo, saved, onSave, onOpenComments, onOpenProfile
+  post, onLike, onOrder, onPlayVideo, saved, onSave, onOpenComments, onOpenProfile, onShare
 }) => {
   const [expanded, setExpanded] = useState(false);
   const isVideo = post.mediaType === 'video';
@@ -171,7 +173,7 @@ const PostCard: React.FC<PostCardProps> = ({
             <MessageCircle size={22} />
             <span>{post.commentsCount}</span>
           </button>
-          <button className="gf-action-btn">
+          <button className="gf-action-btn" onClick={() => onShare(post)}>
             <Share2 size={20} />
           </button>
         </div>
@@ -246,7 +248,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const {
     cities, zones, tenants, posts, toggleLikePost, products,
     addToCart, removeFromCart, cart, setCurrentTenantBySlug, orders,
-    isCatalogLoading, catalogError, showToast
+    isCatalogLoading, catalogError, showToast, currentUser, authMode
   } = useApp();
 
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -347,7 +349,10 @@ export const CustomerDeliveryApp: React.FC = () => {
     if (prod) addToCart(prod);
   }, [tenants, products, addToCart, setCurrentTenantBySlug, showToast]);
 
-  const toggleSave = (id: string) =>
+  const toggleSave = async (id: string) => {
+    if (authMode === 'remote' && currentUser?.id) {
+      await toggleRemoteSave(id, currentUser.id);
+    }
     setSavedPosts(prev => {
       const n = new Set(prev);
       if (n.has(id)) {
@@ -357,6 +362,29 @@ export const CustomerDeliveryApp: React.FC = () => {
       }
       return n;
     });
+  };
+
+  const handleShare = useCallback(async (post: Post) => {
+    const url = `${window.location.origin}/post/${post.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${post.tenantName} - ${post.dishName}`,
+          text: `¡Mira esta delicia de ${post.tenantName} en GastroSync!`,
+          url
+        });
+        return;
+      } catch {
+        // user canceled or error
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('Enlace copiado al portapapeles');
+    } catch {
+      showToast('Publicación lista para compartir: ' + url);
+    }
+  }, [showToast]);
 
   // Category filter chips
   const CATEGORIES = ['all', 'Italiana', 'Hamburguesas', 'Asiática', 'Típica', 'Mexicana'];
@@ -808,6 +836,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                     onSave={toggleSave}
                     onOpenComments={setSelectedCommentsPost}
                     onOpenProfile={setSelectedTenantProfile}
+                    onShare={handleShare}
                   />
                 ))
               )}
@@ -831,24 +860,45 @@ export const CustomerDeliveryApp: React.FC = () => {
                       <span>Añade platillos desde el feed</span>
                     </div>
                   ) : (
-                    <div className="gf-cart-items">
-                      {cart.map((item, i) => (
-                        <div key={i} className="gf-cart-item">
-                          <div className="gf-ci-emoji">{item.product.emoji}</div>
-                          <div className="gf-ci-info">
-                            <span className="gf-ci-name">{item.product.name}</span>
-                            <span className="gf-ci-price">${(item.product.price * item.quantity).toLocaleString('es-CO')}</span>
+                    <>
+                      <div style={{ padding: '0 1rem 0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Restaurante actual: <strong style={{ color: 'var(--primary)' }}>{cartTenant?.name}</strong>
+                      </div>
+                      <div className="gf-cart-items">
+                        {cart.map((item, i) => (
+                          <div key={i} className="gf-cart-item">
+                            <div className="gf-ci-emoji">{item.product.emoji}</div>
+                            <div className="gf-ci-info">
+                              <span className="gf-ci-name">{item.product.name}</span>
+                              <span className="gf-ci-price">${item.product.price.toLocaleString('es-CO')} <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>(x{item.quantity})</span></span>
+                            </div>
+                            <div className="gf-ci-controls">
+                              <button className="gf-ci-btn" onClick={() => removeFromCart(item.product.id)}>
+                                {item.quantity === 1 ? <Trash2 size={11} /> : <Minus size={11} />}
+                              </button>
+                              <span>{item.quantity}</span>
+                              <button className="gf-ci-btn add" onClick={() => addToCart(item.product)}><Plus size={11} /></button>
+                            </div>
                           </div>
-                          <div className="gf-ci-controls">
-                            <button className="gf-ci-btn" onClick={() => removeFromCart(item.product.id)}>
-                              {item.quantity === 1 ? <Trash2 size={11} /> : <Minus size={11} />}
-                            </button>
-                            <span>{item.quantity}</span>
-                            <button className="gf-ci-btn add" onClick={() => addToCart(item.product)}><Plus size={11} /></button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                      
+                      <div style={{ padding: '10px 15px' }}>
+                        <button 
+                          className="btn btn-outline" 
+                          style={{ width: '100%', fontSize: '0.8rem', padding: '8px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                          onClick={() => {
+                            if (cartTenant) {
+                              setCurrentTenantBySlug(cartTenant.slug);
+                              setActiveTab('directory');
+                              setSelectedTenantProfile(cartTenant.id);
+                            }
+                          }}
+                        >
+                          <Plus size={14} /> Agregar bebidas y acompañamientos
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
 

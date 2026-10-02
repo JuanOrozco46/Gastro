@@ -4,7 +4,7 @@ import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment } from '../services/supabaseOrderService';
@@ -177,6 +177,8 @@ const DEFAULT_DRIVERS: Driver[] = [];
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cities, setCities] = useState<City[]>(DEFAULT_CITIES);
   const [zones, setZones] = useState<Zone[]>(DEFAULT_ZONES);
+  
+  const [cartConflict, setCartConflict] = useState<{ pendingProduct: Product | null, activeTenantName: string } | null>(null);
 
   const authMode: 'remote' | 'demo' = isSupabaseConfigured ? 'remote' : 'demo';
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(isSupabaseConfigured);
@@ -586,7 +588,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Sesión cerrada correctamente');
   };
 
-  const toggleLikePost = (postId: string) => {
+  const toggleLikePost = async (postId: string) => {
+    if (authMode === 'remote' && currentUser?.id) {
+      await toggleRemoteLike(postId, currentUser.id);
+    }
     setPosts(prev => prev.map(p => {
       if (p.id === postId) {
         const nextLiked = !p.isLiked;
@@ -600,8 +605,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const found = tenants.find(t => t.slug === slug);
     if (found) {
       setCurrentTenant(found);
-      setCart([]);
-      showToast(`Restaurante seleccionado: ${found.name}`);
+      // No vaciar el carrito automáticamente:
+      // setCart([]);
     }
   };
 
@@ -652,12 +657,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addToCart = (product: Product) => {
     if (product.available === false) {
       showToast(`⚠️ "${product.name}" no se encuentra disponible por el momento.`);
-      return;
+      return { success: false };
     }
     const prodTenant = tenants.find(t => t.id === product.tenantId) || currentTenant;
     if (!prodTenant.isOpen) {
       showToast(`⚠️ ${prodTenant.name} se encuentra CERRADO temporalmente.`);
-      return;
+      return { success: false };
     }
 
     if (cart.length > 0) {
@@ -665,8 +670,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (activeTenantId !== product.tenantId) {
         const activeTenant = tenants.find(t => t.id === activeTenantId);
         const activeName = activeTenant ? activeTenant.name : 'otro restaurante';
-        showToast(`⚠️ Tu carrito ya contiene productos de "${activeName}". Finaliza o vacía tu pedido actual antes de agregar de otro restaurante.`);
-        return;
+        setCartConflict({ pendingProduct: product, activeTenantName: activeName });
+        return { success: false, requiresClear: true, activeTenantName: activeName };
       }
     }
 
@@ -677,6 +682,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return [...prev, { product, quantity: 1 }];
     });
+    showToast(`Añadido al carrito: ${product.name}`);
+    return { success: true };
+  };
+
+  const clearCartAndAdd = (product: Product) => {
+    setCart([{ product, quantity: 1 }]);
     showToast(`Añadido al carrito: ${product.name}`);
   };
 
@@ -1020,13 +1031,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Simulado pedido pagado #${newId} para ${targetTenant.name}`);
   };
 
-  const addComment = (postId: string, text: string, userName = 'Tú (Cliente)') => {
+  const addComment = async (postId: string, text: string, userName = 'Tú (Cliente)') => {
+    if (authMode === 'remote' && currentUser?.id) {
+      await addRemoteComment(postId, currentUser.id, text);
+    }
     setPosts(prev => prev.map(p => {
       if (p.id === postId) {
         const newComment = {
           id: `c_${Date.now()}`,
           postId,
-          userName,
+          userName: currentUser ? currentUser.name : userName,
           userAvatar: '🥑',
           text,
           timeAgo: 'Justo ahora',
@@ -1042,6 +1056,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return p;
     }));
     showToast('💬 Comentario publicado');
+  };
+
+  const deleteComment = async (postId: string, commentId: string) => {
+    if (authMode === 'remote' && currentUser?.id) {
+      await deleteRemoteComment(commentId, currentUser.id);
+    }
+    setPosts(prev => prev.map(p => {
+      if (p.id === postId) {
+        const updatedComments = (p.comments || []).filter(c => c.id !== commentId);
+        return {
+          ...p,
+          comments: updatedComments,
+          commentsCount: updatedComments.length
+        };
+      }
+      return p;
+    }));
+    showToast('🗑️ Comentario eliminado');
   };
 
   const createPost = async (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => {
@@ -1456,6 +1488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteProduct,
       setEquityWeight: updateEquityWeight,
       addToCart,
+      clearCartAndAdd,
       removeFromCart,
       clearCart,
       submitOrderWithPayment,
@@ -1467,11 +1500,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       submitRestaurantApplication,
       reviewRestaurantApplication,
       activateApprovedRestaurant,
+      deleteComment,
       showToast,
       triggerTestOrder,
       logout
     }}>
       {children}
+
+      {cartConflict && (
+        <div className="modal-overlay" style={{ zIndex: 99999 }}>
+          <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
+            <h3 style={{ marginTop: 0, fontWeight: 900, color: 'var(--text-main)' }}>⚠️ Cambio de Restaurante</h3>
+            <p style={{ color: 'var(--text-muted)' }}>
+              Tu carrito actual tiene productos de <strong>{cartConflict.activeTenantName}</strong>. 
+              <br /><br />
+              ¿Deseas vaciar tu carrito actual para agregar productos de <strong>{tenants.find(t => t.id === cartConflict.pendingProduct?.tenantId)?.name}</strong>?
+            </p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button 
+                className="btn btn-outline" 
+                style={{ flex: 1 }}
+                onClick={() => setCartConflict(null)}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn btn-primary" 
+                style={{ flex: 1, background: 'var(--danger)', color: 'white', border: 'none' }}
+                onClick={() => {
+                  if (cartConflict.pendingProduct) {
+                    clearCartAndAdd(cartConflict.pendingProduct);
+                    const newTenant = tenants.find(t => t.id === cartConflict.pendingProduct!.tenantId);
+                    if (newTenant) setCurrentTenant(newTenant);
+                  }
+                  setCartConflict(null);
+                }}
+              >
+                Vaciar y Agregar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppContext.Provider>
   );
 };

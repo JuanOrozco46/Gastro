@@ -114,6 +114,58 @@ export async function fetchLiveProducts(): Promise<Product[]> {
   }
 }
 
+export async function addRemoteComment(postId: string, userId: string, text: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { error } = await supabase.from('post_comments').insert([{ post_id: postId, user_id: userId, content: text }]);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteRemoteComment(commentId: string, userId: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { error } = await supabase.from('post_comments').delete().eq('id', commentId).eq('user_id', userId);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function toggleRemoteLike(postId: string, userId: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { data } = await supabase.from('post_likes').select('id').eq('post_id', postId).eq('user_id', userId).single();
+    if (data) {
+      const { error } = await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', userId);
+      return !error;
+    } else {
+      const { error } = await supabase.from('post_likes').insert([{ post_id: postId, user_id: userId }]);
+      return !error;
+    }
+  } catch {
+    return false;
+  }
+}
+
+export async function toggleRemoteSave(postId: string, userId: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { data } = await supabase.from('saved_posts').select('id').eq('post_id', postId).eq('user_id', userId).single();
+    if (data) {
+      const { error } = await supabase.from('saved_posts').delete().eq('post_id', postId).eq('user_id', userId);
+      return !error;
+    } else {
+      const { error } = await supabase.from('saved_posts').insert([{ post_id: postId, user_id: userId }]);
+      return !error;
+    }
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchLivePosts(): Promise<Post[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   try {

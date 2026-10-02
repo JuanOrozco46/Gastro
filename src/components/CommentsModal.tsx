@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/useApp';
 import type { Post } from '../types';
-import { X, Send, Heart, MessageCircle } from 'lucide-react';
+import { X, Send, Heart, MessageCircle, Trash2 } from 'lucide-react';
 
 interface CommentsModalProps {
   post: Post;
@@ -9,7 +9,7 @@ interface CommentsModalProps {
 }
 
 export const CommentsModal: React.FC<CommentsModalProps> = ({ post, onClose }) => {
-  const { addComment } = useApp();
+  const { addComment, deleteComment, currentUser } = useApp();
   const [commentText, setCommentText] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -64,10 +64,17 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ post, onClose }) =
                   </div>
                   <p className="gf-comment-text">{c.text}</p>
                 </div>
-                <button className="gf-comment-like-btn">
-                  <Heart size={14} />
-                  {c.likes > 0 && <span>{c.likes}</span>}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <button className="gf-comment-like-btn">
+                    <Heart size={14} />
+                    {c.likes > 0 && <span>{c.likes}</span>}
+                  </button>
+                  {(c.userName === currentUser?.name || c.userName === 'Tú (Cliente)') && (
+                    <button className="gf-comment-like-btn" onClick={() => deleteComment(post.id, c.id)} style={{ color: 'var(--danger)' }}>
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))
           )}

@@ -37,12 +37,14 @@ export interface AppContextType {
   updateTenant: (tenantId: string, updates: Partial<Tenant>) => void;
   toggleLikePost: (postId: string) => void;
   addComment: (postId: string, text: string, userName?: string) => void;
+  deleteComment: (postId: string, commentId: string) => void;
   createPost: (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => Promise<void> | void;
   deletePost: (postId: string) => Promise<void> | void;
   addDriver: (driver: Omit<Driver, 'id' | 'tenantId' | 'status'>) => void;
   deleteProduct: (productId: string) => Promise<void> | void;
   setEquityWeight: (weight: number) => void;
-  addToCart: (product: Product) => void;
+  addToCart: (product: Product) => { success: boolean; requiresClear?: boolean; activeTenantName?: string; } | void;
+  clearCartAndAdd: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
   submitOrderWithPayment: (typeOrDetails: string | CheckoutDetails, method: PaymentMethod, transaction?: Transaction) => Promise<{ success: boolean; isRemote?: boolean; orderId?: string; paymentId?: string; sandboxUrl?: string; wompiConfig?: any }>;
