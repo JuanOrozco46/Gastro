@@ -4,6 +4,7 @@ import { getOperationalTenant, getFulfillmentBadgeText, getValidOrderTransitions
 import { motion } from 'framer-motion';
 import { FileUploadInput } from './FileUploadInput';
 import { FinancialAnalytics } from './FinancialAnalytics';
+import { ProfileTab } from './RestaurantAdmin/ProfileTab';
 
 import {
   QrCode, Utensils, Truck, Plus, Share2, Play,
@@ -23,7 +24,7 @@ export const RestaurantAdmin: React.FC = () => {
 
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
-  const [activeTab, setActiveTab] = useState<'orders' | 'content' | 'menu' | 'analytics' | 'qr'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'profile' | 'content' | 'menu' | 'analytics' | 'qr'>('orders');
   const [tableNumber, setTableNumber] = useState('4');
   
   // Modals state
@@ -264,6 +265,12 @@ export const RestaurantAdmin: React.FC = () => {
       {/* Navigation Pills */}
       <div className="nav-tabs" style={{ marginBottom: '1.75rem' }}>
         <button
+          className={`nav-tab ${activeTab === 'profile' ? 'active' : ''}`}
+          onClick={() => setActiveTab('profile')}
+        >
+          <MapPin size={16} /> 👤 Perfil y Horarios
+        </button>
+        <button
           className={`nav-tab ${activeTab === 'orders' ? 'active' : ''}`}
           onClick={() => setActiveTab('orders')}
         >
@@ -294,6 +301,11 @@ export const RestaurantAdmin: React.FC = () => {
           <QrCode size={16} /> 📱 QR & Repartidores
         </button>
       </div>
+
+      {/* ── TAB: PROFILE ── */}
+      {activeTab === 'profile' && (
+        <ProfileTab tenant={operatingTenant} />
+      )}
 
       {/* ── TAB 0: ORDER MANAGEMENT ── */}
       {activeTab === 'orders' && (

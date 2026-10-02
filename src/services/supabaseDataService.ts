@@ -741,3 +741,35 @@ export async function deleteLivePost(postId: string): Promise<boolean> {
     return false;
   }
 }
+
+export async function updateRemoteTenant(tenantId: string, updates: Partial<Tenant>): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const dbUpdates: any = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.category !== undefined) dbUpdates.category = updates.category;
+    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+    if (updates.whatsapp !== undefined) dbUpdates.whatsapp = updates.whatsapp;
+    if (updates.address !== undefined) dbUpdates.address = updates.address;
+    if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl;
+    if (updates.logoEmoji !== undefined) dbUpdates.logo_emoji = updates.logoEmoji;
+    if (updates.bannerUrl !== undefined) dbUpdates.banner_url = updates.bannerUrl;
+    if (updates.specialties !== undefined) dbUpdates.specialties = updates.specialties;
+    if (updates.estimatedDeliveryMinutes !== undefined) dbUpdates.estimated_delivery_minutes = parseInt(updates.estimatedDeliveryMinutes as any) || 0;
+    if (updates.isOpen !== undefined) dbUpdates.is_open = updates.isOpen;
+
+    if (Object.keys(dbUpdates).length === 0) return true;
+
+    const { error } = await supabase
+      .from('restaurants')
+      .update(dbUpdates)
+      .eq('id', tenantId);
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error('⚠️ Error updating remote tenant:', err);
+    return false;
+  }
+}

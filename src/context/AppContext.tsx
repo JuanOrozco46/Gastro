@@ -689,11 +689,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateTenant = (tenantId: string, updates: Partial<Tenant>) => {
+  const updateTenant = async (tenantId: string, updates: Partial<Tenant>) => {
+    // Actualizar localmente de inmediato (Optimista)
     setTenants(prev => prev.map(t => t.id === tenantId ? { ...t, ...updates } : t));
     if (currentTenant.id === tenantId) {
       setCurrentTenant(prev => ({ ...prev, ...updates }));
     }
+    
+    if (authMode === 'remote') {
+      const { updateRemoteTenant } = await import('../services/supabaseDataService');
+      const success = await updateRemoteTenant(tenantId, updates);
+      if (!success) {
+        showToast('⚠️ Hubo un error al guardar los cambios en el servidor.');
+        return;
+      }
+    }
+    
     showToast('Perfil del restaurante actualizado con éxito');
   };
 
