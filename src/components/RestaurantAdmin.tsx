@@ -3,27 +3,14 @@ import { useApp } from '../context/useApp';
 import { getOperationalTenant, getFulfillmentBadgeText, getValidOrderTransitions } from '../utils/tenantHelpers';
 import { motion } from 'framer-motion';
 import { FileUploadInput } from './FileUploadInput';
-import {
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar
-} from 'recharts';
+import { FinancialAnalytics } from './FinancialAnalytics';
+
 import {
   QrCode, Utensils, Truck, Plus, Share2, Play,
-  Eye, Heart, Sparkles, Trash2,
-  ShieldCheck, Power, Printer,
+  Eye, Heart, Sparkles, Trash2, Power, Printer,
   MapPin, BarChart3,
   AlertCircle, Package, Clock, CheckCircle
 } from 'lucide-react';
-
-/* Sample sales & commission savings chart data */
-const SALES_GRAPH_DATA = [
-  { day: 'Lun', ventas: 180000, ahorro: 48600, rappiFee: 54000 },
-  { day: 'Mar', ventas: 240000, ahorro: 64800, rappiFee: 72000 },
-  { day: 'Mié', ventas: 310000, ahorro: 83700, rappiFee: 93000 },
-  { day: 'Jue', ventas: 420000, ahorro: 113400, rappiFee: 126000 },
-  { day: 'Vie', ventas: 680000, ahorro: 183600, rappiFee: 204000 },
-  { day: 'Sáb', ventas: 890000, ahorro: 240300, rappiFee: 267000 },
-  { day: 'Dom', ventas: 750000, ahorro: 202500, rappiFee: 225000 },
-];
 
 export const RestaurantAdmin: React.FC = () => {
   const {
@@ -767,84 +754,9 @@ export const RestaurantAdmin: React.FC = () => {
         </div>
       )}
 
-      {/* ── TAB 2: FINANCIAL ANALYTICS WITH RECHARTS ── */}
+      {/* ── TAB 2: FINANCIAL ANALYTICS ── */}
       {activeTab === 'analytics' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-          
-          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '28px', padding: '2rem' }}>
-            <div className="card-header" style={{ marginBottom: '1.5rem' }}>
-              <div>
-                <div className="card-title" style={{ fontSize: '1.3rem', fontWeight: 900, color: 'white' }}>
-                  📈 Reporte de Ventas Semanales & Ahorro Directo (COP)
-                </div>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Comparativa de ingresos reales de {operatingTenant.name} conservando el 97% del valor.
-                </span>
-              </div>
-              <span className="badge badge-secondary" style={{ padding: '6px 14px', fontSize: '0.8rem' }}>
-                ⚡ 27% MÁS GANANCIA NETA
-              </span>
-            </div>
-
-            <div style={{ width: '100%', height: 320 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={SALES_GRAPH_DATA} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#FF5533" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#FF5533" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorAhorro" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                  <XAxis dataKey="day" stroke="#94A3B8" />
-                  <YAxis stroke="#94A3B8" tickFormatter={val => `$${(val/1000).toFixed(0)}k`} />
-                  <Tooltip 
-                    formatter={(value: unknown) => [`$${Number(value || 0).toLocaleString('es-CO')} COP`, ''] as [string, string]}
-                  />
-                  <Area type="monotone" dataKey="ventas" name="Ventas Brutas" stroke="#FF5533" fillOpacity={1} fill="url(#colorVentas)" strokeWidth={3} />
-                  <Area type="monotone" dataKey="ahorro" name="Dinero Ahorrado en Comisiones" stroke="#10B981" fillOpacity={1} fill="url(#colorAhorro)" strokeWidth={3} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="grid-2">
-            <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-              <div className="card-header">
-                <div className="card-title" style={{ color: 'white', fontWeight: 900 }}>
-                  🛡️ Comparativa de Tarifas: GastroSync vs. Rappi
-                </div>
-              </div>
-              <div style={{ width: '100%', height: 240 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={SALES_GRAPH_DATA}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                    <XAxis dataKey="day" stroke="#94A3B8" />
-                    <YAxis stroke="#94A3B8" tickFormatter={val => `$${(val/1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={{ background: '#0F172A', borderColor: 'rgba(255,255,255,0.15)', borderRadius: '12px', color: 'white' }} />
-                    <Bar dataKey="rappiFee" name="Comisión Rappi/iFood (30%)" fill="#EF4444" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="ahorro" name="Retenido por GastroSync (3%)" fill="#10B981" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <ShieldCheck size={48} style={{ color: '#10B981', marginBottom: '1rem' }} />
-              <h3 style={{ fontSize: '1.4rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
-                Modelo de Negocio Ético
-              </h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>
-                En plataformas tradicionales pagas hasta <strong>$30.000 COP de cada $100.000 COP</strong> producidos. Con GastroSync mantienes <strong>$97.000 COP netos</strong>, permitiéndote reinvertir en mejores insumos y personal.
-              </p>
-            </div>
-          </div>
-
-        </div>
+        <FinancialAnalytics tenantId={operatingTenant.id} />
       )}
 
       {/* ── TAB 3: MENU PRODUCTS ── */}
