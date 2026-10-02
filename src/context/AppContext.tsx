@@ -355,6 +355,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const match = remoteTenantsRef.current.find(t => t.id === userAccount.tenantId);
             if (match) setCurrentTenant(match);
           }
+          // Recargar catálogo público tras login para asegurar que el feed sea visible.
+          const [livePosts, liveProducts, liveTenants] = await Promise.all([
+            fetchLivePosts(),
+            fetchLiveProducts(),
+            fetchLiveTenants()
+          ]);
+          setRemotePosts(livePosts);
+          setRemoteProducts(liveProducts);
+          if (liveTenants.length > 0) {
+            setRemoteTenants(liveTenants);
+            remoteTenantsRef.current = liveTenants;
+            setTenants(liveTenants);
+          }
         } else if (event === 'SIGNED_OUT') {
           // Solo limpiamos datos de sesión del usuario.
           // Los posts, tenants y productos son públicos y deben mantenerse visibles.
@@ -594,9 +607,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleLikePost = async (postId: string) => {
-    if (authMode === 'remote' && currentUser?.id) {
+    if (authMode === 'remote') {
+      if (!currentUser?.id) {
+        showToast('⚠️ Inicia sesión para dar like.');
+        return;
+      }
       await toggleRemoteLike(postId, currentUser.id);
+      setRemotePosts(prev => prev.map(p => {
+        if (p.id === postId) {
+          const nextLiked = !p.isLiked;
+          return { ...p, isLiked: nextLiked, likes: nextLiked ? p.likes + 1 : p.likes - 1 };
+        }
+        return p;
+      }));
+      return;
     }
+    // Modo demo
     setPosts(prev => prev.map(p => {
       if (p.id === postId) {
         const nextLiked = !p.isLiked;
@@ -1036,27 +1062,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Simulado pedido pagado #${newId} para ${targetTenant.name}`);
   };
 
-  const addComment = async (postId: string, text: string, userName = 'Tú (Cliente)') => {
-    if (authMode === 'remote' && currentUser?.id) {
-      await addRemoteComment(postId, currentUser.id, text);
+  const addComment = async (postId: string, text: string, _userName = 'Tú (Cliente)') => {
+    if (!currentUser?.id) {
+      showToast('⚠️ Inicia sesión para comentar.');
+      return;
     }
+    if (authMode === 'remote') {
+      const ok = await addRemoteComment(postId, currentUser.id, text);
+      if (!ok) {
+        showToast('❌ No se pudo guardar el comentario.');
+        return;
+      }
+      const newComment = {
+        id: `c_${Date.now()}`,
+        postId,
+        userName: currentUser.name,
+        userAvatar: '🥑',
+        text,
+        timeAgo: 'Justo ahora',
+        likes: 0
+      };
+      setRemotePosts(prev => prev.map(p => {
+        if (p.id === postId) {
+          const updatedComments = [newComment, ...(p.comments || [])];
+          return { ...p, comments: updatedComments, commentsCount: updatedComments.length };
+        }
+        return p;
+      }));
+      showToast('💬 Comentario publicado');
+      return;
+    }
+    // Modo demo
     setPosts(prev => prev.map(p => {
       if (p.id === postId) {
         const newComment = {
           id: `c_${Date.now()}`,
           postId,
-          userName: currentUser ? currentUser.name : userName,
+          userName: currentUser.name,
           userAvatar: '🥑',
           text,
           timeAgo: 'Justo ahora',
           likes: 0
         };
         const updatedComments = [newComment, ...(p.comments || [])];
-        return {
-          ...p,
-          comments: updatedComments,
-          commentsCount: updatedComments.length
-        };
+        return { ...p, comments: updatedComments, commentsCount: updatedComments.length };
       }
       return p;
     }));
@@ -1065,16 +1114,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteComment = async (postId: string, commentId: string) => {
     if (authMode === 'remote' && currentUser?.id) {
-      await deleteRemoteComment(commentId, currentUser.id);
+      const ok = await deleteRemoteComment(commentId, currentUser.id);
+      if (!ok) {
+        showToast('❌ No tienes permiso para eliminar este comentario.');
+        return;
+      }
+      setRemotePosts(prev => prev.map(p => {
+        if (p.id === postId) {
+          const updatedComments = (p.comments || []).filter(c => c.id !== commentId);
+          return { ...p, comments: updatedComments, commentsCount: updatedComments.length };
+        }
+        return p;
+      }));
+      showToast('🗑️ Comentario eliminado');
+      return;
     }
+    // Modo demo
     setPosts(prev => prev.map(p => {
       if (p.id === postId) {
         const updatedComments = (p.comments || []).filter(c => c.id !== commentId);
-        return {
-          ...p,
-          comments: updatedComments,
-          commentsCount: updatedComments.length
-        };
+        return { ...p, comments: updatedComments, commentsCount: updatedComments.length };
       }
       return p;
     }));
