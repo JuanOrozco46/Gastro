@@ -224,14 +224,29 @@ const PostCard: React.FC<PostCardProps> = ({
           {[1,2,3,4,5].map(i => <Star key={i} size={12} fill="#E6942B" strokeWidth={0} />)}
           <span className="gf-stars-label">· {post.commentsCount} reseñas</span>
         </div>
-        <button
-          className="gf-order-btn"
-          onClick={() => onOrder(post.productId, post.tenantId)}
-        >
-          <ShoppingBag size={16} />
-          <span>Añadir al Carrito</span>
-          <span className="gf-order-price">${post.price.toLocaleString('es-CO')}</span>
-        </button>
+        {post.hasValidProduct ? (
+          <button
+            className="gf-order-btn"
+            onClick={() => onOrder(post.productId, post.tenantId)}
+          >
+            <ShoppingBag size={16} />
+            <span>Añadir al Carrito</span>
+            <span className="gf-order-price">${post.price.toLocaleString('es-CO')}</span>
+          </button>
+        ) : (
+          <div style={{ 
+            padding: '12px', 
+            background: 'rgba(251, 191, 36, 0.1)', 
+            border: '1px solid rgba(251, 191, 36, 0.3)',
+            borderRadius: '12px', 
+            fontSize: '0.8rem', 
+            color: '#F59E0B',
+            textAlign: 'center',
+            fontWeight: 600
+          }}>
+            📋 Solo para referencia - No disponible para pedido
+          </div>
+        )}
         {isVideo && (
           <button className="gf-watch-btn" onClick={() => onPlayVideo(post)}>
             <Play size={14} fill="currentColor" /> Ver video del plato

@@ -163,6 +163,7 @@ export interface Post {
   ordersFromPost?: number;
   timeAgo: string;
   productId: string;
+  hasValidProduct?: boolean; // Flag to indicate if product exists in catalog for ordering
 }
 
 export interface StoryItem {

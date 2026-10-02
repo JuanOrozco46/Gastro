@@ -323,6 +323,7 @@ export async function fetchLivePosts(): Promise<Post[]> {
         comments: [],
         timeAgo: formatTimeAgo(dbPost.created_at),
         productId: dbPost.product_id || dbPost.id,
+        hasValidProduct: !!dbPost.product_id, // Flag to indicate if product exists in catalog
         status: dbPost.is_published ? 'published' : 'draft',
         createdAt: new Date(dbPost.created_at).getTime()
       };
