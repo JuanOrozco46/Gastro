@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { Tenant, Product, Post, RestaurantApplication, OrderFulfillment } from '../types';
+import type { Tenant, Product, Post, RestaurantApplication, OrderFulfillment, City, Zone } from '../types';
 import type {
   DbRestaurant, DbProduct, DbPost
 } from './supabaseTypes';
@@ -13,6 +13,35 @@ import {
  * Servicio de Sincronización en Tiempo Real con Supabase.
  * Permite cargar datos reales del servidor PostgreSQL sin depender de mocks inventados.
  */
+
+export async function fetchLiveCities(): Promise<City[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  try {
+    const { data, error } = await supabase.from('cities').select('*').eq('is_active', true);
+    if (error || !data) return [];
+    return data.map(d => ({
+      id: d.id,
+      name: d.name,
+      countryCode: d.country_code,
+      currencyCode: d.currency_code,
+      isActive: d.is_active
+    }));
+  } catch { return []; }
+}
+
+export async function fetchLiveZones(): Promise<Zone[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  try {
+    const { data, error } = await supabase.from('zones').select('*').eq('is_active', true);
+    if (error || !data) return [];
+    return data.map(d => ({
+      id: d.id,
+      cityId: d.city_id,
+      name: d.name,
+      isActive: d.is_active
+    }));
+  } catch { return []; }
+}
 
 export async function fetchLiveTenants(): Promise<Tenant[]> {
   if (!isSupabaseConfigured || !supabase) return [];
@@ -53,10 +82,14 @@ export async function fetchLiveProducts(): Promise<Product[]> {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select(`id, restaurant_id, name, description, category, price_cop, available`)
+      .select(`id, restaurant_id, name, description, category, price_cop, available, image_url`)
       .eq('available', true);
 
-    if (error || !data) return [];
+    if (error) {
+      console.error('⚠️ Error RLS o BD al consultar Supabase (Products):', error);
+      return [];
+    }
+    if (!data) return [];
 
     const validCategories = ['Platos Principales', 'Bebidas', 'Postres', 'Entradas'];
 
@@ -89,7 +122,11 @@ export async function fetchLivePosts(): Promise<Post[]> {
       .select(`id, restaurant_id, product_id, title, description, media_url, media_type, price_cop, is_published, created_at`)
       .order('created_at', { ascending: false });
 
-    if (error || !data) return [];
+    if (error) {
+      console.error('⚠️ Error RLS o BD al consultar Supabase (Posts):', error);
+      return [];
+    }
+    if (!data) return [];
 
     return (data as unknown as DbPost[]).map(mapDbPostToPost).filter(p => {
       if (!p.tenantId || !p.id || !p.dishName) {

@@ -4,7 +4,7 @@ import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment } from '../services/supabaseOrderService';
@@ -175,8 +175,8 @@ const DEFAULT_DRIVERS: Driver[] = [];
 
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [cities] = useState<City[]>(DEFAULT_CITIES);
-  const [zones] = useState<Zone[]>(DEFAULT_ZONES);
+  const [cities, setCities] = useState<City[]>(DEFAULT_CITIES);
+  const [zones, setZones] = useState<Zone[]>(DEFAULT_ZONES);
 
   const authMode: 'remote' | 'demo' = isSupabaseConfigured ? 'remote' : 'demo';
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(isSupabaseConfigured);
@@ -289,11 +289,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             );
           }
 
-          const [liveTenants, liveProducts, livePosts, liveApps] = await Promise.all([
+          const [liveTenants, liveProducts, livePosts, liveApps, liveCities, liveZones] = await Promise.all([
             fetchLiveTenants(),
             fetchLiveProducts(),
             fetchLivePosts(),
-            fetchLiveApplications()
+            fetchLiveApplications(),
+            fetchLiveCities(),
+            fetchLiveZones()
           ]);
 
           if (!isSubscribed) return;
@@ -307,6 +309,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setRemoteProducts(liveProducts);
           setRemotePosts(livePosts);
           setRestaurantApplications(liveApps);
+
+          if (liveCities.length > 0) setCities(liveCities);
+          if (liveZones.length > 0) setZones(liveZones);
 
           setCurrentTenant(prev => {
             if (prev.id === EMPTY_TENANT.id && liveTenants.length > 0) {

@@ -263,10 +263,11 @@ export const CustomerDeliveryApp: React.FC = () => {
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'price_low' | 'price_high'>('recent');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const activeCity = cities.find(c => c.id === 'city_armenia_quindio') || cities[0];
+  const activeCity = cities.find(c => c.name.includes('Armenia')) || cities[0];
   const activeZones = useMemo(() => {
+    if (!activeCity) return [];
     return zones.filter(z => z.cityId === activeCity.id && z.isActive);
-  }, [zones, activeCity.id]);
+  }, [zones, activeCity]);
 
   const [selectedZone, setSelectedZone] = useState<string>(() => {
     try {
@@ -292,7 +293,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const zoneFilteredPosts = useMemo(() => {
     return posts.reduce<Post[]>((acc, post) => {
       const tenant = tenantMap.get(post.tenantId);
-      if (!tenant || tenant.status !== 'active' || tenant.cityId !== activeCity.id) {
+      if (!tenant || tenant.status !== 'active' || !activeCity || tenant.cityId !== activeCity.id) {
         return acc;
       }
       if (selectedZone !== 'all' && tenant.zoneId !== selectedZone) {
@@ -306,15 +307,15 @@ export const CustomerDeliveryApp: React.FC = () => {
       });
       return acc;
     }, []);
-  }, [posts, tenantMap, selectedZone, activeCity.id]);
+  }, [posts, tenantMap, selectedZone, activeCity]);
 
   const activeTenantsInZoneCount = useMemo(() => {
     return tenants.filter(t => {
-      if (t.status !== 'active' || t.cityId !== activeCity.id) return false;
+      if (t.status !== 'active' || !activeCity || t.cityId !== activeCity.id) return false;
       if (selectedZone === 'all') return true;
       return t.zoneId === selectedZone;
     }).length;
-  }, [tenants, selectedZone, activeCity.id]);
+  }, [tenants, selectedZone, activeCity]);
 
   const currentZoneObj = zones.find(z => z.id === selectedZone);
   const zoneInfoText = selectedZone === 'all'
