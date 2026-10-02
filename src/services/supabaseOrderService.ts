@@ -136,16 +136,36 @@ export async function updateLiveOrderStatus(
   }
 
   try {
-    const { error } = await supabase.rpc('update_order_status', {
+    const { data, error } = await supabase.rpc('update_order_status', {
       p_order_id: orderId,
       p_next_status: newStatus
     });
 
     if (error) {
-      console.warn('⚠️ Detalle técnico al actualizar estado de pedido vía RPC:', error.message);
-      return { success: false, error: 'No fue posible actualizar el pedido. La transición no es válida o no tienes permisos.' };
+      console.error('❌ RPC Error:', error);
+      console.error('   - Message:', error.message);
+      console.error('   - Details:', error.details);
+      console.error('   - Hint:', error.hint);
+      console.error('   - Code:', error.code);
+      
+      // Extraer mensaje específico del RPC
+      let userMessage = error.message;
+      
+      // Si el mensaje contiene una excepción de PostgreSQL, extraerla
+      if (error.message && error.message.includes('No autorizado')) {
+        userMessage = 'No tienes permisos para actualizar este pedido.';
+      } else if (error.message && error.message.includes('Transición')) {
+        userMessage = 'Esta transición de estado no está permitida.';
+      } else if (error.message && error.message.includes('pedido finalizado')) {
+        userMessage = 'No se puede modificar un pedido finalizado.';
+      } else if (error.message && error.message.includes('Perfil de usuario no encontrado')) {
+        userMessage = 'Tu perfil no está configurado correctamente. Contacta al administrador.';
+      }
+      
+      return { success: false, error: userMessage };
     }
 
+    console.log('✅ Order status updated successfully:', { orderId, newStatus, result: data });
     return { success: true };
   } catch (err: unknown) {
     console.warn('⚠️ Excepción técnica en actualización de pedido:', err instanceof Error ? err.message : String(err));

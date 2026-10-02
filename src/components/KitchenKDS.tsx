@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/useApp';
 import { getOperationalTenant, getFulfillmentBadgeText } from '../utils/tenantHelpers';
+import { debugOrderUpdatePermissions } from '../utils/debugKDS';
 import { PlusCircle, Clock, Flame, CheckCircle, PackageCheck, Building2, AlertCircle, Loader2 } from 'lucide-react';
 import type { OrderStatus } from '../types';
 
@@ -48,6 +49,12 @@ export const KitchenKDS: React.FC = () => {
 
   const handleUpdate = async (orderId: string, status: OrderStatus) => {
     setUpdatingOrderId(orderId);
+    
+    // Debug en desarrollo
+    if (import.meta.env.DEV) {
+      await debugOrderUpdatePermissions(orderId);
+    }
+    
     const success = await updateOrderStatus(orderId, status);
     setUpdatingOrderId(null);
     
