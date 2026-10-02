@@ -6,6 +6,8 @@ import { MyOrders } from './MyOrders';
 import { StoriesBar } from './StoriesBar';
 import { CommentsModal } from './CommentsModal';
 import { RestaurantProfileModal } from './RestaurantProfileModal';
+import { FloatingCartButton } from './FloatingCartButton';
+import { CartModal } from './CartModal';
 import { motion } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, ShoppingBag, Bike,
@@ -21,7 +23,7 @@ import type { Post, Tenant } from '../types';
 const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
 
 /* ── Video Modal ─────────────────────────────────────────── */
-const VideoModal: React.FC<{ post: Post; onClose: () => void; onOrder: () => void }> = ({ post, onClose, onOrder }) => (
+const VideoModal: React.FC<{ post: Post; tenant?: Tenant; onClose: () => void; onOrder: () => void }> = ({ post, tenant, onClose, onOrder }) => (
   <motion.div
     className="video-modal-overlay"
     onClick={onClose}
@@ -57,10 +59,16 @@ const VideoModal: React.FC<{ post: Post; onClose: () => void; onOrder: () => voi
 
       <div className="video-modal-footer">
         <div className="video-modal-info">
-          <span className="video-modal-emoji">{post.tenantLogoEmoji}</span>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: tenant?.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {tenant?.logoUrl ? (
+              <img src={tenant.logoUrl} alt={tenant?.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span className="video-modal-emoji" style={{ margin: 0 }}>{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
+            )}
+          </div>
           <div>
             <h4>{post.dishName}</h4>
-            <span>{post.tenantName}</span>
+            <span>{tenant?.name || post.tenantName}</span>
           </div>
         </div>
         <motion.button
@@ -80,6 +88,7 @@ const VideoModal: React.FC<{ post: Post; onClose: () => void; onOrder: () => voi
 /* ── Single Post Card ────────────────────────────────────── */
 interface PostCardProps {
   post: Post;
+  tenant?: Tenant;
   onLike: (id: string) => void;
   onOrder: (productId: string, tenantSlug: string) => void;
   onPlayVideo: (post: Post) => void;
@@ -91,7 +100,7 @@ interface PostCardProps {
 }
 
 const PostCard: React.FC<PostCardProps> = ({
-  post, onLike, onOrder, onPlayVideo, saved, onSave, onOpenComments, onOpenProfile, onShare
+  post, tenant, onLike, onOrder, onPlayVideo, saved, onSave, onOpenComments, onOpenProfile, onShare
 }) => {
   const [expanded, setExpanded] = useState(false);
   const isVideo = post.mediaType === 'video';
@@ -108,16 +117,22 @@ const PostCard: React.FC<PostCardProps> = ({
       {/* ── Header ── */}
       <header className="gf-post-header">
         <div className="gf-post-author" onClick={() => onOpenProfile(post.tenantId)} style={{ cursor: 'pointer' }}>
-          <div className="gf-author-avatar">{post.tenantLogoEmoji}</div>
+          <div className="gf-author-avatar" style={{ backgroundColor: tenant?.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden' }}>
+            {tenant?.logoUrl ? (
+              <img src={tenant.logoUrl} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span>{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
+            )}
+          </div>
           <div className="gf-author-meta">
             <div className="gf-author-top">
-              <strong className="gf-author-name">{post.tenantName}</strong>
+              <strong className="gf-author-name">{tenant?.name || post.tenantName}</strong>
               {isVideo && <span className="gf-video-chip"><Play size={9} fill="currentColor" /> VIDEO</span>}
             </div>
             <div className="gf-author-sub">
-              <span className="gf-category-pill">{post.tenantCategory}</span>
-              {post.tenantAddress && (
-                <span className="gf-address"><MapPin size={10} /> {post.tenantAddress}</span>
+              <span className="gf-category-pill">{tenant?.category || post.tenantCategory}</span>
+              {(tenant?.address || post.tenantAddress) && (
+                <span className="gf-address"><MapPin size={10} /> {tenant?.address || post.tenantAddress}</span>
               )}
             </div>
           </div>
@@ -273,6 +288,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const [videoPost, setVideoPost] = useState<Post | null>(null);
   const [selectedCommentsPost, setSelectedCommentsPost] = useState<Post | null>(null);
   const [selectedTenantProfile, setSelectedTenantProfile] = useState<string | null>(null);
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [priceFilter, setPriceFilter] = useState<'all' | '$' | '$$' | '$$$'>('all');
@@ -870,6 +886,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                   <PostCard
                     key={post.id}
                     post={post}
+                    tenant={tenants.find(t => t.id === post.tenantId)}
                     onLike={toggleLikePost}
                     onOrder={handleOrder}
                     onPlayVideo={setVideoPost}
@@ -1020,6 +1037,7 @@ export const CustomerDeliveryApp: React.FC = () => {
       {videoPost && (
         <VideoModal
           post={videoPost}
+          tenant={tenants.find(t => t.id === videoPost.tenantId)}
           onClose={() => setVideoPost(null)}
           onOrder={() => handleOrder(videoPost.productId, videoPost.tenantId)}
         />
@@ -1029,6 +1047,7 @@ export const CustomerDeliveryApp: React.FC = () => {
       {selectedCommentsPost && (
         <CommentsModal
           post={selectedCommentsPost}
+          tenant={tenants.find(t => t.id === selectedCommentsPost.tenantId)}
           onClose={() => setSelectedCommentsPost(null)}
         />
       )}
@@ -1041,6 +1060,26 @@ export const CustomerDeliveryApp: React.FC = () => {
           onOrderProduct={handleOrder}
         />
       )}
+
+      <FloatingCartButton 
+        isVisible={!isMobileCartOpen && !isPaymentOpen}
+        onOpen={() => setIsMobileCartOpen(true)}
+      />
+
+      <CartModal
+        isOpen={isMobileCartOpen}
+        onClose={() => setIsMobileCartOpen(false)}
+        onCheckout={() => setIsPaymentOpen(true)}
+        onContinueShopping={() => {
+          const cartTenantId = cart.length > 0 ? cart[0].product.tenantId : null;
+          const cartTenant = cartTenantId ? tenants.find(t => t.id === cartTenantId) : null;
+          if (cartTenant) {
+            setCurrentTenantBySlug(cartTenant.slug);
+            setActiveTab('directory');
+            setSelectedTenantProfile(cartTenant.id);
+          }
+        }}
+      />
 
       <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} orderType="Domicilio" />
     </div>

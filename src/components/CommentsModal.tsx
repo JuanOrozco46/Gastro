@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/useApp';
-import type { Post } from '../types';
+import type { Post, Tenant } from '../types';
 import { X, Send, Heart, MessageCircle, Trash2 } from 'lucide-react';
 
 interface CommentsModalProps {
   post: Post;
+  tenant?: Tenant;
   onClose: () => void;
 }
 
-export const CommentsModal: React.FC<CommentsModalProps> = ({ post, onClose }) => {
+export const CommentsModal: React.FC<CommentsModalProps> = ({ post, tenant, onClose }) => {
   const { addComment, deleteComment, currentUser } = useApp();
   const [commentText, setCommentText] = useState('');
 
@@ -38,10 +39,16 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ post, onClose }) =
 
         {/* Post Preview Bar */}
         <div className="gf-comments-post-summary">
-          <span className="gf-post-summary-emoji">{post.tenantLogoEmoji}</span>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: tenant?.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {tenant?.logoUrl ? (
+              <img src={tenant.logoUrl} alt={tenant?.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span className="gf-post-summary-emoji" style={{ margin: 0, fontSize: '1.2rem' }}>{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
+            )}
+          </div>
           <div className="gf-post-summary-text">
             <strong>{post.dishName}</strong>
-            <span>{post.tenantName}</span>
+            <span>{tenant?.name || post.tenantName}</span>
           </div>
           <span className="gf-post-summary-price">${post.price.toLocaleString('es-CO')}</span>
         </div>

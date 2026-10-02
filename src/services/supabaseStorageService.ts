@@ -47,7 +47,7 @@ export async function uploadMediaFile(
     const cleanFolder = folder.replace(/[^a-zA-Z0-9_-]/g, '');
     const randomHash = Math.random().toString(36).substring(2, 8);
     const fileName = `${Date.now()}_${randomHash}.${fileExt}`;
-    const filePath = tenantId ? `${tenantId}/${cleanFolder}/${fileName}` : `${cleanFolder}/${fileName}`;
+    const filePath = tenantId ? `restaurants/${tenantId}/${cleanFolder}/${fileName}` : `${cleanFolder}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('gastro-media')

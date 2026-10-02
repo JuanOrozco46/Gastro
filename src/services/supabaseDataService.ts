@@ -302,7 +302,7 @@ export async function fetchLivePosts(): Promise<Post[]> {
       console.error('⚠️ Error RLS o BD al consultar Supabase (Posts):', error);
       return [];
     }
-    if (!data) return [];
+    if (!data || data.length === 0) return [];
 
     // Fetch all likes count and user's likes in parallel
     const postIds = data.map((p: { id: string }) => p.id);
