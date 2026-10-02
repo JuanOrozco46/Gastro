@@ -48,6 +48,7 @@ function translateAuthError(errMessage: string): string {
 export async function resolveSupabaseUserProfile(userId: string, email: string, needsPasswordSet?: boolean): Promise<UserAccount> {
   if (!isSupabaseConfigured || !supabase) {
     return {
+      id: userId,
       email,
       name: email.split('@')[0],
       role: 'client_delivery',
@@ -69,6 +70,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
 
     if (platformRole === 'platform_admin') {
       return {
+        id: userId,
         email,
         name: fullName,
         role: 'platform_admin',
@@ -87,6 +89,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
     if (member) {
       if (member.role === 'owner') {
         return {
+          id: userId,
           email,
           name: fullName,
           role: 'admin',
@@ -96,6 +99,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
         };
       } else {
         return {
+          id: userId,
           email,
           name: fullName,
           role: 'kitchen',
@@ -108,6 +112,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
 
     // Default: Cliente final de entregas
     return {
+      id: userId,
       email,
       name: fullName,
       role: 'client_delivery',
@@ -117,6 +122,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
   } catch (err: unknown) {
     console.warn('⚠️ Error al resolver perfil de Supabase:', err);
     return {
+      id: userId,
       email,
       name: email.split('@')[0],
       role: 'client_delivery',
@@ -186,6 +192,7 @@ export async function signUpWithSupabase(email: string, pass: string, fullName: 
     });
 
     const userAccount: UserAccount = {
+      id: data.user.id,
       email: normalizedEmail,
       name: cleanName,
       role: 'client_delivery',
