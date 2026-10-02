@@ -407,12 +407,19 @@ export const CustomerDeliveryApp: React.FC = () => {
     const q = searchQuery.trim().toLowerCase();
     if (q !== '') {
       result = result.filter(p => {
+        const tenant = tenantMap.get(p.tenantId);
+        const zoneName = activeZones.find(z => z.id === tenant?.zoneId)?.name.toLowerCase() || '';
+        const cityName = activeCity?.name.toLowerCase() || '';
+
         const matchDish = p.dishName.toLowerCase().includes(q);
         const matchDesc = p.desc.toLowerCase().includes(q);
         const matchTenant = p.tenantName.toLowerCase().includes(q);
         const matchCategory = p.tenantCategory.toLowerCase().includes(q);
         const matchHash = p.hashtags?.some(h => h.toLowerCase().includes(q)) ?? false;
-        return matchDish || matchDesc || matchTenant || matchCategory || matchHash;
+        const matchZone = zoneName.includes(q);
+        const matchCity = cityName.includes(q);
+
+        return matchDish || matchDesc || matchTenant || matchCategory || matchHash || matchZone || matchCity;
       });
     }
 
@@ -455,7 +462,7 @@ export const CustomerDeliveryApp: React.FC = () => {
     }
 
     return result;
-  }, [zoneFilteredPosts, searchQuery, filterCategory, priceFilter, onlyOpen, onlyVideo, sortBy, tenantMap]);
+  }, [zoneFilteredPosts, searchQuery, filterCategory, priceFilter, onlyOpen, onlyVideo, sortBy, tenantMap, activeCity, activeZones]);
 
   return (
     <div className="tab-content active">

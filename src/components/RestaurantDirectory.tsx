@@ -16,7 +16,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
   selectedZone,
   onSelectTenantAndGoToFeed
 }) => {
-  const { tenants, products, addToCart, setCurrentTenantBySlug, isCatalogLoading, catalogError } = useApp();
+  const { tenants, products, cities, zones, addToCart, setCurrentTenantBySlug, isCatalogLoading, catalogError } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
@@ -51,6 +51,10 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
         }
         if (searchQuery.trim() !== '') {
           const q = searchQuery.toLowerCase();
+          const activeCity = cities.find(c => c.id === t.cityId);
+          const zoneName = zones.find(z => z.id === t.zoneId)?.name.toLowerCase() || '';
+          const cityName = activeCity?.name.toLowerCase() || '';
+
           const matchName = t.name.toLowerCase().includes(q);
           const matchCategory = t.category.toLowerCase().includes(q);
           const matchDesc = t.description?.toLowerCase().includes(q) ?? false;
@@ -59,7 +63,10 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
           const matchProduct = products.some(
             p => p.tenantId === t.id && p.name.toLowerCase().includes(q)
           );
-          return matchName || matchCategory || matchDesc || matchAddress || matchSpecialty || matchProduct;
+          const matchZone = zoneName.includes(q);
+          const matchCity = cityName.includes(q);
+
+          return matchName || matchCategory || matchDesc || matchAddress || matchSpecialty || matchProduct || matchZone || matchCity;
         }
         return true;
       })
@@ -76,7 +83,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
         }
         return 0;
       });
-  }, [tenants, products, selectedCategory, onlyOpen, priceRange, searchQuery, sortBy, selectedZone]);
+  }, [tenants, products, selectedCategory, onlyOpen, priceRange, searchQuery, sortBy, selectedZone, cities, zones]);
 
   // Tenant featured hero
   const featuredTenant = useMemo(() => {
