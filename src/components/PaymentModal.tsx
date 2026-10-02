@@ -152,7 +152,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       const res = await submitOrderWithPayment(checkoutDetails, method);
       if (res.success && res.orderId && res.paymentId) {
         if (res.wompiConfig) {
-          setWompiConfig(res.wompiConfig);
+          setWompiConfig(res.wompiConfig as WompiCheckoutConfig);
         } else {
           setPendingPaymentInfo({ 
             orderId: res.orderId, 
@@ -291,7 +291,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                 const res = await retryRemotePayment(currentOrderId);
                 if (res.success && res.paymentId) {
                   if (res.wompiConfig) {
-                    setWompiConfig(res.wompiConfig);
+                    setWompiConfig(res.wompiConfig as WompiCheckoutConfig);
                   } else {
                     setPendingPaymentInfo({
                       orderId: currentOrderId,

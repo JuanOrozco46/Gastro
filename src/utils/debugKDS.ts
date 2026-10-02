@@ -93,6 +93,7 @@ export async function debugOrderUpdatePermissions(orderId: string) {
 
 // Auto-call on window for easy debugging
 if (typeof window !== 'undefined') {
-  (window as any).debugKDS = debugOrderUpdatePermissions;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as unknown as { debugKDS: unknown }).debugKDS = debugOrderUpdatePermissions;
   console.log('💡 Debug KDS available: window.debugKDS("order-id")');
 }

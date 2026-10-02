@@ -117,6 +117,7 @@ export interface Tenant {
   deliveryRadiusKm?: number;
   estimatedDeliveryMinutes?: string | number;
   ownerUserId?: string;
+  acceptingOrders?: boolean;
 }
 
 export type Restaurant = Tenant;

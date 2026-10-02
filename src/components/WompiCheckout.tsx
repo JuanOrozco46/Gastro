@@ -29,7 +29,7 @@ export const WompiCheckout: React.FC<WompiCheckoutProps> = ({ config, onWidgetCl
       if (openedRef.current) return;
 
       try {
-        if (!(window as any).WidgetCheckout) {
+        if (!(window as unknown as { WidgetCheckout: unknown }).WidgetCheckout) {
           await new Promise<void>((resolve, reject) => {
             const script = document.createElement('script');
             script.src = 'https://checkout.wompi.co/widget.js';
@@ -43,7 +43,9 @@ export const WompiCheckout: React.FC<WompiCheckoutProps> = ({ config, onWidgetCl
         if (!isMounted || openedRef.current) return;
         openedRef.current = true;
 
-        const checkout = new (window as any).WidgetCheckout({
+        const WidgetCheckout = (window as unknown as { WidgetCheckout: new (config: unknown) => { open: (cb: (result: unknown) => void) => void } }).WidgetCheckout;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const checkout = new WidgetCheckout({
           currency: config.currency,
           amountInCents: config.amountInCents,
           reference: config.providerReference,
@@ -51,7 +53,8 @@ export const WompiCheckout: React.FC<WompiCheckoutProps> = ({ config, onWidgetCl
           signature: { integrity: config.signature }
         });
 
-        checkout.open((result: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        checkout.open((result: unknown) => {
           console.log('Resultado del Widget Wompi:', result);
           if (isMounted) onWidgetClosed();
         });

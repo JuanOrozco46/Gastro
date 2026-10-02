@@ -16,7 +16,8 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     logoEmoji: tenant.logoEmoji || '🍽️',
     logoUrl: tenant.logoUrl || '',
     bannerUrl: tenant.bannerUrl || '',
-    estimatedDeliveryMinutes: tenant.estimatedDeliveryMinutes?.toString() || '30'
+    estimatedDeliveryMinutes: tenant.estimatedDeliveryMinutes?.toString() || '30',
+    acceptingOrders: tenant.acceptingOrders !== false
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -56,6 +57,26 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
           <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', textAlign: 'right', marginTop: '4px' }}>
             {formData.description.length}/200
           </div>
+        </div>
+
+        <div style={{ padding: '1rem', backgroundColor: formData.acceptingOrders ? 'var(--success-light)' : 'var(--warning-light)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${formData.acceptingOrders ? 'var(--success-border)' : 'var(--warning-border)'}` }}>
+          <div>
+            <h4 style={{ margin: 0, color: formData.acceptingOrders ? 'var(--success-text)' : 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {formData.acceptingOrders ? '🟢 Recibiendo Pedidos' : '⏸️ Pausado Temporalmente'}
+            </h4>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              {formData.acceptingOrders 
+                ? 'El restaurante está visible y permite checkout.' 
+                : 'La tienda sigue abierta pero los clientes no pueden completar compras. Útil si la cocina está saturada.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFormData(prev => ({ ...prev, acceptingOrders: !prev.acceptingOrders }))}
+            className={`btn ${formData.acceptingOrders ? 'btn-secondary' : 'btn-primary'}`}
+          >
+            {formData.acceptingOrders ? 'Pausar Recepción' : 'Reanudar'}
+          </button>
         </div>
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--neutral-border)', margin: '0.5rem 0' }} />

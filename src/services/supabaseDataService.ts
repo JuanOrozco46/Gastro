@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { Tenant, Product, Post, RestaurantApplication, OrderFulfillment, City, Zone } from '../types';
+import type { Tenant, Product, Post, RestaurantApplication, OrderFulfillment, City, Zone, RestaurantDeliveryMode, PostComment } from '../types';
 import type {
   DbRestaurant, DbProduct, DbPost
 } from './supabaseTypes';
@@ -67,7 +67,7 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
       const validDeliveryModes = (t.deliveryModes || []).filter(m => validModes.includes(m));
       if (validDeliveryModes.length !== (t.deliveryModes || []).length) {
         console.warn(`⚠️ Limpiando deliveryModes inválidos para restaurante: ${t.id}`);
-        t.deliveryModes = validDeliveryModes as any;
+        t.deliveryModes = validDeliveryModes as RestaurantDeliveryMode[];
       }
       return true;
     });
@@ -129,7 +129,7 @@ export async function fetchRemoteComments(postId: string) {
     }
     if (!comments || comments.length === 0) return [];
 
-    const userIds = Array.from(new Set(comments.map((c: any) => c.user_id)));
+    const userIds = Array.from(new Set(comments.map((c: { user_id: string }) => c.user_id)));
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name')
@@ -137,10 +137,10 @@ export async function fetchRemoteComments(postId: string) {
 
     const profileMap = new Map();
     if (profiles) {
-      profiles.forEach((p: any) => profileMap.set(p.id, p.full_name));
+      profiles.forEach((p: { id: string, full_name: string }) => profileMap.set(p.id, p.full_name));
     }
 
-    return comments.map((c: any) => ({
+    return comments.map((c: { id: string, post_id: string, user_id: string, content: string, created_at: string }) => ({
       id: c.id,
       postId: c.post_id,
       userName: profileMap.get(c.user_id) || 'Usuario',
@@ -293,6 +293,7 @@ export async function fetchLivePosts(): Promise<Post[]> {
         price_cop, 
         is_published, 
         created_at,
+        updated_at,
         restaurants!inner(name, category, slug, status)
       `)
       .order('created_at', { ascending: false });
@@ -304,7 +305,7 @@ export async function fetchLivePosts(): Promise<Post[]> {
     if (!data) return [];
 
     // Fetch all likes count and user's likes in parallel
-    const postIds = data.map((p: any) => p.id);
+    const postIds = data.map((p: { id: string }) => p.id);
     
     const [likesData, commentsData, userLikesData] = await Promise.all([
       // Get likes count per post
@@ -336,11 +337,11 @@ export async function fetchLivePosts(): Promise<Post[]> {
 
     // Build lookup maps for counts and comments
     const likesMap = new Map<string, number>();
-    const commentsMap = new Map<string, any[]>();
+    const commentsMap = new Map<string, PostComment[]>();
     const userLikesSet = new Set<string>();
 
     if (likesData.data) {
-      likesData.data.forEach((like: any) => {
+      likesData.data.forEach((like: { post_id: string }) => {
         const count = likesMap.get(like.post_id) || 0;
         likesMap.set(like.post_id, count + 1);
       });
@@ -348,7 +349,7 @@ export async function fetchLivePosts(): Promise<Post[]> {
 
     if (commentsData.data && commentsData.data.length > 0) {
       // Get profiles for all comment authors
-      const userIds = Array.from(new Set(commentsData.data.map((c: any) => c.user_id)));
+      const userIds = Array.from(new Set(commentsData.data.map((c: { user_id: string }) => c.user_id)));
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name')
@@ -356,10 +357,10 @@ export async function fetchLivePosts(): Promise<Post[]> {
         
       const profileMap = new Map();
       if (profiles) {
-        profiles.forEach((p: any) => profileMap.set(p.id, p.full_name));
+        profiles.forEach((p: { id: string, full_name: string }) => profileMap.set(p.id, p.full_name));
       }
 
-      commentsData.data.forEach((comment: any) => {
+      commentsData.data.forEach((comment: { id: string; post_id: string; user_id: string; content: string; created_at: string }) => {
         const postComments = commentsMap.get(comment.post_id) || [];
         postComments.push({
           id: comment.id,
@@ -375,13 +376,13 @@ export async function fetchLivePosts(): Promise<Post[]> {
     }
 
     if (userLikesData.data) {
-      userLikesData.data.forEach((like: any) => {
+      userLikesData.data.forEach((like: { post_id: string }) => {
         userLikesSet.add(like.post_id);
       });
     }
 
-    return data.map((dbPost: any) => {
-      const restaurant = dbPost.restaurants;
+    return data.map((dbPost: import('./supabaseTypes').DbPost & { restaurants: { name: string; category: string; slug: string; status: string; } | { name: string; category: string; slug: string; status: string; }[] }) => {
+      const restaurant = Array.isArray(dbPost.restaurants) ? dbPost.restaurants[0] : dbPost.restaurants;
       
       if (!restaurant || restaurant.status !== 'active') {
         return null;
@@ -678,7 +679,7 @@ export async function createLiveProduct(tenantId: string, name: string, desc: st
 export async function updateLiveProduct(productId: string, updates: Partial<{ name: string; desc: string; category: string; price: number; available: boolean; imageUrl: string }>): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
-    const dbUpdates: any = {};
+    const dbUpdates: Record<string, unknown> = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.desc !== undefined) dbUpdates.description = updates.desc || null;
     if (updates.category !== undefined) dbUpdates.category = updates.category;
@@ -742,34 +743,56 @@ export async function deleteLivePost(postId: string): Promise<boolean> {
   }
 }
 
-export async function updateRemoteTenant(tenantId: string, updates: Partial<Tenant>): Promise<boolean> {
-  if (!isSupabaseConfigured || !supabase) return false;
+interface DBRestaurantUpdate {
+  name?: string;
+  description?: string;
+  category?: string;
+  phone?: string;
+  whatsapp?: string;
+  address?: string;
+  logo_url?: string;
+  logo_emoji?: string;
+  banner_url?: string;
+  specialties?: string[];
+  estimated_delivery_minutes?: number;
+  is_open?: boolean;
+}
+
+export async function updateRemoteTenant(tenantId: string, updates: Partial<Tenant>): Promise<Tenant | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
   try {
-    const dbUpdates: any = {};
-    if (updates.name !== undefined) dbUpdates.name = updates.name;
-    if (updates.description !== undefined) dbUpdates.description = updates.description;
-    if (updates.category !== undefined) dbUpdates.category = updates.category;
-    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
-    if (updates.whatsapp !== undefined) dbUpdates.whatsapp = updates.whatsapp;
-    if (updates.address !== undefined) dbUpdates.address = updates.address;
-    if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl;
-    if (updates.logoEmoji !== undefined) dbUpdates.logo_emoji = updates.logoEmoji;
-    if (updates.bannerUrl !== undefined) dbUpdates.banner_url = updates.bannerUrl;
-    if (updates.specialties !== undefined) dbUpdates.specialties = updates.specialties;
-    if (updates.estimatedDeliveryMinutes !== undefined) dbUpdates.estimated_delivery_minutes = parseInt(updates.estimatedDeliveryMinutes as any) || 0;
-    if (updates.isOpen !== undefined) dbUpdates.is_open = updates.isOpen;
+    const dbUpdates: DBRestaurantUpdate = {};
+    if (typeof updates.name === 'string') dbUpdates.name = updates.name;
+    if (typeof updates.description === 'string') dbUpdates.description = updates.description;
+    if (typeof updates.category === 'string') dbUpdates.category = updates.category;
+    if (typeof updates.phone === 'string') dbUpdates.phone = updates.phone;
+    if (typeof updates.whatsapp === 'string') dbUpdates.whatsapp = updates.whatsapp;
+    if (typeof updates.address === 'string') dbUpdates.address = updates.address;
+    if (typeof updates.logoUrl === 'string') dbUpdates.logo_url = updates.logoUrl;
+    if (typeof updates.logoEmoji === 'string') dbUpdates.logo_emoji = updates.logoEmoji;
+    if (typeof updates.bannerUrl === 'string') dbUpdates.banner_url = updates.bannerUrl;
+    if (Array.isArray(updates.specialties)) dbUpdates.specialties = updates.specialties;
+    
+    if (typeof updates.estimatedDeliveryMinutes === 'number' && Number.isFinite(updates.estimatedDeliveryMinutes) && updates.estimatedDeliveryMinutes >= 0 && updates.estimatedDeliveryMinutes <= 1440) {
+      dbUpdates.estimated_delivery_minutes = updates.estimatedDeliveryMinutes;
+    }
+    
+    if (typeof updates.isOpen === 'boolean') dbUpdates.is_open = updates.isOpen;
 
-    if (Object.keys(dbUpdates).length === 0) return true;
+    if (Object.keys(dbUpdates).length === 0) return null; // No updates
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('restaurants')
       .update(dbUpdates)
-      .eq('id', tenantId);
+      .eq('id', tenantId)
+      .select()
+      .single();
 
     if (error) throw error;
-    return true;
+    
+    return data ? mapDbRestaurantToTenant(data as import('./supabaseTypes').DbRestaurant) : null;
   } catch (err) {
     console.error('⚠️ Error updating remote tenant:', err);
-    return false;
+    return null;
   }
 }

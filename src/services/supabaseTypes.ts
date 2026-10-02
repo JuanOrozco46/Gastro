@@ -48,6 +48,13 @@ export interface DbRestaurant {
   commission_rate: number;
   created_at: string;
   updated_at: string;
+  logo_url?: string;
+  logo_emoji?: string;
+  banner_url?: string;
+  estimated_delivery_minutes?: number;
+  specialties?: string[];
+  accepting_orders?: boolean;
+
 }
 
 export interface DbRestaurantMember {
@@ -159,8 +166,9 @@ export function mapDbRestaurantToTenant(db: DbRestaurant): Tenant {
     slug: db.slug,
     name: db.name,
     category: db.category,
-    logoEmoji: '🍽️',
-    bannerUrl: undefined,
+    logoUrl: db.logo_url || undefined,
+    logoEmoji: db.logo_emoji || '🍽️',
+    bannerUrl: db.banner_url || undefined,
     description: db.description || '',
     address: db.address,
     phone: db.phone || undefined,
@@ -169,6 +177,9 @@ export function mapDbRestaurantToTenant(db: DbRestaurant): Tenant {
     zoneId: db.zone_id,
     status: db.status,
     isOpen: db.is_open,
+    acceptingOrders: db.accepting_orders,
+    estimatedDeliveryMinutes: db.estimated_delivery_minutes,
+    specialties: db.specialties || [],
     deliveryModes: db.delivery_modes as RestaurantDeliveryMode[],
     minOrder: db.min_order,
     deliveryFee: db.delivery_fee || 0,
@@ -178,7 +189,8 @@ export function mapDbRestaurantToTenant(db: DbRestaurant): Tenant {
     rating: 0,
     distanceKm: 0,
     isNew: false,
-    tablesCount: 0
+    tablesCount: 0,
+    ownerUserId: db.owner_user_id || undefined
   };
 }
 

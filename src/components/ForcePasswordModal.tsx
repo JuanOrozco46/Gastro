@@ -41,8 +41,8 @@ export const ForcePasswordModal: React.FC = () => {
       
       // Reload page strictly to clean up states and ensure everything is updated
       window.location.reload();
-    } catch (err: any) {
-      setError(err.message || 'Error al actualizar la contraseña');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al actualizar la contraseña');
       setLoading(false);
     }
   };

@@ -24,7 +24,7 @@ interface FinancialAnalyticsProps {
 
 type Period = 'today' | 'last_7_days' | 'this_month' | 'last_month' | 'custom';
 
-const MetricCard = ({ title, value, icon, color, tooltip }: any) => (
+const MetricCard = ({ title, value, icon, color, tooltip }: { title: string, value: string | number, icon: React.ReactNode, color: string, tooltip?: string }) => (
   <div style={{
     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: '16px', padding: '20px', position: 'relative', overflow: 'hidden'
@@ -96,7 +96,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
 
       if (authMode === 'demo') {
         // Calculate from local orders
-        const localOrders = orders.filter((o: any) => 
+        const localOrders = orders.filter((o: import('../types').Order) => 
           o.tenantId === tenantId && 
           o.createdAt >= queryStart.getTime() && 
           o.createdAt <= queryEnd.getTime()
@@ -108,7 +108,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
           refunds: 0, savingsVs30: 0, deliveryFees: 0
         };
 
-        localOrders.forEach((o: any) => {
+        localOrders.forEach((o: import('../types').Order) => {
           if (o.status === 'cancelled') {
             m.cancelledOrdersCount++;
             if (o.paymentId) m.refunds += o.total; 
@@ -117,7 +117,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
           } else {
             m.paidOrdersCount++;
             m.grossSales += o.total;
-            m.deliveryFees += o.deliveryFee || 0;
+            m.deliveryFees += o.deliveryFeeApplied || 0;
             const fee = o.total * 0.03; 
             m.platformCommission += fee;
             m.netRestaurant += (o.total - fee);
@@ -157,9 +157,9 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
           });
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'Error al cargar métricas financieras.');
+      setError(err instanceof Error ? err.message : 'Error al cargar métricas financieras.');
     } finally {
       setLoading(false);
     }

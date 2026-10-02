@@ -280,7 +280,7 @@ export async function getCurrentSupabaseSession() {
   }
 }
 
-export function subscribeToSupabaseAuthChanges(callback: (event: string, session: any) => void) {
+export function subscribeToSupabaseAuthChanges(callback: (event: string, session: import('@supabase/supabase-js').Session | null) => void) {
   if (!isSupabaseConfigured || !supabase) {
     return { data: { subscription: { unsubscribe: () => {} } } };
   }
