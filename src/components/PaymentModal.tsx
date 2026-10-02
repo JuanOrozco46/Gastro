@@ -557,7 +557,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                 </label>
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: 'repeat(5, 1fr)', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', 
                   gap: '4px', 
                   background: 'rgba(0,0,0,0.3)', 
                   padding: '5px', 
@@ -584,7 +584,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                         color: method === item.id || (method === 'wompi' && item.id === 'wompi') ? 'white' : 'var(--text-muted)',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'normal',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.2
                       }}
                       onClick={() => setMethod(item.id as PaymentMethod)}
                     >
