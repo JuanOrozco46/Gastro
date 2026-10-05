@@ -3,6 +3,7 @@ import { useApp } from '../context/useApp';
 import { PaymentModal } from './PaymentModal';
 import { RestaurantDirectory } from './RestaurantDirectory';
 import { MyOrders } from './MyOrders';
+import { SupportCenter } from './SupportCenter';
 import { StoriesBar } from './StoriesBar';
 import { CommentsModal } from './CommentsModal';
 import { RestaurantProfileModal } from './RestaurantProfileModal';
@@ -285,7 +286,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   } = useApp();
 
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'feed' | 'directory' | 'orders'>('feed');
+  const [activeTab, setActiveTab] = useState<'feed' | 'directory' | 'orders' | 'support'>('feed');
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [videoPost, setVideoPost] = useState<Post | null>(null);
   const [selectedCommentsPostId, setSelectedCommentsPostId] = useState<string | null>(null);
@@ -514,6 +515,9 @@ export const CustomerDeliveryApp: React.FC = () => {
           <button className={`gf-tab-pill ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')} style={{ position: 'relative' }}>
             <Package size={15} /> Pedidos
             {activeOrdersCount > 0 && <span className="tab-orders-badge">{activeOrdersCount}</span>}
+          </button>
+          <button className={`gf-tab-pill ${activeTab === 'support' ? 'active' : ''}`} onClick={() => setActiveTab('support')}>
+            <MessageCircle size={15} /> Soporte
           </button>
         </div>
       </div>
@@ -922,6 +926,10 @@ export const CustomerDeliveryApp: React.FC = () => {
           </div>
           <MyOrders />
         </div>
+      )}
+
+      {activeTab === 'support' && (
+        <SupportCenter />
       )}
 
       {/* ── Video Modal ── */}

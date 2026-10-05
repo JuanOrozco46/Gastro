@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe, Building2, DollarSign, ShoppingBag, CreditCard,
   ShieldCheck, AlertCircle, FileText, Phone, Mail, MapPin,
-  CheckCircle, Zap, Key
+  CheckCircle, Zap, Key, MessageSquare
 } from 'lucide-react';
 import type { RestaurantApplicationStatus } from '../types';
+import { AdminSupportTickets } from './AdminSupportTickets';
 
 export const SuperAdminView: React.FC = () => {
   const {
@@ -15,7 +16,7 @@ export const SuperAdminView: React.FC = () => {
     activateApprovedRestaurant, cities, zones
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'applications' | 'settlement'>('applications');
+  const [activeTab, setActiveTab] = useState<'applications' | 'settlement' | 'support'>('applications');
   const [statusFilter, setStatusFilter] = useState<'all' | RestaurantApplicationStatus>('all');
   const [cityFilter, setCityFilter] = useState<string>('all');
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
@@ -180,6 +181,14 @@ export const SuperAdminView: React.FC = () => {
           >
             <Globe size={16} />
             <span>Red & Liquidaciones</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('support')}
+            className={`btn ${activeTab === 'support' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: 800, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <MessageSquare size={16} />
+            <span>Centro de Soporte</span>
           </button>
         </div>
       </div>
@@ -707,6 +716,13 @@ export const SuperAdminView: React.FC = () => {
               Entendido
             </button>
           </motion.div>
+        </div>
+      )}
+
+      {/* ── TAB 3: CENTRO DE SOPORTE HUMANO ── */}
+      {activeTab === 'support' && (
+        <div style={{ marginTop: '1.5rem' }}>
+          <AdminSupportTickets />
         </div>
       )}
     </div>

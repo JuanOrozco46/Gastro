@@ -5,11 +5,12 @@ import { motion } from 'framer-motion';
 import { FileUploadInput } from './FileUploadInput';
 import { FinancialAnalytics } from './FinancialAnalytics';
 import { ProfileTab } from './RestaurantAdmin/ProfileTab';
+import { SupportTab } from './RestaurantAdmin/SupportTab';
 
 import {
   QrCode, Utensils, Truck, Plus, Share2, Play,
   Eye, Heart, Sparkles, Trash2, Power, Printer,
-  MapPin, BarChart3,
+  MapPin, BarChart3, MessageSquare,
   AlertCircle, Package, Clock, CheckCircle
 } from 'lucide-react';
 
@@ -24,7 +25,7 @@ export const RestaurantAdmin: React.FC = () => {
 
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
-  const [activeTab, setActiveTab] = useState<'orders' | 'profile' | 'content' | 'menu' | 'analytics' | 'qr'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'profile' | 'content' | 'menu' | 'analytics' | 'qr' | 'support'>('orders');
   const [tableNumber, setTableNumber] = useState('4');
   
   // Modals state
@@ -299,6 +300,12 @@ export const RestaurantAdmin: React.FC = () => {
           onClick={() => setActiveTab('qr')}
         >
           <QrCode size={16} /> 📱 QR & Repartidores
+        </button>
+        <button
+          className={`nav-tab ${activeTab === 'support' ? 'active' : ''}`}
+          onClick={() => setActiveTab('support')}
+        >
+          <MessageSquare size={16} /> 💬 Soporte
         </button>
       </div>
 
@@ -967,6 +974,11 @@ export const RestaurantAdmin: React.FC = () => {
           </div>
 
         </div>
+      )}
+
+      {/* ── TAB: SOPORTE ── */}
+      {activeTab === 'support' && operatingTenant && (
+        <SupportTab restaurantId={operatingTenant.id} />
       )}
 
     </motion.div>
