@@ -1402,7 +1402,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (authMode === 'remote') {
-      const savedPost = await createLivePost(targetTenantId, postData.dishName, postData.desc, postData.price, postData.image || '', postData.mediaType || 'photo');
+      const savedPost = await createLivePost(targetTenantId, postData.dishName, postData.desc, postData.price, postData.image || '', postData.mediaType || 'photo', postData.productId, postData.width, postData.height);
       if (!savedPost) {
         showToast('⚠️ Error al crear publicación en el servidor.');
         return;

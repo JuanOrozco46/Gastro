@@ -64,6 +64,9 @@ export const RestaurantAdmin: React.FC = () => {
   const [postMediaType, setPostMediaType] = useState<'photo' | 'video'>('video');
   const [postImage, setPostImage] = useState('');
   const [postMediaUrl, setPostMediaUrl] = useState('');
+  const [postProductId, setPostProductId] = useState('');
+  const [postMediaWidth, setPostMediaWidth] = useState<number | undefined>();
+  const [postMediaHeight, setPostMediaHeight] = useState<number | undefined>();
 
   if (!operatingTenant) {
     return (
@@ -144,8 +147,8 @@ export const RestaurantAdmin: React.FC = () => {
       .filter(h => h.trim().length > 0)
       .map(h => h.startsWith('#') ? h : `#${h}`);
 
-    const existingProduct = tenantProducts.find(p => p.name.toLowerCase().includes(postDishName.toLowerCase()));
-    const productId = existingProduct ? existingProduct.id : (tenantProducts[0]?.id || 'p1');
+    const existingProduct = postProductId ? tenantProducts.find(p => p.id === postProductId) : tenantProducts.find(p => p.name.toLowerCase().includes(postDishName.toLowerCase()));
+    const productId = existingProduct ? existingProduct.id : undefined;
 
     const finalImage = postMediaType === 'photo' && postMediaUrl
       ? postMediaUrl
@@ -166,12 +169,17 @@ export const RestaurantAdmin: React.FC = () => {
       mediaType: postMediaType,
       mediaUrl: postMediaUrl,
       duration: postMediaType === 'video' ? 45 : undefined,
-      productId
+      productId: productId || '',
+      width: postMediaWidth,
+      height: postMediaHeight
     });
 
     setPostDishName('');
+    setPostProductId('');
     setPostDesc('');
     setPostMediaUrl('');
+    setPostMediaWidth(undefined);
+    setPostMediaHeight(undefined);
     setPostImage('');
   };
 
@@ -522,13 +530,16 @@ export const RestaurantAdmin: React.FC = () => {
                   </label>
                   {tenantProducts.length > 0 ? (
                     <select
-                      value={postDishName}
+                      value={postProductId}
                       onChange={e => {
-                        const selected = tenantProducts.find(p => p.name === e.target.value);
-                        setPostDishName(e.target.value);
+                        const selected = tenantProducts.find(p => p.id === e.target.value);
+                        setPostProductId(e.target.value);
                         if (selected) {
+                          setPostDishName(selected.name);
                           setPostPrice(selected.price.toString());
                           setPostDishEmoji(selected.emoji);
+                        } else {
+                          setPostDishName('');
                         }
                       }}
                       required
@@ -536,7 +547,7 @@ export const RestaurantAdmin: React.FC = () => {
                     >
                       <option value="">-- Selecciona del Menú --</option>
                       {tenantProducts.map(p => (
-                        <option key={p.id} value={p.name} style={{ color: '#000' }}>
+                        <option key={p.id} value={p.id} style={{ color: '#000' }}>
                           {p.emoji} {p.name} - ${p.price.toLocaleString('es-CO')}
                         </option>
                       ))}
@@ -598,9 +609,11 @@ export const RestaurantAdmin: React.FC = () => {
                 label={postMediaType === 'video' ? "Archivo de Video" : "Foto del Plato"}
                 accept={postMediaType === 'video' ? 'video' : 'image'}
                 value={postMediaUrl}
-                onChange={(val, type) => {
+                onChange={(val, type, w, h) => {
                   setPostMediaUrl(val);
                   setPostMediaType(type);
+                  setPostMediaWidth(w);
+                  setPostMediaHeight(h);
                 }}
                 folder="posts"
                 tenantId={operatingTenant.id}

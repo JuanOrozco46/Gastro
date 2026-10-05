@@ -116,8 +116,7 @@ export async function fetchLiveProducts(): Promise<Product[]> {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select(`id, restaurant_id, name, description, category, price_cop, available, image_url`)
-      .eq('available', true);
+      .select(`id, restaurant_id, name, description, category, price_cop, available, image_url`);
 
     if (error) {
       console.error('⚠️ Error RLS o BD al consultar Supabase (Products):', error);
@@ -906,7 +905,7 @@ export async function deleteLiveProduct(productId: string): Promise<boolean> {
   }
 }
 
-export async function createLivePost(tenantId: string, title: string, desc: string, price: number, mediaUrl: string, mediaType: 'photo' | 'video'): Promise<Post | null> {
+export async function createLivePost(tenantId: string, title: string, desc: string, price: number, mediaUrl: string, mediaType: 'photo' | 'video', productId?: string, width?: number, height?: number): Promise<Post | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
     const { data, error } = await supabase.from('posts').insert({
@@ -916,7 +915,11 @@ export async function createLivePost(tenantId: string, title: string, desc: stri
       price_cop: price,
       media_url: mediaUrl,
       media_type: mediaType,
-      is_published: true
+      is_published: true,
+      product_id: productId || null,
+      media_width: width || null,
+      media_height: height || null,
+      aspect_ratio: (width && height) ? Number((width / height).toFixed(4)) : null
     }).select().single();
 
     if (error || !data) throw error;

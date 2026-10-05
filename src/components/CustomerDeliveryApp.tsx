@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { toggleRemoteSave } from '../services/supabaseDataService';
-import type { Post, Tenant } from '../types';
+import type { Post, Tenant, Product } from '../types';
 
 const PaymentModal = lazy(() => import('./PaymentModal').then(m => ({ default: m.PaymentModal })));
 const SupportCenter = lazy(() => import('./SupportCenter').then(m => ({ default: m.SupportCenter })));
@@ -100,6 +100,7 @@ const VideoModal: React.FC<{ post: Post; tenant?: Tenant; onClose: () => void; o
 interface PostCardProps {
   post: Post;
   tenant?: Tenant;
+  product?: Product;
   onLike: (id: string) => void;
   onOrder: (productId: string, tenantSlug: string) => void;
   onPlayVideo: (post: Post) => void;
@@ -111,7 +112,7 @@ interface PostCardProps {
 }
 
 const PostCard: React.FC<PostCardProps> = ({
-  post, tenant, onLike, onOrder, onPlayVideo, saved, onSave, onOpenComments, onOpenProfile, onShare
+  post, tenant, product, onLike, onOrder, onPlayVideo, saved, onSave, onOpenComments, onOpenProfile, onShare
 }) => {
   const [expanded, setExpanded] = useState(false);
   const isVideo = post.mediaType === 'video';
@@ -155,7 +156,10 @@ const PostCard: React.FC<PostCardProps> = ({
       <h3 className="gf-dish-title">{post.dishEmoji} {post.dishName}</h3>
 
       {/* ── Media ── */}
-      <div className="gf-media-wrapper">
+      <div 
+        className="gf-media-wrapper" 
+        style={post.width && post.height ? { aspectRatio: `${post.width} / ${post.height}` } : undefined}
+      >
         <img loading="lazy" decoding="async" src={post.image} alt={post.dishName} className="gf-media-img" />
 
         {/* Video overlay */}
@@ -250,7 +254,28 @@ const PostCard: React.FC<PostCardProps> = ({
           {[1,2,3,4,5].map(i => <Star key={i} size={12} fill="#E6942B" strokeWidth={0} />)}
           <span className="gf-stars-label">· {post.commentsCount} reseñas</span>
         </div>
-        {post.hasValidProduct ? (
+        {(!post.productId || post.productId === post.id) ? (
+          <div style={{ 
+            padding: '12px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)',
+            borderRadius: '12px', fontSize: '0.8rem', color: '#F59E0B', textAlign: 'center', fontWeight: 600
+          }}>
+            📋 Solo para referencia - No disponible para pedido
+          </div>
+        ) : !product ? (
+          <div style={{ 
+            padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '12px', fontSize: '0.8rem', color: '#EF4444', textAlign: 'center', fontWeight: 600
+          }}>
+            🚫 Este producto ya no está disponible
+          </div>
+        ) : !product.available ? (
+          <div style={{ 
+            padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '12px', fontSize: '0.8rem', color: '#EF4444', textAlign: 'center', fontWeight: 600
+          }}>
+            ⚠️ Agotado temporalmente
+          </div>
+        ) : (
           <button
             className="gf-order-btn"
             onClick={() => onOrder(post.productId, post.tenantId)}
@@ -259,19 +284,6 @@ const PostCard: React.FC<PostCardProps> = ({
             <span>Añadir al Carrito</span>
             <span className="gf-order-price">${post.price.toLocaleString('es-CO')}</span>
           </button>
-        ) : (
-          <div style={{ 
-            padding: '12px', 
-            background: 'rgba(251, 191, 36, 0.1)', 
-            border: '1px solid rgba(251, 191, 36, 0.3)',
-            borderRadius: '12px', 
-            fontSize: '0.8rem', 
-            color: '#F59E0B',
-            textAlign: 'center',
-            fontWeight: 600
-          }}>
-            📋 Solo para referencia - No disponible para pedido
-          </div>
         )}
         {isVideo && (
           <button className="gf-watch-btn" onClick={() => onPlayVideo(post)}>
@@ -797,6 +809,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                     key={post.id}
                     post={post}
                     tenant={tenants.find(t => t.id === post.tenantId)}
+                    product={products.find(p => p.id === post.productId)}
                     onLike={toggleLikePost}
                     onOrder={handleOrder}
                     onPlayVideo={setVideoPost}

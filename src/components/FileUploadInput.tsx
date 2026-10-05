@@ -7,7 +7,7 @@ interface FileUploadInputProps {
   label: string;
   accept: 'image' | 'video' | 'both';
   value: string; // Data URL or Web URL
-  onChange: (value: string, fileType: 'photo' | 'video') => void;
+  onChange: (value: string, fileType: 'photo' | 'video', width?: number, height?: number) => void;
   maxSizeMB?: number;
   placeholder?: string;
   folder?: string;
@@ -75,9 +75,28 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
 
       const fileType: 'photo' | 'video' = isVideoFile ? 'video' : 'photo';
 
+      const getDimensions = (f: File, t: 'photo' | 'video'): Promise<{width: number, height: number}> => {
+        return new Promise((resolve) => {
+          const url = URL.createObjectURL(f);
+          if (t === 'photo') {
+            const img = new Image();
+            img.onload = () => { URL.revokeObjectURL(url); resolve({width: img.width, height: img.height}); };
+            img.onerror = () => { URL.revokeObjectURL(url); resolve({width: 0, height: 0}); };
+            img.src = url;
+          } else {
+            const vid = document.createElement('video');
+            vid.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve({width: vid.videoWidth, height: vid.videoHeight}); };
+            vid.onerror = () => { URL.revokeObjectURL(url); resolve({width: 0, height: 0}); };
+            vid.src = url;
+          }
+        });
+      };
+
+      const dims = await getDimensions(finalFile, fileType);
+
       const res = await uploadMediaFile(finalFile, folder, tenantId);
       if (res.success && res.publicUrl) {
-        onChange(res.publicUrl, fileType);
+        onChange(res.publicUrl, fileType, dims.width, dims.height);
       } else {
         setError(res.error || 'No se pudo procesar la subida.');
       }

@@ -89,6 +89,9 @@ export interface DbPost {
   is_published: boolean;
   created_at: string;
   updated_at: string;
+  media_width?: number | null;
+  media_height?: number | null;
+  aspect_ratio?: number | null;
 }
 
 export interface DbRestaurantApplication {
@@ -249,7 +252,10 @@ export function mapDbPostToPost(db: DbPost): Post {
     isLiked: false,
     commentsCount: 0,
     timeAgo: db.created_at,
-    productId: db.product_id || ''
+    productId: db.product_id || '',
+    hasValidProduct: !!db.product_id,
+    width: db.media_width || undefined,
+    height: db.media_height || undefined
   };
 }
 
