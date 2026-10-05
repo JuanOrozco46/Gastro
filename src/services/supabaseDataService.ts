@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Tenant, Product, Post, RestaurantApplication, OrderFulfillment, City, Zone, RestaurantDeliveryMode, PostComment } from '../types';
 import type {
@@ -482,88 +483,125 @@ function formatTimeAgo(timestamp: string): string {
   return `Hace ${Math.floor(diffDays / 7)}sem`;
 }
 
-export async function checkDuplicatePendingApplication(
-  ownerEmail: string,
-  restaurantName?: string
-): Promise<{ isDuplicate: boolean; reason?: string }> {
-  if (!isSupabaseConfigured || !supabase || !ownerEmail) return { isDuplicate: false };
-  try {
-    const normalizedEmail = ownerEmail.trim().toLowerCase();
-    const { data: emailData, error: emailErr } = await supabase
-      .from('restaurant_applications')
-      .select('id')
-      .in('status', ['submitted', 'reviewing'])
-      .eq('owner_email', normalizedEmail)
-      .limit(1);
+/**
+ * Tasa de comisión de plataforma que el restaurante acepta al solicitar su vinculación.
+ * Se persiste en restaurant_applications.commission_rate_accepted.
+ */
+export const PLATFORM_COMMISSION_RATE = 0.03;
 
-    if (!emailErr && emailData && emailData.length > 0) {
-      return { isDuplicate: true, reason: 'Ya existe una solicitud pendiente registrada con este correo electrónico.' };
-    }
+export type SubmitApplicationFailure =
+  | 'duplicate_email'
+  | 'duplicate_name'
+  | 'invalid_location'
+  | 'invalid_data'
+  | 'unknown';
 
-    if (restaurantName?.trim()) {
-      const { data: nameData, error: nameErr } = await supabase
-        .from('restaurant_applications')
-        .select('id')
-        .in('status', ['submitted', 'reviewing'])
-        .ilike('restaurant_name', restaurantName.trim())
-        .limit(1);
+export type SubmitApplicationResult =
+  | { ok: true; application: RestaurantApplication }
+  | { ok: false; reason: SubmitApplicationFailure; message: string };
 
-      if (!nameErr && nameData && nameData.length > 0) {
-        return { isDuplicate: true, reason: 'Ya existe una solicitud pendiente registrada con este nombre de restaurante.' };
+export interface ApplicationAssetFiles {
+  logo?: File | null;
+  banner?: File | null;
+}
+
+export interface ApplicationAssetResult {
+  logo: boolean;
+  banner: boolean;
+  /** Mensaje legible si alguna imagen no pudo subirse o fue rechazada. */
+  error?: string;
+}
+
+const APPLICATION_ASSET_MIME = ['image/jpeg', 'image/png', 'image/webp'];
+const APPLICATION_ASSET_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Extrae el mensaje {error} de una respuesta no-2xx de una Edge Function. */
+async function readFunctionError(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body: unknown = await error.context.json();
+      if (typeof body === 'object' && body !== null && 'error' in body) {
+        return String((body as { error: unknown }).error);
       }
+    } catch {
+      /* cuerpo no JSON */
     }
-
-    return { isDuplicate: false };
-  } catch {
-    return { isDuplicate: false };
   }
+  return error instanceof Error ? error.message : 'Error desconocido';
 }
 
-export async function uploadApplicationAsset(
-  file: File,
-  folderPath: string
-): Promise<string | null> {
-  if (!isSupabaseConfigured || !supabase) return null;
-  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
-  if (!allowedMimeTypes.includes(file.type)) {
-    console.warn('⚠️ Tipo de archivo no permitido. Solo JPG, PNG o WEBP.');
-    return null;
-  }
-  const MAX_SIZE_BYTES = 5 * 1024 * 1024;
-  if (file.size > MAX_SIZE_BYTES) {
-    console.warn('⚠️ El archivo excede el tamaño máximo de 5MB.');
-    return null;
+/**
+ * Sube logo/banner de una solicitud YA CREADA usando URLs firmadas emitidas por la Edge
+ * Function `application-assets` (bucket privado, validación de MIME/tamaño/bytes en servidor).
+ * Nunca lanza: si falla, la solicitud sigue siendo válida (las imágenes son opcionales).
+ */
+export async function uploadApplicationAssets(
+  applicationId: string,
+  files: ApplicationAssetFiles
+): Promise<ApplicationAssetResult> {
+  const empty: ApplicationAssetResult = { logo: false, banner: false };
+  if (!isSupabaseConfigured || !supabase) return empty;
+
+  const entries: Array<{ kind: 'logo' | 'banner'; file: File }> = [];
+  if (files.logo) entries.push({ kind: 'logo', file: files.logo });
+  if (files.banner) entries.push({ kind: 'banner', file: files.banner });
+  if (entries.length === 0) return empty;
+
+  for (const { kind, file } of entries) {
+    if (!APPLICATION_ASSET_MIME.includes(file.type)) {
+      return { ...empty, error: `El ${kind} debe ser JPG, PNG o WEBP.` };
+    }
+    if (file.size > APPLICATION_ASSET_MAX_BYTES) {
+      return { ...empty, error: `El ${kind} supera el máximo de 5 MB.` };
+    }
   }
 
   try {
-    const fileExt = file.name.split('.').pop() || 'png';
-    const fileName = `applications/${folderPath}/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+    const sign = await supabase.functions.invoke('application-assets', {
+      body: {
+        action: 'sign',
+        applicationId,
+        files: entries.map(e => ({ kind: e.kind, contentType: e.file.type, size: e.file.size }))
+      }
+    });
+    if (sign.error) return { ...empty, error: await readFunctionError(sign.error) };
 
-    const { data, error } = await supabase.storage
-      .from('restaurant-assets')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    const signed = sign.data as { bucket?: string; uploads?: Array<{ kind: 'logo' | 'banner'; path: string; token: string }> } | null;
+    if (!signed?.uploads || !signed.bucket) return { ...empty, error: 'Respuesta inválida del servidor de subidas.' };
 
-    if (error || !data) {
-      console.warn('⚠️ Error al subir imagen de solicitud:', error?.message);
-      return null;
+    for (const up of signed.uploads) {
+      const entry = entries.find(e => e.kind === up.kind);
+      if (!entry) continue;
+      const { error: upErr } = await supabase.storage
+        .from(signed.bucket)
+        .uploadToSignedUrl(up.path, up.token, entry.file, { contentType: entry.file.type });
+      if (upErr) return { ...empty, error: `No se pudo subir el ${up.kind}: ${upErr.message}` };
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from('restaurant-assets')
-      .getPublicUrl(fileName);
+    const fin = await supabase.functions.invoke('application-assets', {
+      body: { action: 'finalize', applicationId }
+    });
+    if (fin.error) return { ...empty, error: await readFunctionError(fin.error) };
 
-    return publicUrlData.publicUrl;
-  } catch (err) {
-    console.warn('⚠️ Excepción subiendo asset de solicitud:', err);
-    return null;
+    const result = fin.data as { logo?: boolean; banner?: boolean; rejected?: string[] } | null;
+    const rejected = result?.rejected ?? [];
+    return {
+      logo: !!result?.logo,
+      banner: !!result?.banner,
+      error: rejected.length > 0 ? `Imágenes rechazadas: ${rejected.join('; ')}` : undefined
+    };
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción subiendo imágenes de la solicitud:', err);
+    return { ...empty, error: 'No se pudieron subir las imágenes.' };
   }
 }
 
-export async function submitLiveApplication(appData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>): Promise<RestaurantApplication | null> {
-  if (!isSupabaseConfigured || !supabase) return null;
+export async function submitLiveApplication(
+  appData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>
+): Promise<SubmitApplicationResult> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { ok: false, reason: 'unknown', message: 'Supabase no está configurado.' };
+  }
   try {
     let realCityId = appData.cityId;
     let realZoneId = appData.zoneId;
@@ -581,10 +619,13 @@ export async function submitLiveApplication(appData: Omit<RestaurantApplication,
     }
 
     const newId = crypto.randomUUID();
+    const normalizedEmail = appData.ownerEmail.trim().toLowerCase();
+    // Los visitantes anónimos NO pueden leer la tabla (RLS), por eso no se usa .select():
+    // la unicidad de pendientes la garantizan los índices únicos parciales de la migración 022.
     const { error } = await supabase.from('restaurant_applications').insert([{
       id: newId,
       owner_name: appData.ownerName,
-      owner_email: appData.ownerEmail.trim().toLowerCase(),
+      owner_email: normalizedEmail,
       owner_phone: appData.ownerPhone,
       restaurant_name: appData.restaurantName,
       category: appData.category,
@@ -599,44 +640,60 @@ export async function submitLiveApplication(appData: Omit<RestaurantApplication,
       delivery_radius_km: appData.deliveryRadiusKm,
       estimated_delivery_minutes: appData.estimatedDeliveryMinutes,
       schedule_hours: appData.scheduleHours,
-      logo_url: appData.logoUrl,
-      banner_url: appData.bannerUrl,
       notes: appData.notes,
+      commission_rate_accepted: appData.commissionRateAccepted,
+      terms_version: appData.termsVersion,
       status: 'submitted'
     }]);
 
     if (error) {
       console.warn('⚠️ Error al insertar la solicitud en Supabase:', error);
-      return null;
+      const msg = error.message ?? '';
+      if (error.code === '23505' && msg.includes('uq_restaurant_apps_pending_email')) {
+        return { ok: false, reason: 'duplicate_email', message: 'Ya existe una solicitud pendiente con este correo electrónico.' };
+      }
+      if (error.code === '23505' && msg.includes('uq_restaurant_apps_pending_name_city')) {
+        return { ok: false, reason: 'duplicate_name', message: 'Ya existe una solicitud pendiente con este nombre de restaurante en esa ciudad.' };
+      }
+      if (error.code === '42501' || error.code === '23503') {
+        return { ok: false, reason: 'invalid_location', message: 'La ciudad o zona seleccionada no es válida, o faltó aceptar los términos.' };
+      }
+      if (error.code === '23514') {
+        return { ok: false, reason: 'invalid_data', message: 'Algún dato excede el largo permitido o tiene un formato inválido.' };
+      }
+      return { ok: false, reason: 'unknown', message: 'No se pudo registrar la solicitud. Inténtalo nuevamente.' };
     }
 
     return {
-      id: newId,
-      ownerName: appData.ownerName,
-      ownerEmail: appData.ownerEmail.trim().toLowerCase(),
-      ownerPhone: appData.ownerPhone,
-      restaurantName: appData.restaurantName,
-      category: appData.category,
-      cityId: realCityId,
-      zoneId: realZoneId,
-      address: appData.address,
-      description: appData.description,
-      whatsapp: appData.whatsapp,
-      minOrder: appData.minOrder,
-      deliveryModes: appData.deliveryModes,
-      deliveryFee: appData.deliveryFee,
-      deliveryRadiusKm: appData.deliveryRadiusKm,
-      estimatedDeliveryMinutes: appData.estimatedDeliveryMinutes,
-      scheduleHours: appData.scheduleHours,
-      logoUrl: appData.logoUrl,
-      bannerUrl: appData.bannerUrl,
-      notes: appData.notes,
-      status: 'submitted',
-      submittedAt: Date.now(),
-    } as RestaurantApplication;
+      ok: true,
+      application: {
+        id: newId,
+        ownerName: appData.ownerName,
+        ownerEmail: normalizedEmail,
+        ownerPhone: appData.ownerPhone,
+        restaurantName: appData.restaurantName,
+        category: appData.category,
+        cityId: realCityId,
+        zoneId: realZoneId,
+        address: appData.address,
+        description: appData.description,
+        whatsapp: appData.whatsapp,
+        minOrder: appData.minOrder,
+        deliveryModes: appData.deliveryModes,
+        deliveryFee: appData.deliveryFee,
+        deliveryRadiusKm: appData.deliveryRadiusKm,
+        estimatedDeliveryMinutes: appData.estimatedDeliveryMinutes,
+        scheduleHours: appData.scheduleHours,
+        notes: appData.notes,
+        commissionRateAccepted: appData.commissionRateAccepted,
+        termsVersion: appData.termsVersion,
+        status: 'submitted',
+        submittedAt: Date.now(),
+      }
+    };
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al insertar aplicacion en Supabase:', err);
-    return null;
+    return { ok: false, reason: 'unknown', message: 'Error inesperado al conectar con el servidor.' };
   }
 }
 
@@ -650,7 +707,16 @@ export async function fetchLiveApplications(): Promise<RestaurantApplication[]> 
 
     if (error || !data) return [];
 
-    return data.map((app: Record<string, unknown>) => ({
+    // Las imágenes viven en un bucket PRIVADO: se resuelven a URLs firmadas de corta vida.
+    // Solo el platform_admin pasa la política de lectura; para otros usuarios no habrá URL.
+    const client = supabase;
+    const signPath = async (path: unknown): Promise<string | undefined> => {
+      if (typeof path !== 'string' || !path) return undefined;
+      const { data: signed } = await client.storage.from('application-assets').createSignedUrl(path, 3600);
+      return signed?.signedUrl;
+    };
+
+    return await Promise.all(data.map(async (app: Record<string, unknown>): Promise<RestaurantApplication> => ({
       id: app.id as string,
       ownerName: app.owner_name as string,
       ownerEmail: app.owner_email as string,
@@ -660,11 +726,19 @@ export async function fetchLiveApplications(): Promise<RestaurantApplication[]> 
       cityId: app.city_id as string,
       zoneId: app.zone_id as string,
       address: app.address as string,
+      description: (app.description as string | null) ?? undefined,
       whatsapp: app.whatsapp as string | undefined,
       minOrder: app.min_order as number | undefined,
       deliveryModes: app.delivery_modes as OrderFulfillment[],
       deliveryFee: app.delivery_fee as number | undefined,
       deliveryRadiusKm: app.delivery_radius_km as number | undefined,
+      estimatedDeliveryMinutes: (app.estimated_delivery_minutes as number | null) ?? undefined,
+      scheduleHours: (app.schedule_hours as string | null) ?? undefined,
+      logoUrl: await signPath(app.logo_path),
+      bannerUrl: await signPath(app.banner_path),
+      commissionRateAccepted: app.commission_rate_accepted !== null && app.commission_rate_accepted !== undefined ? Number(app.commission_rate_accepted) : undefined,
+      termsAcceptedAt: app.terms_accepted_at ? new Date(app.terms_accepted_at as string).getTime() : undefined,
+      termsVersion: (app.terms_version as string | null) ?? undefined,
       notes: app.notes as string | undefined,
       status: app.status as RestaurantApplication['status'],
       submittedAt: new Date(app.created_at as string).getTime(),
@@ -672,7 +746,7 @@ export async function fetchLiveApplications(): Promise<RestaurantApplication[]> 
       reviewNote: app.review_note as string | undefined,
       activatedAt: app.activated_at ? new Date(app.activated_at as string).getTime() : undefined,
       activatedTenantId: app.activated_restaurant_id as string | undefined,
-    }));
+    })));
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al consultar aplicaciones en Supabase:', err);
     return [];

@@ -99,6 +99,10 @@ export interface RestaurantApplication {
   scheduleHours?: string;
   logoUrl?: string;
   bannerUrl?: string;
+  /** Tasa de comisión (0.03 = 3%) aceptada explícitamente por el solicitante. */
+  commissionRateAccepted?: number;
+  termsAcceptedAt?: number;
+  termsVersion?: string;
   notes?: string;
   reviewedAt?: number;
   reviewedByEmail?: string;

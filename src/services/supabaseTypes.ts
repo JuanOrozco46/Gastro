@@ -111,6 +111,11 @@ export interface DbRestaurantApplication {
   schedule_hours?: string | null;
   logo_url?: string | null;
   banner_url?: string | null;
+  logo_path?: string | null;
+  banner_path?: string | null;
+  commission_rate_accepted?: number | null;
+  terms_accepted_at?: string | null;
+  terms_version?: string | null;
   notes: string | null;
   status: 'submitted' | 'reviewing' | 'approved' | 'rejected';
   review_note: string | null;

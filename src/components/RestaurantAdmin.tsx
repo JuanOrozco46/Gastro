@@ -582,6 +582,7 @@ export const RestaurantAdmin: React.FC = () => {
                 }}
                 folder="posts"
                 tenantId={operatingTenant.id}
+                maxSizeMB={8}
               />
 
               <div>
@@ -790,6 +791,7 @@ export const RestaurantAdmin: React.FC = () => {
                 placeholder="Seleccionar foto o pegar enlace de la imagen..."
                 folder="dishes"
                 tenantId={operatingTenant.id}
+                maxSizeMB={8}
               />
 
               <motion.button 

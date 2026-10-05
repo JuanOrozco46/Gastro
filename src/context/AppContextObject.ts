@@ -1,5 +1,6 @@
 import { createContext } from 'react';
 import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, RestaurantApplication, UserLocationState } from '../types';
+import type { ApplicationAssetFiles } from '../services/supabaseDataService';
 
 export interface AppContextType {
   cities: City[];
@@ -65,7 +66,7 @@ export interface AppContextType {
   toggleProductAvailability: (productId: string) => Promise<void> | void;
   addProduct: (product: Omit<Product, 'id' | 'tenantId'>) => Promise<void> | void;
   assignDriverToOrder: (orderId: string, driverId: string) => void;
-  submitRestaurantApplication: (applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>) => Promise<boolean>;
+  submitRestaurantApplication: (applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>, assets?: ApplicationAssetFiles) => Promise<boolean>;
   reviewRestaurantApplication: (applicationId: string, nextStatus: 'reviewing' | 'approved' | 'rejected', reviewNote?: string) => Promise<boolean>;
   activateApprovedRestaurant: (applicationId: string) => Promise<{ success: boolean; tenantId?: string; error?: string; message?: string }>;
   showToast: (message: string) => void;

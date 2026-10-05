@@ -26,32 +26,56 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [compressionInfo, setCompressionInfo] = useState<{ original: number, final: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const acceptMime = accept === 'image' 
-    ? 'image/*' 
+    ? 'image/jpeg,image/png,image/webp' 
     : accept === 'video' 
       ? 'video/*' 
-      : 'image/*,video/*';
+      : 'image/jpeg,image/png,image/webp,video/*';
+
 
   const isVideo = value.startsWith('data:video/') || 
     /\.(mp4|webm|ogg|mov)$/i.test(value);
 
-  const handleFile = async (file: File) => {
+  const handleFile = async (rawFile: File) => {
     setError(null);
-    if (!file) return;
+    if (!rawFile) return;
+    setCompressionInfo(null);
 
-    const fileMB = file.size / (1024 * 1024);
-    if (fileMB > maxSizeMB) {
-      setError(`El archivo pesa ${fileMB.toFixed(1)}MB. El tamaño máximo permitido es ${maxSizeMB}MB.`);
+    const isVideoFile = rawFile.type.startsWith('video/');
+    const allowedImages = ['image/jpeg', 'image/png', 'image/webp'];
+
+    if (!isVideoFile && !allowedImages.includes(rawFile.type)) {
+      setError('Formato no permitido. Solo JPG, PNG o WEBP para imágenes (SVG y GIF rechazados).');
       return;
     }
 
-    const fileType: 'photo' | 'video' = file.type.startsWith('video/') ? 'video' : 'photo';
-
     setIsProcessing(true);
+    let finalFile = rawFile;
+
     try {
-      const res = await uploadMediaFile(file, folder, tenantId);
+      if (!isVideoFile) {
+        const { compressImage } = await import('../utils/imageCompression');
+        // Para productos (folder dishes) o logos, max size is generally what passed in maxSizeMB (e.g. 8MB for products)
+        const result = await compressImage(rawFile, maxSizeMB);
+        finalFile = result.file;
+        if (result.compressed) {
+          setCompressionInfo({ original: result.originalSize, final: result.finalSize });
+        }
+      }
+
+      const fileMB = finalFile.size / (1024 * 1024);
+      if (fileMB > maxSizeMB) {
+        setError(`El archivo pesa ${fileMB.toFixed(1)}MB. El tamaño máximo permitido es ${maxSizeMB}MB.`);
+        setIsProcessing(false);
+        return;
+      }
+
+      const fileType: 'photo' | 'video' = isVideoFile ? 'video' : 'photo';
+
+      const res = await uploadMediaFile(finalFile, folder, tenantId);
       if (res.success && res.publicUrl) {
         onChange(res.publicUrl, fileType);
       } else {
@@ -226,6 +250,11 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
           )}
         </div>
 
+      {compressionInfo && !error && value && (
+        <p style={{ color: '#10B981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>
+          ⚡ Comprimido: {(compressionInfo.original / 1024 / 1024).toFixed(1)}MB → {(compressionInfo.final / 1024 / 1024).toFixed(1)}MB (WEBP)
+        </p>
+      )}
       {error && (
         <p style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '6px', fontWeight: 600 }}>
           ⚠️ {error}

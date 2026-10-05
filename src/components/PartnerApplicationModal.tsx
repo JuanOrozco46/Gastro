@@ -3,7 +3,7 @@ import { useApp } from '../context/useApp';
 import { motion } from 'framer-motion';
 import { X, Building2, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck, Upload, Image, Clock, FileText, AlertCircle } from 'lucide-react';
 import type { OrderFulfillment } from '../types';
-import { checkDuplicatePendingApplication, uploadApplicationAsset } from '../services/supabaseDataService';
+import { PLATFORM_COMMISSION_RATE } from '../services/supabaseDataService';
 
 interface PartnerApplicationModalProps {
   isOpen: boolean;
@@ -56,6 +56,10 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
   const [notes, setNotes] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // States para compresión
+  const [logoCompression, setLogoCompression] = useState<{ original: number, final: number } | null>(null);
+  const [bannerCompression, setBannerCompression] = useState<{ original: number, final: number } | null>(null);
+
   // UI state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -85,19 +89,28 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     });
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'banner') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'banner') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      setErrors(prev => ({ ...prev, [type]: 'Solo se permiten imágenes en formato JPG, PNG o WEBP.' }));
+      setErrors(prev => ({ ...prev, [type]: 'Solo se permiten imágenes en formato JPG, PNG o WEBP. No se admiten SVG, GIF o ejecutables.' }));
       return;
     }
 
-    const MAX_SIZE = 5 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      setErrors(prev => ({ ...prev, [type]: 'La imagen no debe superar los 5MB de tamaño.' }));
+    const { compressImage } = await import('../utils/imageCompression');
+    
+    // Limits: Logo 5MB, Banner 12MB
+    const maxMB = type === 'logo' ? 5 : 12;
+    const MAX_SIZE = maxMB * 1024 * 1024;
+    
+    // First, try compressing if valid image
+    const result = await compressImage(file, maxMB);
+    const finalFile = result.file;
+
+    if (finalFile.size > MAX_SIZE) {
+      setErrors(prev => ({ ...prev, [type]: `La imagen no debe superar los ${maxMB}MB de tamaño (actual: ${(finalFile.size/1024/1024).toFixed(1)}MB).` }));
       return;
     }
 
@@ -108,11 +121,15 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     });
 
     if (type === 'logo') {
-      setLogoFile(file);
-      setLogoPreviewUrl(URL.createObjectURL(file));
+      setLogoFile(finalFile);
+      setLogoPreviewUrl(URL.createObjectURL(finalFile));
+      if (result.compressed) setLogoCompression({ original: result.originalSize, final: result.finalSize });
+      else setLogoCompression(null);
     } else {
-      setBannerFile(file);
-      setBannerPreviewUrl(URL.createObjectURL(file));
+      setBannerFile(finalFile);
+      setBannerPreviewUrl(URL.createObjectURL(finalFile));
+      if (result.compressed) setBannerCompression({ original: result.originalSize, final: result.finalSize });
+      else setBannerCompression(null);
     }
   };
 
@@ -158,30 +175,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
 
     setIsSubmitting(true);
     try {
-      // Check duplicate
-      const dupCheck = await checkDuplicatePendingApplication(ownerEmail, restaurantName);
-      if (dupCheck.isDuplicate) {
-        setSubmitError(dupCheck.reason || 'Ya existe una solicitud pendiente con este correo o nombre.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Upload assets if provided
-      let uploadedLogoUrl: string | undefined;
-      let uploadedBannerUrl: string | undefined;
-
-      const tempFolderId = `app_${Date.now()}`;
-
-      if (logoFile) {
-        const logoUrl = await uploadApplicationAsset(logoFile, tempFolderId);
-        if (logoUrl) uploadedLogoUrl = logoUrl;
-      }
-
-      if (bannerFile) {
-        const bannerUrl = await uploadApplicationAsset(bannerFile, tempFolderId);
-        if (bannerUrl) uploadedBannerUrl = bannerUrl;
-      }
-
+      // La solicitud se crea primero; las imágenes (opcionales) se suben después con URLs firmadas.
+      // La unicidad de solicitudes pendientes la garantiza la base de datos.
       const ok = await submitRestaurantApplication({
         ownerName: ownerName.trim(),
         ownerEmail: ownerEmail.trim(),
@@ -199,10 +194,10 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
         minOrder: minOrder !== '' ? Number(minOrder) : undefined,
         deliveryFee: deliveryModes.includes('restaurant_delivery') && deliveryFee !== '' ? Number(deliveryFee) : undefined,
         deliveryRadiusKm: deliveryModes.includes('restaurant_delivery') && deliveryRadiusKm !== '' ? Number(deliveryRadiusKm) : undefined,
-        logoUrl: uploadedLogoUrl,
-        bannerUrl: uploadedBannerUrl,
-        notes: notes.trim() || undefined
-      });
+        notes: notes.trim() || undefined,
+        commissionRateAccepted: termsAccepted ? PLATFORM_COMMISSION_RATE : undefined,
+        termsVersion: '2026-10'
+      }, { logo: logoFile, banner: bannerFile });
 
       if (ok) {
         setSubmittedSuccess(true);
@@ -236,6 +231,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     setDeliveryRadiusKm('');
     setNotes('');
     setTermsAccepted(false);
+    setLogoCompression(null);
+    setBannerCompression(null);
     setErrors({});
     setSubmitError(null);
     setSubmittedSuccess(false);
@@ -584,12 +581,17 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   {logoPreviewUrl && (
                     <img src={logoPreviewUrl} alt="Logo preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', marginTop: '8px' }} />
                   )}
+                  {logoCompression && (
+                    <div style={{ fontSize: '0.7rem', color: '#10B981', marginTop: '4px' }}>
+                      Comprimido: {(logoCompression.original / 1024 / 1024).toFixed(1)}MB → {(logoCompression.final / 1024 / 1024).toFixed(1)}MB
+                    </div>
+                  )}
                   {errors.logo && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.logo}</span>}
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Portada / Banner (JPG, PNG, max 5MB)
+                    Portada / Banner (JPG, PNG, max 12MB)
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', cursor: 'pointer', border: '1px dashed rgba(255,255,255,0.2)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                     <Image size={16} />
@@ -603,6 +605,11 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   </label>
                   {bannerPreviewUrl && (
                     <img src={bannerPreviewUrl} alt="Banner preview" style={{ width: '100px', height: '48px', objectFit: 'cover', borderRadius: '8px', marginTop: '8px' }} />
+                  )}
+                  {bannerCompression && (
+                    <div style={{ fontSize: '0.7rem', color: '#10B981', marginTop: '4px' }}>
+                      Comprimido: {(bannerCompression.original / 1024 / 1024).toFixed(1)}MB → {(bannerCompression.final / 1024 / 1024).toFixed(1)}MB
+                    </div>
                   )}
                   {errors.banner && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.banner}</span>}
                 </div>

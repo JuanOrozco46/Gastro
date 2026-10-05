@@ -4,7 +4,8 @@ import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment } from '../services/supabaseDataService';
+import type { ApplicationAssetFiles } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment } from '../services/supabaseOrderService';
@@ -1536,8 +1537,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const submitRestaurantApplication = async (
-    applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>
+    applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>,
+    assets?: ApplicationAssetFiles
   ): Promise<boolean> => {
+    if (applicationData.commissionRateAccepted === undefined) {
+      showToast('⚠️ Debes aceptar los términos y la comisión de la plataforma para enviar la solicitud.');
+      return false;
+    }
     if (
       !applicationData.ownerName?.trim() ||
       !applicationData.ownerEmail?.trim() ||
@@ -1621,15 +1627,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'submitted'
     };
 
+    let assetWarning: string | undefined;
+
     if (isSupabaseConfigured) {
       try {
-        const realApp = await submitLiveApplication(newApp);
-        if (!realApp) {
-          showToast('⚠️ Hubo un error de conexión o validación al enviar la solicitud al servidor.');
+        const result = await submitLiveApplication(newApp);
+        if (!result.ok) {
+          showToast(`⚠️ ${result.message}`);
           return false; // Stop the flow, do not add fake app
         }
+
+        const finalApp = result.application;
+
+        // Imágenes (opcionales): se suben DESPUÉS de crear la solicitud, con URLs firmadas.
+        // Si fallan, la solicitud ya es válida y solo se avisa al usuario.
+        if (assets && (assets.logo || assets.banner)) {
+          const assetResult = await uploadApplicationAssets(finalApp.id, assets);
+          if (assetResult.error) assetWarning = assetResult.error;
+        }
+
         // Success! Only save the real App
-        setRestaurantApplications(prev => [realApp, ...prev]);
+        setRestaurantApplications(prev => [finalApp, ...prev]);
       } catch (err) {
         console.warn('⚠️ No se pudo enviar la solicitud a Supabase:', err);
         showToast('⚠️ Hubo un error inesperado al conectar con el servidor.');
@@ -1640,7 +1658,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setRestaurantApplications(prev => [newApp, ...prev]);
     }
 
-    showToast('📝 ¡Solicitud recibida! Quedará pendiente de revisión antes de activar el restaurante.');
+    showToast(
+      assetWarning
+        ? `📝 Solicitud recibida, pero las imágenes no se guardaron: ${assetWarning}`
+        : '📝 ¡Solicitud recibida! Quedará pendiente de revisión antes de activar el restaurante.'
+    );
     return true;
   };
 
