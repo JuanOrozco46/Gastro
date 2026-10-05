@@ -54,7 +54,7 @@ export interface DbRestaurant {
   estimated_delivery_minutes?: number;
   specialties?: string[];
   accepting_orders?: boolean;
-
+  restaurant_hours?: any[];
 }
 
 export interface DbRestaurantMember {
@@ -73,6 +73,12 @@ export interface DbProduct {
   price_cop: number;
   available: boolean;
   image_url: string | null;
+  is_archived?: boolean;
+  sort_order?: number;
+  tags?: string[];
+  preparation_time_minutes?: number;
+  ingredients?: string[];
+  allergens?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -203,7 +209,17 @@ export function mapDbRestaurantToTenant(db: DbRestaurant): Tenant {
     distanceKm: 0,
     isNew: false,
     tablesCount: 0,
-    ownerUserId: db.owner_user_id || undefined
+    ownerUserId: db.owner_user_id || undefined,
+    hours: db.restaurant_hours ? db.restaurant_hours.map(h => ({
+      id: h.id,
+      restaurantId: db.id,
+      dayOfWeek: h.day_of_week,
+      isOpen: h.is_open,
+      openTime: h.open_time,
+      closeTime: h.close_time,
+      openTime2: h.open_time2,
+      closeTime2: h.close_time2
+    })) : undefined
   };
 }
 
@@ -231,7 +247,13 @@ export function mapDbProductToProduct(db: DbProduct): Product {
     price: db.price_cop,
     available: db.available,
     image: db.image_url || undefined,
-    emoji: emoji
+    emoji: emoji,
+    isArchived: db.is_archived,
+    sortOrder: db.sort_order,
+    tags: db.tags,
+    preparationTimeMinutes: db.preparation_time_minutes,
+    ingredients: db.ingredients,
+    allergens: db.allergens
   };
 }
 

@@ -1480,6 +1480,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`🛵 Repartidor ${newDriver.name} registrado`);
   };
 
+  const updateProduct = async (productId: string, updates: Partial<Product>) => {
+    const target = products.find(p => p.id === productId);
+    if (!target) return;
+
+    if (!isRestaurantOwner(currentUser) || !hasOwnershipOfTenant(currentUser, target.tenantId)) {
+      showToast('⚠️ No tienes autorización para editar productos de este restaurante.');
+      return;
+    }
+
+    if (authMode === 'remote') {
+      const updatedProd = await updateLiveProduct(productId, updates);
+      if (!updatedProd) {
+        showToast('⚠️ Error al actualizar producto en el servidor.');
+        return;
+      }
+      setRemoteProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
+      setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
+      showToast(`Producto actualizado exitosamente.`);
+      return;
+    }
+
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, ...updates } : p));
+    showToast(`Producto actualizado localmente.`);
+  };
+
   const deleteProduct = async (productId: string) => {
     const target = products.find(p => p.id === productId);
     if (!target) return;
@@ -1856,6 +1881,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateOrderStatus,
       toggleProductAvailability,
       addProduct,
+      updateProduct,
       assignDriverToOrder,
       submitRestaurantApplication,
       reviewRestaurantApplication,

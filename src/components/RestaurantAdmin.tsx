@@ -8,6 +8,7 @@ import { NotificationBell } from './NotificationBell';
 
 const FinancialAnalytics = lazy(() => import('./FinancialAnalytics').then(m => ({ default: m.FinancialAnalytics })));
 const SupportTab = lazy(() => import('./RestaurantAdmin/SupportTab').then(m => ({ default: m.SupportTab })));
+const MenuTab = lazy(() => import('./RestaurantAdmin/MenuTab').then(m => ({ default: m.MenuTab })));
 
 const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
   <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
@@ -26,7 +27,7 @@ import {
 export const RestaurantAdmin: React.FC = () => {
   const {
     tenants, currentUser, toggleTenantOpenStatus,
-    products, toggleProductAvailability, addProduct, deleteProduct,
+    products,
     drivers, addDriver,
     posts, createPost, deletePost,
     orders, updateOrderStatus, authMode, showToast
@@ -39,16 +40,10 @@ export const RestaurantAdmin: React.FC = () => {
   const [tableNumber, setTableNumber] = useState('4');
   
   // Modals state
-  const [showAddProductForm, setShowAddProductForm] = useState(false);
+  // Modals state
   const [showAddDriverForm, setShowAddDriverForm] = useState(false);
 
-  // Form State for Products
-  const [newName, setNewName] = useState('');
-  const [newDesc, setNewDesc] = useState('');
-  const [newPrice, setNewPrice] = useState('');
-  const [newCategory, setNewCategory] = useState<'Platos Principales' | 'Bebidas' | 'Postres' | 'Entradas'>('Platos Principales');
-  const [newEmoji, setNewEmoji] = useState('🍲');
-  const [newProductImage, setNewProductImage] = useState('');
+
 
   // Form State for Drivers
   const [driverName, setDriverName] = useState('');
@@ -103,26 +98,6 @@ export const RestaurantAdmin: React.FC = () => {
   const activeOrders = tenantOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
   const pastOrders = tenantOrders.filter(o => o.status === 'delivered' || o.status === 'cancelled');
 
-  const handleAddProductSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName || !newPrice) return;
-
-    await addProduct({
-      name: newName,
-      desc: newDesc || 'Deliciosa opción preparada con ingredientes frescos.',
-      price: parseFloat(newPrice),
-      category: newCategory,
-      emoji: newEmoji,
-      image: newProductImage || undefined,
-      available: true
-    });
-
-    setNewName('');
-    setNewDesc('');
-    setNewPrice('');
-    setNewProductImage('');
-    setShowAddProductForm(false);
-  };
 
   const handleAddDriverSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -760,144 +735,10 @@ export const RestaurantAdmin: React.FC = () => {
       </Suspense>
       )}
 
-      {/* ── TAB 3: MENU PRODUCTS ── */}
       {activeTab === 'menu' && (
-        <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-          <div className="card-header">
-            <div className="card-title" style={{ color: 'white', fontWeight: 900, fontSize: '1.2rem' }}>
-              <Utensils size={22} style={{ color: 'var(--primary)' }} /> Menú de {operatingTenant.name} ({tenantProducts.length} Platos)
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="btn btn-primary"
-              style={{ padding: '8px 16px', fontSize: '0.85rem', fontWeight: 800, borderRadius: '12px' }}
-              onClick={() => setShowAddProductForm(!showAddProductForm)}
-            >
-              <Plus size={16} /> {showAddProductForm ? 'Cancelar' : 'Nuevo Producto'}
-            </motion.button>
-          </div>
-
-          {showAddProductForm && (
-            <form onSubmit={handleAddProductSubmit} style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '18px', marginBottom: '1.5rem', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <h4 style={{ color: 'white', margin: '0 0 14px', fontWeight: 900 }}>Agregar Plato a {operatingTenant.name}</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <input
-                  placeholder="Nombre del plato"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  required
-                />
-                <input
-                  type="number"
-                  placeholder="Precio en COP"
-                  value={newPrice}
-                  onChange={(e) => setNewPrice(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <select
-                  onChange={(e) => setNewCategory(e.target.value as 'Platos Principales' | 'Bebidas' | 'Postres' | 'Entradas')}
-                >
-                  <option value="Platos Principales">Platos Principales</option>
-                  <option value="Entradas">Entradas</option>
-                  <option value="Bebidas">Bebidas</option>
-                  <option value="Postres">Postres</option>
-                </select>
-                <input
-                  placeholder="Emoji e.g. 🍕"
-                  value={newEmoji}
-                  onChange={(e) => setNewEmoji(e.target.value)}
-                />
-              </div>
-
-              <input
-                placeholder="Descripción de los ingredientes"
-                value={newDesc}
-                onChange={(e) => setNewDesc(e.target.value)}
-                style={{ width: '100%', marginBottom: '14px' }}
-              />
-
-              <FileUploadInput
-                label="Foto del Producto / Plato"
-                accept="image"
-                value={newProductImage}
-                onChange={(val) => setNewProductImage(val)}
-                placeholder="Seleccionar foto o pegar enlace de la imagen..."
-                folder="dishes"
-                tenantId={operatingTenant.id}
-                maxSizeMB={8}
-              />
-
-              <motion.button 
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit" 
-                className="btn btn-primary" 
-                style={{ width: '100%', padding: '12px', fontWeight: 900, borderRadius: '12px' }}
-              >
-                Guardar Producto en el Menú de {operatingTenant.name}
-              </motion.button>
-            </form>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {tenantProducts.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>
-                Este restaurante aún no tiene productos registrados en su carta.
-              </p>
-            ) : (
-              tenantProducts.map(product => (
-                <div key={product.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <span style={{ fontSize: '2rem' }}>{product.emoji}</span>
-                    <div>
-                      <strong style={{ color: 'white', fontSize: '1rem' }}>{product.name}</strong>
-                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '3px 0 4px' }}>{product.desc}</p>
-                      <span style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 900 }}>
-                        ${product.price.toLocaleString('es-CO')} COP
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className={`btn ${product.available ? 'btn-secondary' : 'btn-outline'}`}
-                      onClick={() => {
-                        if (authMode === 'remote') {
-                          showToast('⚠️ La edición remota del catálogo estará disponible en una próxima fase.');
-                          return;
-                        }
-                        toggleProductAvailability(product.id);
-                      }}
-                      style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: 800, borderRadius: '12px' }}
-                    >
-                      {product.available ? '🟢 Disponible' : '🔴 Agotado'}
-                    </motion.button>
-                    <button
-                      className="btn btn-outline"
-                      onClick={() => {
-                        if (authMode === 'remote') {
-                          showToast('⚠️ La edición remota del catálogo estará disponible en una próxima fase.');
-                          return;
-                        }
-                        deleteProduct(product.id);
-                      }}
-                      style={{ padding: '8px 12px', color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '12px' }}
-                      title="Eliminar plato"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <Suspense fallback={<FallbackLoader message="Cargando menú..." />}>
+          <MenuTab tenant={operatingTenant} />
+        </Suspense>
       )}
 
       {/* ── TAB 4: QR & DRIVERS ── */}

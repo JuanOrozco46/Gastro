@@ -82,7 +82,12 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
   try {
     const { data, error } = await supabase
       .from('restaurants')
-      .select(`id, slug, name, category, description, address, phone, whatsapp, city_id, zone_id, status, is_open, delivery_modes, min_order, delivery_fee, delivery_radius_km, commission_rate`);
+      .select(`
+        id, slug, name, category, description, address, phone, whatsapp, city_id, zone_id, status, is_open, 
+        delivery_modes, min_order, delivery_fee, delivery_radius_km, commission_rate,
+        logo_url, banner_url, logo_emoji, specialties, accepting_orders, estimated_delivery_minutes, owner_user_id,
+        restaurant_hours ( id, day_of_week, is_open, open_time, close_time, open_time2, close_time2 )
+      `);
 
     if (error || !data) {
       console.warn('⚠️ Error al cargar restaurantes de Supabase:', error);
@@ -116,7 +121,7 @@ export async function fetchLiveProducts(): Promise<Product[]> {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select(`id, restaurant_id, name, description, category, price_cop, available, image_url`);
+      .select(`id, restaurant_id, name, description, category, price_cop, available, image_url, is_archived, sort_order, tags, preparation_time_minutes, ingredients, allergens`);
 
     if (error) {
       console.error('⚠️ Error RLS o BD al consultar Supabase (Products):', error);
@@ -873,23 +878,37 @@ export async function createLiveProduct(tenantId: string, name: string, desc: st
   }
 }
 
-export async function updateLiveProduct(productId: string, updates: Partial<{ name: string; desc: string; category: string; price: number; available: boolean; imageUrl: string }>): Promise<boolean> {
-  if (!isSupabaseConfigured || !supabase) return false;
+export async function updateLiveProduct(productId: string, updates: Partial<Product>): Promise<Product | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
   try {
-    const dbUpdates: Record<string, unknown> = {};
+    const dbUpdates: any = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.desc !== undefined) dbUpdates.description = updates.desc || null;
     if (updates.category !== undefined) dbUpdates.category = updates.category;
     if (updates.price !== undefined) dbUpdates.price_cop = updates.price;
     if (updates.available !== undefined) dbUpdates.available = updates.available;
-    if (updates.imageUrl !== undefined) dbUpdates.image_url = updates.imageUrl || null;
+    if (updates.image !== undefined) dbUpdates.image_url = updates.image || null;
+    if (updates.isArchived !== undefined) dbUpdates.is_archived = updates.isArchived;
+    if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder;
+    if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
+    if (updates.preparationTimeMinutes !== undefined) dbUpdates.preparation_time_minutes = updates.preparationTimeMinutes;
+    if (updates.ingredients !== undefined) dbUpdates.ingredients = updates.ingredients;
+    if (updates.allergens !== undefined) dbUpdates.allergens = updates.allergens;
 
-    const { error } = await supabase.from('products').update(dbUpdates).eq('id', productId);
-    if (error) throw error;
-    return true;
+    if (Object.keys(dbUpdates).length === 0) return null;
+
+    const { data, error } = await supabase
+      .from('products')
+      .update(dbUpdates)
+      .eq('id', productId)
+      .select()
+      .single();
+
+    if (error || !data) throw error;
+    return mapDbProductToProduct(data as unknown as import('./supabaseTypes').DbProduct);
   } catch (err) {
     console.warn('⚠️ Error updating live product:', err);
-    return false;
+    return null;
   }
 }
 
@@ -897,10 +916,14 @@ export async function deleteLiveProduct(productId: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
     const { error } = await supabase.from('products').delete().eq('id', productId);
-    if (error) throw error;
+    if (error) {
+      console.warn('⚠️ Error deleting product, maybe foreign key violation. Archiving instead.');
+      const { error: archiveError } = await supabase.from('products').update({ is_archived: true, available: false }).eq('id', productId);
+      return !archiveError;
+    }
     return true;
   } catch (err) {
-    console.warn('⚠️ Error deleting live product:', err);
+    console.warn('⚠️ Error deleting product:', err);
     return false;
   }
 }
@@ -955,8 +978,13 @@ interface DBRestaurantUpdate {
   logo_emoji?: string;
   banner_url?: string;
   specialties?: string[];
-  estimated_delivery_minutes?: number;
+  estimated_delivery_minutes?: number | string;
   is_open?: boolean;
+  accepting_orders?: boolean;
+  delivery_fee?: number;
+  min_order?: number;
+  delivery_radius_km?: number;
+  delivery_modes?: string[];
 }
 
 export async function updateRemoteTenant(tenantId: string, updates: Partial<Tenant>): Promise<Tenant | null> {
@@ -974,19 +1002,54 @@ export async function updateRemoteTenant(tenantId: string, updates: Partial<Tena
     if (typeof updates.bannerUrl === 'string') dbUpdates.banner_url = updates.bannerUrl;
     if (Array.isArray(updates.specialties)) dbUpdates.specialties = updates.specialties;
     
-    if (typeof updates.estimatedDeliveryMinutes === 'number' && Number.isFinite(updates.estimatedDeliveryMinutes) && updates.estimatedDeliveryMinutes >= 0 && updates.estimatedDeliveryMinutes <= 1440) {
+    if (typeof updates.estimatedDeliveryMinutes === 'number' || typeof updates.estimatedDeliveryMinutes === 'string') {
       dbUpdates.estimated_delivery_minutes = updates.estimatedDeliveryMinutes;
     }
     
     if (typeof updates.isOpen === 'boolean') dbUpdates.is_open = updates.isOpen;
+    if (typeof updates.acceptingOrders === 'boolean') dbUpdates.accepting_orders = updates.acceptingOrders;
+    if (typeof updates.deliveryFee === 'number') dbUpdates.delivery_fee = updates.deliveryFee;
+    if (typeof updates.minOrder === 'number') dbUpdates.min_order = updates.minOrder;
+    if (typeof updates.deliveryRadiusKm === 'number') dbUpdates.delivery_radius_km = updates.deliveryRadiusKm;
+    if (Array.isArray(updates.deliveryModes)) dbUpdates.delivery_modes = updates.deliveryModes;
 
-    if (Object.keys(dbUpdates).length === 0) return null; // No updates
+    let tenantUpdated = false;
+    
+    if (Object.keys(dbUpdates).length > 0) {
+      const { error } = await supabase
+        .from('restaurants')
+        .update(dbUpdates)
+        .eq('id', tenantId);
+
+      if (error) throw error;
+      tenantUpdated = true;
+    }
+
+    if (updates.hours && Array.isArray(updates.hours)) {
+      const hoursToUpsert = updates.hours.map(h => ({
+        restaurant_id: tenantId,
+        day_of_week: h.dayOfWeek,
+        is_open: h.isOpen,
+        open_time: h.openTime || null,
+        close_time: h.closeTime || null,
+        open_time2: h.openTime2 || null,
+        close_time2: h.closeTime2 || null
+      }));
+      
+      const { error } = await supabase
+        .from('restaurant_hours')
+        .upsert(hoursToUpsert, { onConflict: 'restaurant_id,day_of_week' });
+        
+      if (error) throw error;
+      tenantUpdated = true;
+    }
+
+    if (!tenantUpdated) return null; // No updates provided
 
     const { data, error } = await supabase
       .from('restaurants')
-      .update(dbUpdates)
-      .eq('id', tenantId)
       .select()
+      .eq('id', tenantId)
       .single();
 
     if (error) throw error;

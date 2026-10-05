@@ -65,6 +65,7 @@ export interface AppContextType {
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<boolean>;
   toggleProductAvailability: (productId: string) => Promise<void> | void;
   addProduct: (product: Omit<Product, 'id' | 'tenantId'>) => Promise<void> | void;
+  updateProduct: (productId: string, updates: Partial<Product>) => Promise<void>;
   assignDriverToOrder: (orderId: string, driverId: string) => void;
   submitRestaurantApplication: (applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>, assets?: ApplicationAssetFiles) => Promise<boolean>;
   reviewRestaurantApplication: (applicationId: string, nextStatus: 'reviewing' | 'approved' | 'rejected', reviewNote?: string) => Promise<boolean>;

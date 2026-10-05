@@ -146,6 +146,18 @@ export interface Tenant {
   estimatedDeliveryMinutes?: string | number;
   ownerUserId?: string;
   acceptingOrders?: boolean;
+  hours?: RestaurantHour[];
+}
+
+export interface RestaurantHour {
+  id?: string;
+  restaurantId: string;
+  dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
+  isOpen: boolean;
+  openTime?: string; // HH:mm format
+  closeTime?: string; // HH:mm format
+  openTime2?: string; // HH:mm format (for split shifts)
+  closeTime2?: string; // HH:mm format (for split shifts)
 }
 
 export type Restaurant = Tenant;
@@ -243,6 +255,12 @@ export interface Product {
   emoji: string;
   image?: string;
   available: boolean;
+  isArchived?: boolean;
+  sortOrder?: number;
+  tags?: string[];
+  preparationTimeMinutes?: number;
+  ingredients?: string[];
+  allergens?: string[];
 }
 
 export interface CartItem {
