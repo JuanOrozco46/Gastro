@@ -4,13 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe, Building2, DollarSign, ShoppingBag, CreditCard,
   ShieldCheck, AlertCircle, FileText, Phone, Mail, MapPin,
-  CheckCircle, Zap, Key, MessageSquare
+  CheckCircle, Zap, Key, MessageSquare, BarChart3
 } from 'lucide-react';
 import type { RestaurantApplicationStatus } from '../types';
 import { formatCop, formatCopOrZero, safeFormatDate } from '../utils/formatters';
 import { ErrorBoundary } from './ErrorBoundary';
 
 const AdminSupportTickets = React.lazy(() => import('./AdminSupportTickets').then(m => ({ default: m.AdminSupportTickets })));
+const SupportMetricsPanel = React.lazy(() => import('./SupportMetricsPanel').then(m => ({ default: m.SupportMetricsPanel })));
 
 const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
   <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
@@ -26,7 +27,7 @@ const SuperAdminViewContent: React.FC = () => {
     activateApprovedRestaurant, cities, zones
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'applications' | 'settlement' | 'support'>('applications');
+  const [activeTab, setActiveTab] = useState<'applications' | 'settlement' | 'support' | 'metrics'>('applications');
   const [statusFilter, setStatusFilter] = useState<'all' | RestaurantApplicationStatus>('all');
   const [cityFilter, setCityFilter] = useState<string>('all');
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
@@ -199,6 +200,14 @@ const SuperAdminViewContent: React.FC = () => {
           >
             <MessageSquare size={16} />
             <span>Centro de Soporte</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('metrics')}
+            className={`btn ${activeTab === 'metrics' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: 800, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <BarChart3 size={16} />
+            <span>Métricas de Soporte</span>
           </button>
         </div>
       </div>
@@ -734,6 +743,15 @@ const SuperAdminViewContent: React.FC = () => {
         <div style={{ marginTop: '1.5rem' }}>
         <React.Suspense fallback={<FallbackLoader message="Cargando soporte..." />}>
           <AdminSupportTickets />
+        </React.Suspense>
+        </div>
+      )}
+
+      {/* ── TAB 4: MÉTRICAS DE SOPORTE ── */}
+      {activeTab === 'metrics' && (
+        <div style={{ marginTop: '1.5rem' }}>
+        <React.Suspense fallback={<FallbackLoader message="Cargando métricas de soporte..." />}>
+          <SupportMetricsPanel />
         </React.Suspense>
         </div>
       )}

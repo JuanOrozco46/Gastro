@@ -4,6 +4,7 @@ import { getOperationalTenant, getFulfillmentBadgeText, getValidOrderTransitions
 import { motion } from 'framer-motion';
 import { FileUploadInput } from './FileUploadInput';
 import { ProfileTab } from './RestaurantAdmin/ProfileTab';
+import { NotificationBell } from './NotificationBell';
 
 const FinancialAnalytics = lazy(() => import('./FinancialAnalytics').then(m => ({ default: m.FinancialAnalytics })));
 const SupportTab = lazy(() => import('./RestaurantAdmin/SupportTab').then(m => ({ default: m.SupportTab })));
@@ -34,6 +35,7 @@ export const RestaurantAdmin: React.FC = () => {
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
   const [activeTab, setActiveTab] = useState<'orders' | 'profile' | 'content' | 'menu' | 'analytics' | 'qr' | 'support'>('orders');
+  const [supportInitialTicketId, setSupportInitialTicketId] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState('4');
   
   // Modals state
@@ -226,17 +228,22 @@ export const RestaurantAdmin: React.FC = () => {
             </div>
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            className={`btn ${operatingTenant.isOpen ? 'btn-secondary' : 'btn-outline'}`}
-            onClick={() => toggleTenantOpenStatus(operatingTenant.id)}
-            style={{ padding: '12px 20px', fontWeight: 800, borderRadius: '14px', fontSize: '0.9rem' }}
-          >
-            <Power size={18} />
-            {operatingTenant.isOpen ? '🟢 ABIERTO Y RECIBIENDO PEDIDOS' : '🔴 CERRADO TEMPORALMENTE'}
-          </motion.button>
-
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <NotificationBell onOpenTicket={(ticketId) => {
+              setSupportInitialTicketId(ticketId);
+              setActiveTab('support');
+            }} />
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className={`btn ${operatingTenant.isOpen ? 'btn-secondary' : 'btn-outline'}`}
+              onClick={() => toggleTenantOpenStatus(operatingTenant.id)}
+              style={{ padding: '12px 20px', fontWeight: 800, borderRadius: '14px', fontSize: '0.9rem' }}
+            >
+              <Power size={18} />
+              {operatingTenant.isOpen ? '🟢 ABIERTO' : '🔴 CERRADO'}
+            </motion.button>
+          </div>
         </div>
 
         {/* Financial KPI Cards */}
@@ -989,7 +996,7 @@ export const RestaurantAdmin: React.FC = () => {
       {/* ── TAB: SOPORTE ── */}
       {activeTab === 'support' && operatingTenant && (
       <Suspense fallback={<FallbackLoader message="Cargando soporte..." />}>
-        <SupportTab restaurantId={operatingTenant.id} />
+        <SupportTab restaurantId={operatingTenant.id} initialTicketId={supportInitialTicketId} />
       </Suspense>
       )}
 

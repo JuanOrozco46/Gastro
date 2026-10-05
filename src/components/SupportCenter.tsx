@@ -11,17 +11,19 @@ import { MessageSquare, Plus, ArrowLeft, Send, CheckCircle, RefreshCcw, Info } f
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { safeFormatDate } from '../utils/formatters';
+import { SupportFeedbackForm } from './SupportFeedbackForm';
 
 interface SupportCenterProps {
   initialOrderId?: string | null;
+  initialTicketId?: string | null;
 }
 
-export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId }) => {
+export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, initialTicketId }) => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeView, setActiveView] = useState<'list' | 'create' | 'conversation'>(initialOrderId ? 'create' : 'list');
+  const [activeView, setActiveView] = useState<'list' | 'create' | 'conversation'>(initialTicketId ? 'conversation' : (initialOrderId ? 'create' : 'list'));
   const [, setSelectedTicketId] = useState<string | null>(null);
   
   // Create ticket state
@@ -78,6 +80,17 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId }) 
     }
     setLoadingConv(false);
   };
+
+  const [prevInitialTicketId, setPrevInitialTicketId] = useState(initialTicketId);
+  useEffect(() => {
+    if (initialTicketId && initialTicketId !== prevInitialTicketId) {
+      Promise.resolve().then(() => {
+        setPrevInitialTicketId(initialTicketId);
+        setActiveView('conversation');
+        loadConversation(initialTicketId);
+      });
+    }
+  }, [initialTicketId, prevInitialTicketId]);
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -382,6 +395,10 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId }) 
                 <RefreshCcw size={16} style={{ marginRight: '8px' }} />
                 Reabrir si el problema continúa
               </button>
+              
+              <div style={{ marginTop: '30px', textAlign: 'left' }}>
+                <SupportFeedbackForm ticketId={activeTicket.id} />
+              </div>
             </div>
           ) : (
             <div style={{ textAlign: 'center', marginTop: '24px' }}>

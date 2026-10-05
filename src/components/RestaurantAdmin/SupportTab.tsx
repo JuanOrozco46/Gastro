@@ -14,9 +14,10 @@ import { safeFormatDate } from '../../utils/formatters';
 
 interface Props {
   restaurantId: string;
+  initialTicketId?: string | null;
 }
 
-export const SupportTab: React.FC<Props> = ({ restaurantId }) => {
+export const SupportTab: React.FC<Props> = ({ restaurantId, initialTicketId }) => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +66,17 @@ export const SupportTab: React.FC<Props> = ({ restaurantId }) => {
     }
     setLoadingConv(false);
   };
+
+  const [prevInitialTicketId, setPrevInitialTicketId] = useState(initialTicketId);
+  useEffect(() => {
+    if (initialTicketId && initialTicketId !== prevInitialTicketId) {
+      Promise.resolve().then(() => {
+        setPrevInitialTicketId(initialTicketId);
+        setActiveView('conversation');
+        loadConversation(initialTicketId);
+      });
+    }
+  }, [initialTicketId, prevInitialTicketId]);
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();

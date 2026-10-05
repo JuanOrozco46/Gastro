@@ -5,6 +5,7 @@ import { MyOrders } from './MyOrders';
 import { StoriesBar } from './StoriesBar';
 import { FloatingCartButton } from './FloatingCartButton';
 import { LocationSelector } from './LocationSelector';
+import { NotificationBell } from './NotificationBell';
 import { motion } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, ShoppingBag, Bike,
@@ -296,6 +297,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'feed' | 'directory' | 'orders' | 'support'>('feed');
   const [supportInitialOrder, setSupportInitialOrder] = useState<string | null>(null);
+  const [supportInitialTicketId, setSupportInitialTicketId] = useState<string | null>(null);
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [videoPost, setVideoPost] = useState<Post | null>(null);
   const [selectedCommentsPostId, setSelectedCommentsPostId] = useState<string | null>(null);
@@ -529,6 +531,10 @@ export const CustomerDeliveryApp: React.FC = () => {
             <MessageCircle size={15} /> Soporte
           </button>
         </div>
+        <NotificationBell onOpenTicket={(ticketId) => {
+          setSupportInitialTicketId(ticketId);
+          setActiveTab('support');
+        }} />
       </div>
 
       {activeTab === 'feed' && (
@@ -942,7 +948,7 @@ export const CustomerDeliveryApp: React.FC = () => {
 
       {activeTab === 'support' && (
       <Suspense fallback={<FallbackLoader message="Cargando soporte..." />}>
-        <SupportCenter initialOrderId={supportInitialOrder} />
+        <SupportCenter initialOrderId={supportInitialOrder} initialTicketId={supportInitialTicketId} />
       </Suspense>
       )}
 
