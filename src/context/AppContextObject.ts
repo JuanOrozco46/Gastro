@@ -4,6 +4,12 @@ import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMeth
 export interface AppContextType {
   cities: City[];
   zones: Zone[];
+  selectedCityId: string;
+  selectedZoneId: string | null;
+  setSelectedCity: (cityId: string) => void;
+  setSelectedZone: (zoneId: string | null) => void;
+  refreshCities: () => Promise<void>;
+  refreshZones: (cityId?: string) => Promise<void>;
   tenants: Tenant[];
   currentTenant: Tenant;
   products: Product[];
@@ -53,7 +59,7 @@ export interface AppContextType {
   toggleProductAvailability: (productId: string) => Promise<void> | void;
   addProduct: (product: Omit<Product, 'id' | 'tenantId'>) => Promise<void> | void;
   assignDriverToOrder: (orderId: string, driverId: string) => void;
-  submitRestaurantApplication: (applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status' | 'cityId'>) => Promise<boolean>;
+  submitRestaurantApplication: (applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>) => Promise<boolean>;
   reviewRestaurantApplication: (applicationId: string, nextStatus: 'reviewing' | 'approved' | 'rejected', reviewNote?: string) => Promise<boolean>;
   activateApprovedRestaurant: (applicationId: string) => Promise<{ success: boolean; tenantId?: string; error?: string; message?: string }>;
   showToast: (message: string) => void;

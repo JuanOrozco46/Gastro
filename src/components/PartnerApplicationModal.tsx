@@ -10,17 +10,29 @@ interface PartnerApplicationModalProps {
 }
 
 export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = ({ isOpen, onClose }) => {
-  const { zones, submitRestaurantApplication } = useApp();
+  const { cities, zones, selectedCityId, submitRestaurantApplication } = useApp();
 
-  // Filter active zones for Armenia
-  const armeniaZones = zones.filter(z => z.cityId === 'city_armenia_quindio' && z.isActive);
+  const activeCities = cities.filter(c => c.isActive);
+
+  const [cityId, setCityId] = useState<string>(() => {
+    return selectedCityId || (activeCities.length > 0 ? activeCities[0].id : '');
+  });
+
+  const cityZones = zones.filter(z => z.cityId === cityId && z.isActive);
+
+  const [zoneId, setZoneId] = useState<string>(() => (cityZones.length > 0 ? cityZones[0].id : ''));
+
+  const handleCityChange = (newCityId: string) => {
+    setCityId(newCityId);
+    const nextCityZones = zones.filter(z => z.cityId === newCityId && z.isActive);
+    setZoneId(nextCityZones.length > 0 ? nextCityZones[0].id : '');
+  };
 
   const [ownerName, setOwnerName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
   const [restaurantName, setRestaurantName] = useState('');
   const [category, setCategory] = useState('Hamburguesas');
-  const [zoneId, setZoneId] = useState(() => (armeniaZones.length > 0 ? armeniaZones[0].id : 'zone_armenia_centro'));
   const [address, setAddress] = useState('');
   const [deliveryModes, setDeliveryModes] = useState<OrderFulfillment[]>(['pickup', 'restaurant_delivery']);
   
@@ -67,7 +79,10 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     if (!ownerPhone.trim()) newErrors.ownerPhone = 'El teléfono de contacto es obligatorio.';
     if (!restaurantName.trim()) newErrors.restaurantName = 'El nombre del restaurante es obligatorio.';
     if (!category.trim()) newErrors.category = 'Selecciona una categoría gastronómica.';
-    if (!zoneId) newErrors.zoneId = 'Selecciona una zona en Armenia.';
+    if (!cityId) newErrors.cityId = 'Selecciona una ciudad válida.';
+    if (!zoneId) newErrors.zoneId = 'Selecciona una zona válida.';
+    if (!address.trim()) newErrors.address = 'La dirección o referencia comercial es obligatoria.';
+    if (deliveryModes.length === 0) newErrors.deliveryModes = 'Selecciona al menos una modalidad de atención.';
     if (!address.trim()) newErrors.address = 'La dirección o referencia comercial es obligatoria.';
     if (deliveryModes.length === 0) newErrors.deliveryModes = 'Selecciona al menos una modalidad de atención.';
 
@@ -101,6 +116,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
         ownerPhone: ownerPhone.trim(),
         restaurantName: restaurantName.trim(),
         category: category.trim(),
+        cityId,
         zoneId,
         address: address.trim(),
         deliveryModes,
@@ -350,21 +366,24 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
               {/* Location */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label htmlFor="cityDisplay" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Ciudad (Fija)
+                  <label htmlFor="cityId" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
+                    Ciudad *
                   </label>
-                  <input
-                    id="cityDisplay"
-                    type="text"
-                    value="Armenia, Quindío"
-                    disabled
-                    style={{ width: '100%', opacity: 0.7, background: 'rgba(255,255,255,0.05)' }}
-                  />
+                  <select
+                    id="cityId"
+                    value={cityId}
+                    onChange={e => handleCityChange(e.target.value)}
+                    style={{ width: '100%' }}
+                  >
+                    {activeCities.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
                   <label htmlFor="zoneId" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Zona de Armenia *
+                    Zona Urbana *
                   </label>
                   <select
                     id="zoneId"
@@ -372,8 +391,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     onChange={e => setZoneId(e.target.value)}
                     style={{ width: '100%' }}
                   >
-                    {armeniaZones.map(z => (
-                      <option key={z.id} value={z.id}>{z.name}</option>
+                    {cityZones.map(z => (
+                      <option key={z.id} value={z.id}>Zona {z.name}</option>
                     ))}
                   </select>
                 </div>

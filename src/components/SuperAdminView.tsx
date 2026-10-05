@@ -12,7 +12,7 @@ export const SuperAdminView: React.FC = () => {
   const {
     currentUser, tenants, orders, transactions,
     restaurantApplications, reviewRestaurantApplication,
-    activateApprovedRestaurant, zones
+    activateApprovedRestaurant, cities, zones
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'applications' | 'settlement'>('applications');
@@ -261,6 +261,8 @@ export const SuperAdminView: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <AnimatePresence>
                 {filteredApps.map(app => {
+                  const cityObj = cities.find(c => c.id === app.cityId);
+                  const cityName = cityObj ? cityObj.name : 'Ciudad';
                   const zoneObj = zones.find(z => z.id === app.zoneId);
                   const zoneName = zoneObj ? zoneObj.name : app.zoneId;
 
@@ -289,7 +291,7 @@ export const SuperAdminView: React.FC = () => {
                             {getStatusBadge(app.status)}
                           </div>
                           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                            Categoría: <strong>{app.category}</strong> · Zona: <strong>{zoneName} (Armenia)</strong>
+                            Categoría: <strong>{app.category}</strong> · Ubicación: <strong>Zona {zoneName} ({cityName})</strong>
                           </span>
                         </div>
 

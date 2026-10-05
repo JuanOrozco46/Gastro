@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useApp } from '../context/useApp';
 import { PaymentModal } from './PaymentModal';
 import { RestaurantDirectory } from './RestaurantDirectory';
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { toggleRemoteSave } from '../services/supabaseDataService';
+import { LocationSelector } from './LocationSelector';
 import type { Post, Tenant } from '../types';
 
 /* ── Format numbers ──────────────────────────────────────── */
@@ -276,7 +277,8 @@ const PostCard: React.FC<PostCardProps> = ({
 /* ── Main Component ──────────────────────────────────────── */
 export const CustomerDeliveryApp: React.FC = () => {
   const {
-    cities, zones, tenants, posts, toggleLikePost, products,
+    cities, zones, selectedCityId, selectedZoneId, setSelectedZone,
+    tenants, posts, toggleLikePost, products,
     addToCart, removeFromCart, cart, setCurrentTenantBySlug, orders,
     isCatalogLoading, catalogError, showToast, currentUser, authMode,
     remotePosts
@@ -297,28 +299,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'price_low' | 'price_high'>('recent');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const activeCity = cities.find(c => c.name.includes('Armenia')) || cities[0];
-  const activeZones = useMemo(() => {
-    if (!activeCity) return [];
-    return zones.filter(z => z.cityId === activeCity.id && z.isActive);
-  }, [zones, activeCity]);
-
-  const [selectedZone, setSelectedZone] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem('gs_selected_zone_v1');
-      if (!saved || saved === 'all') return 'all';
-      const isValid = zones.some(z => z.id === saved && z.isActive && z.cityId === activeCity.id);
-      return isValid ? saved : 'all';
-    } catch {
-      return 'all';
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('gs_selected_zone_v1', selectedZone);
-    } catch {}
-  }, [selectedZone]);
+  const activeCity = cities.find(c => c.id === selectedCityId) || cities[0];
 
   const tenantMap = useMemo(() => {
     const map = new Map<string, Tenant>();
@@ -338,7 +319,7 @@ export const CustomerDeliveryApp: React.FC = () => {
       if (!tenant || tenant.status !== 'active' || !activeCity || tenant.cityId !== activeCity.id) {
         return acc;
       }
-      if (selectedZone !== 'all' && tenant.zoneId !== selectedZone) {
+      if (selectedZoneId && tenant.zoneId !== selectedZoneId) {
         return acc;
       }
       acc.push({
@@ -349,20 +330,20 @@ export const CustomerDeliveryApp: React.FC = () => {
       });
       return acc;
     }, []);
-  }, [activePosts, tenantMap, selectedZone, activeCity]);
+  }, [activePosts, tenantMap, selectedZoneId, activeCity]);
 
   const activeTenantsInZoneCount = useMemo(() => {
     return tenants.filter(t => {
       if (t.status !== 'active' || !activeCity || t.cityId !== activeCity.id) return false;
-      if (selectedZone === 'all') return true;
-      return t.zoneId === selectedZone;
+      if (!selectedZoneId) return true;
+      return t.zoneId === selectedZoneId;
     }).length;
-  }, [tenants, selectedZone, activeCity]);
+  }, [tenants, selectedZoneId, activeCity]);
 
-  const currentZoneObj = zones.find(z => z.id === selectedZone);
-  const zoneInfoText = selectedZone === 'all'
-    ? 'Descubre lo nuevo cerca de ti en Armenia.'
-    : `Descubre restaurantes y platos en ${currentZoneObj?.name || 'esta zona'}.`;
+  const currentZoneObj = zones.find(z => z.id === selectedZoneId);
+  const zoneInfoText = !selectedZoneId
+    ? `Descubre lo nuevo cerca de ti en ${activeCity ? activeCity.name : 'tu ciudad'}.`
+    : `Descubre restaurantes y platos en Zona ${currentZoneObj?.name || ''}.`;
 
   const cartTotal = cart.reduce((s, i) => s + (i.product?.price || 0) * i.quantity, 0);
   const cartQty   = cart.reduce((s, i) => s + i.quantity, 0);
@@ -456,7 +437,7 @@ export const CustomerDeliveryApp: React.FC = () => {
     if (q !== '') {
       result = result.filter(p => {
         const tenant = tenantMap.get(p.tenantId);
-        const zoneName = activeZones.find(z => z.id === tenant?.zoneId)?.name.toLowerCase() || '';
+        const zoneName = zones.find((z: { id: string; name: string }) => z.id === tenant?.zoneId)?.name.toLowerCase() || '';
         const cityName = activeCity?.name.toLowerCase() || '';
 
         const matchDish = p.dishName.toLowerCase().includes(q);
@@ -512,7 +493,7 @@ export const CustomerDeliveryApp: React.FC = () => {
     }
 
     return result;
-  }, [zoneFilteredPosts, searchQuery, filterCategory, priceFilter, onlyOpen, onlyVideo, sortBy, tenantMap, activeCity, activeZones]);
+  }, [zoneFilteredPosts, searchQuery, filterCategory, priceFilter, onlyOpen, onlyVideo, sortBy, tenantMap, activeCity, zones]);
 
   return (
     <div className="tab-content active">
@@ -521,7 +502,7 @@ export const CustomerDeliveryApp: React.FC = () => {
       <div className="gf-top-bar">
         <div className="gf-top-left">
           <h2 className="gf-page-title">¿Qué se te antoja hoy?</h2>
-          <p className="gf-page-sub">Explora sabores cerca de ti en Armenia</p>
+          <p className="gf-page-sub">Explora sabores cerca de ti en {activeCity ? activeCity.name : 'tu ciudad'}</p>
         </div>
         <div className="gf-tab-pills">
           <button className={`gf-tab-pill ${activeTab === 'feed' ? 'active' : ''}`} onClick={() => setActiveTab('feed')}>
@@ -539,109 +520,19 @@ export const CustomerDeliveryApp: React.FC = () => {
 
       {activeTab === 'feed' && (
         <>
-          {/* ── Zone Selector Bar ── */}
-          <div 
-            style={{
-              background: 'var(--glass-light)',
-              backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '20px',
-              padding: '0.85rem 1.25rem',
-              marginBottom: '1.25rem',
+          {/* ── Location Selector Bar ── */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <LocationSelector variant="full" />
+            <div style={{
               display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ 
-                  background: 'var(--primary-glow)', 
-                  color: 'var(--primary)', 
-                  padding: '6px', 
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <MapPin size={16} />
-                </div>
-                <div>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Armenia
-                  </span>
-                  <strong style={{ fontSize: '0.9rem', color: 'white', display: 'block', fontWeight: 800 }}>
-                    {activeCity ? `${activeCity.name}, Quindío` : 'Armenia, Quindío'}
-                  </strong>
-                </div>
-              </div>
-
-              {/* Zone Chips Group */}
-              <div 
-                role="toolbar" 
-                aria-label="Seleccionar zona de Armenia"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}
-              >
-                <button
-                  type="button"
-                  aria-pressed={selectedZone === 'all'}
-                  onClick={() => setSelectedZone('all')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '12px',
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    border: selectedZone === 'all' ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.1)',
-                    background: selectedZone === 'all' ? 'var(--primary-glass-border)' : 'rgba(255, 255, 255, 0.04)',
-                    color: selectedZone === 'all' ? 'white' : 'var(--text-muted)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  🇨🇴 Toda Armenia
-                </button>
-
-                {activeZones.map(zone => {
-                  const isSelected = selectedZone === zone.id;
-                  return (
-                    <button
-                      key={zone.id}
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() => setSelectedZone(zone.id)}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '12px',
-                        fontSize: '0.82rem',
-                        fontWeight: 800,
-                        border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.1)',
-                        background: isSelected ? 'var(--primary-glass-border)' : 'rgba(255, 255, 255, 0.04)',
-                        color: isSelected ? 'white' : 'var(--text-muted)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      📍 Zona {zone.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Zone Info Bar */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              fontSize: '0.78rem', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '0.78rem',
               color: 'var(--text-muted)',
-              paddingTop: '6px',
-              borderTop: '1px dashed rgba(255, 255, 255, 0.08)'
+              padding: '8px 12px 0 12px'
             }}>
               <span>{zoneInfoText}</span>
-              <span style={{ fontWeight: 700, color: 'white' }}>
+              <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>
                 {activeTenantsInZoneCount} local{activeTenantsInZoneCount !== 1 ? 'es' : ''} · {zoneFilteredPosts.length} post{zoneFilteredPosts.length !== 1 ? 's' : ''}
               </span>
             </div>
@@ -828,13 +719,13 @@ export const CustomerDeliveryApp: React.FC = () => {
                 >
                   <Building2 size={48} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
                   <h3 style={{ fontSize: '1.3rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
-                    🚀 Pronto en GastroSync Armenia
+                    🚀 Pronto en GastroSync {activeCity ? activeCity.name : ''}
                   </h3>
                   <p style={{ fontSize: '0.88rem', maxWidth: '440px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
-                    Aún no hay restaurantes aliados activos. Pronto podrás descubrir los mejores sabores de Armenia aquí.
+                    Aún no hay restaurantes aliados activos en esta zona. Pronto podrás descubrir los mejores sabores de {activeCity ? activeCity.name : 'tu ciudad'} aquí.
                   </p>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-                    ¿Tienes un restaurante o negocio gastronómico en Armenia?
+                    ¿Tienes un restaurante o negocio gastronómico en {activeCity ? activeCity.name : 'tu ciudad'}?
                   </p>
                   <button
                     type="button"
@@ -873,12 +764,12 @@ export const CustomerDeliveryApp: React.FC = () => {
                     className="btn btn-primary"
                     style={{ borderRadius: '12px', fontWeight: 800, padding: '10px 20px' }}
                     onClick={() => {
-                      setSelectedZone('all');
+                      setSelectedZone(null);
                       setFilterCategory('all');
                       setSearchQuery('');
                     }}
                   >
-                    Ver toda Armenia
+                    Ver toda {activeCity ? activeCity.name : 'la ciudad'}
                   </button>
                 </div>
               ) : (
@@ -1012,7 +903,7 @@ export const CustomerDeliveryApp: React.FC = () => {
       )}
 
       {activeTab === 'directory' && (
-        <RestaurantDirectory selectedZone={selectedZone} onSelectTenantAndGoToFeed={() => setActiveTab('feed')} />
+        <RestaurantDirectory selectedZone={selectedZoneId || 'all'} onSelectTenantAndGoToFeed={() => setActiveTab('feed')} />
       )}
 
       {activeTab === 'orders' && (

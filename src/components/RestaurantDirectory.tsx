@@ -16,7 +16,9 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
   selectedZone,
   onSelectTenantAndGoToFeed
 }) => {
-  const { tenants, products, cities, zones, addToCart, setCurrentTenantBySlug, isCatalogLoading, catalogError } = useApp();
+  const { tenants, products, cities, zones, selectedCityId, selectedZoneId, addToCart, setCurrentTenantBySlug, isCatalogLoading, catalogError } = useApp();
+
+  const activeCity = cities.find(c => c.id === selectedCityId) || cities[0];
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
@@ -37,7 +39,9 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
     return tenants
       .filter(t => {
         if (t.status !== 'active') return false;
-        if (selectedZone && selectedZone !== 'all' && t.zoneId !== selectedZone) {
+        if (activeCity && t.cityId !== activeCity.id) return false;
+        const zoneFilter = selectedZone || selectedZoneId;
+        if (zoneFilter && zoneFilter !== 'all' && t.zoneId !== zoneFilter) {
           return false;
         }
         if (selectedCategory !== 'Todas' && t.category !== selectedCategory) {
@@ -85,7 +89,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
         }
         return 0;
       });
-  }, [tenants, products, selectedCategory, onlyOpen, priceRange, searchQuery, sortBy, selectedZone, cities, zones]);
+  }, [tenants, products, selectedCategory, onlyOpen, priceRange, searchQuery, sortBy, selectedZone, selectedZoneId, activeCity, cities, zones]);
 
   // Tenant featured hero
   const featuredTenant = useMemo(() => {
@@ -121,7 +125,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
             <ShieldCheck size={16} /> PEDIDOS DIRECTOS · COMISIÓN JUSTA DEL 3%
           </div>
           <h2 className="directory-hero-title" style={{ fontFamily: "var(--font-heading)", fontWeight: 900 }}>
-            Restaurantes en Armenia
+            Restaurantes en {activeCity ? activeCity.name : 'tu ciudad'}
           </h2>
           <p className="directory-hero-subtitle">
             Explora las cocinas independientes de tu ciudad. Tu compra apoya directamente al comercio local.

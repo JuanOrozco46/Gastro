@@ -30,6 +30,7 @@ export interface UserAccount {
 export interface City {
   id: string;
   name: string;
+  slug?: string;
   countryCode: string;
   currencyCode: string;
   isActive: boolean;
@@ -39,6 +40,7 @@ export interface Zone {
   id: string;
   cityId: string;
   name: string;
+  slug?: string;
   isActive: boolean;
 }
 

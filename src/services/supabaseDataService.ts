@@ -17,10 +17,11 @@ import {
 export async function fetchLiveCities(): Promise<City[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
-    const { data, error } = await supabase.from('cities').select('*').eq('is_active', true);
+    const { data, error } = await supabase.from('cities').select('*').eq('is_active', true).order('name');
     if (error || !data) return [];
     return data.map(d => ({
       id: d.id,
+      slug: d.slug,
       name: d.name,
       countryCode: d.country_code,
       currencyCode: d.currency_code,
@@ -29,18 +30,50 @@ export async function fetchLiveCities(): Promise<City[]> {
   } catch { return []; }
 }
 
-export async function fetchLiveZones(): Promise<Zone[]> {
+export async function fetchLiveZones(cityId?: string): Promise<Zone[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
-    const { data, error } = await supabase.from('zones').select('*').eq('is_active', true);
+    let query = supabase.from('zones').select('*').eq('is_active', true);
+    if (cityId) {
+      query = query.eq('city_id', cityId);
+    }
+    const { data, error } = await query.order('name');
     if (error || !data) return [];
     return data.map(d => ({
       id: d.id,
       cityId: d.city_id,
       name: d.name,
+      slug: d.slug,
       isActive: d.is_active
     }));
   } catch { return []; }
+}
+
+export async function updateRemoteRestaurantLocation(
+  restaurantId: string,
+  cityId: string,
+  zoneId?: string | null
+): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !restaurantId || !cityId) return false;
+  try {
+    const { error } = await supabase
+      .from('restaurants')
+      .update({
+        city_id: cityId,
+        zone_id: zoneId || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', restaurantId);
+
+    if (error) {
+      console.error('⚠️ Error actualizando ubicación del restaurante en Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('⚠️ Excepción actualizando ubicación del restaurante:', err);
+    return false;
+  }
 }
 
 export async function fetchLiveTenants(): Promise<Tenant[]> {

@@ -124,8 +124,17 @@ const validateCachedSession = (): UserAccount | null => {
 
 const DEFAULT_CITIES: City[] = [
   {
-    id: 'city_armenia_quindio',
+    id: '00000000-0000-0000-0000-000000000001',
     name: 'Armenia',
+    slug: 'armenia-quindio',
+    countryCode: 'CO',
+    currencyCode: 'COP',
+    isActive: true
+  },
+  {
+    id: '00000000-0000-0000-0000-000000000002',
+    name: 'Pereira',
+    slug: 'pereira-risaralda',
     countryCode: 'CO',
     currencyCode: 'COP',
     isActive: true
@@ -133,9 +142,12 @@ const DEFAULT_CITIES: City[] = [
 ];
 
 const DEFAULT_ZONES: Zone[] = [
-  { id: 'zone_armenia_centro', cityId: 'city_armenia_quindio', name: 'Centro', isActive: true },
-  { id: 'zone_armenia_norte', cityId: 'city_armenia_quindio', name: 'Norte', isActive: true },
-  { id: 'zone_armenia_sur', cityId: 'city_armenia_quindio', name: 'Sur', isActive: true }
+  { id: '00000000-0000-0000-0000-000000000011', cityId: '00000000-0000-0000-0000-000000000001', name: 'Centro', slug: 'armenia-centro', isActive: true },
+  { id: '00000000-0000-0000-0000-000000000012', cityId: '00000000-0000-0000-0000-000000000001', name: 'Norte', slug: 'armenia-norte', isActive: true },
+  { id: '00000000-0000-0000-0000-000000000013', cityId: '00000000-0000-0000-0000-000000000001', name: 'Sur', slug: 'armenia-sur', isActive: true },
+  { id: '00000000-0000-0000-0000-000000000021', cityId: '00000000-0000-0000-0000-000000000002', name: 'Circunvalar', slug: 'pereira-circunvalar', isActive: true },
+  { id: '00000000-0000-0000-0000-000000000022', cityId: '00000000-0000-0000-0000-000000000002', name: 'Cerritos', slug: 'pereira-cerritos', isActive: true },
+  { id: '00000000-0000-0000-0000-000000000023', cityId: '00000000-0000-0000-0000-000000000002', name: 'Centro', slug: 'pereira-centro', isActive: true }
 ];
 
 const EMPTY_TENANT: Tenant = {
@@ -146,7 +158,7 @@ const EMPTY_TENANT: Tenant = {
   logoEmoji: '🏪',
   bannerUrl: '',
   description: 'No hay restaurantes registrados aún.',
-  address: 'Armenia, Quindío',
+  address: 'Dirección del restaurante',
   deliveryTime: '0 min',
   priceRange: '$',
   minOrder: 0,
@@ -158,8 +170,8 @@ const EMPTY_TENANT: Tenant = {
   commissionRate: 0,
   tablesCount: 0,
   isOpen: false,
-  cityId: 'city_armenia_quindio',
-  zoneId: 'zone_armenia_centro',
+  cityId: '00000000-0000-0000-0000-000000000001',
+  zoneId: '00000000-0000-0000-0000-000000000011',
   status: 'draft',
   deliveryModes: []
 };
@@ -177,7 +189,83 @@ const DEFAULT_DRIVERS: Driver[] = [];
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cities, setCities] = useState<City[]>(DEFAULT_CITIES);
   const [zones, setZones] = useState<Zone[]>(DEFAULT_ZONES);
-  
+
+  const [selectedCityId, setSelectedCityIdState] = useState<string>(() => {
+    try {
+      const savedCity = localStorage.getItem('gs_selected_city_v1');
+      if (savedCity && savedCity.trim()) {
+        return savedCity;
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_CITIES[0].id;
+  });
+
+  const [selectedZoneId, setSelectedZoneIdState] = useState<string | null>(() => {
+    try {
+      const savedZone = localStorage.getItem('gs_selected_zone_v1');
+      if (savedZone && savedZone !== 'null' && savedZone.trim()) {
+        return savedZone;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+
+  const setSelectedCity = (cityId: string) => {
+    setSelectedCityIdState(cityId);
+    try {
+      localStorage.setItem('gs_selected_city_v1', cityId);
+    } catch { /* ignore */ }
+
+    setSelectedZoneIdState(prevZoneId => {
+      if (!prevZoneId) return null;
+      const zoneBelongs = zones.some(z => z.id === prevZoneId && z.cityId === cityId && z.isActive);
+      if (!zoneBelongs) {
+        try { localStorage.removeItem('gs_selected_zone_v1'); } catch { /* ignore */ }
+        return null;
+      }
+      return prevZoneId;
+    });
+  };
+
+  const setSelectedZone = (zoneId: string | null) => {
+    setSelectedZoneIdState(zoneId);
+    try {
+      if (zoneId) {
+        localStorage.setItem('gs_selected_zone_v1', zoneId);
+      } else {
+        localStorage.removeItem('gs_selected_zone_v1');
+      }
+    } catch { /* ignore */ }
+  };
+
+  const refreshCities = async () => {
+    const liveCities = await fetchLiveCities();
+    if (liveCities.length > 0) {
+      setCities(liveCities);
+      setSelectedCityIdState(prev => {
+        const exists = liveCities.some(c => c.id === prev && c.isActive);
+        if (exists) return prev;
+        const fallback = liveCities[0].id;
+        try { localStorage.setItem('gs_selected_city_v1', fallback); } catch {}
+        return fallback;
+      });
+    }
+  };
+
+  const refreshZones = async (cityId?: string) => {
+    const liveZones = await fetchLiveZones(cityId);
+    if (liveZones.length > 0) {
+      setZones(prev => {
+        const otherZones = prev.filter(z => cityId ? z.cityId !== cityId : false);
+        return [...otherZones, ...liveZones];
+      });
+    }
+  };
+
   const [cartConflict, setCartConflict] = useState<{ pendingProduct: Product | null, activeTenantName: string } | null>(null);
 
   const authMode: 'remote' | 'demo' = isSupabaseConfigured ? 'remote' : 'demo';
@@ -313,8 +401,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setRemotePosts(livePosts);
           setRestaurantApplications(liveApps);
 
+          const activeCities = liveCities.length > 0 ? liveCities : DEFAULT_CITIES;
+          const activeZones = liveZones.length > 0 ? liveZones : DEFAULT_ZONES;
+
           if (liveCities.length > 0) setCities(liveCities);
           if (liveZones.length > 0) setZones(liveZones);
+
+          // Validate selected city ID exists
+          setSelectedCityIdState(prev => {
+            const exists = activeCities.some(c => c.id === prev && c.isActive);
+            if (exists) return prev;
+            const fallback = activeCities[0]?.id || DEFAULT_CITIES[0].id;
+            try { localStorage.setItem('gs_selected_city_v1', fallback); } catch { /* ignore */ }
+            return fallback;
+          });
+
+          // Validate selected zone ID exists and belongs to city
+          setSelectedZoneIdState(prev => {
+            if (!prev) return null;
+            const exists = activeZones.some(z => z.id === prev && z.isActive);
+            if (exists) return prev;
+            try { localStorage.removeItem('gs_selected_zone_v1'); } catch { /* ignore */ }
+            return null;
+          });
 
           setCurrentTenant(prev => {
             if (prev.id === EMPTY_TENANT.id && liveTenants.length > 0) {
@@ -1302,7 +1411,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const submitRestaurantApplication = async (
-    applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status' | 'cityId'>
+    applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>
   ): Promise<boolean> => {
     if (
       !applicationData.ownerName?.trim() ||
@@ -1310,12 +1419,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       !applicationData.ownerPhone?.trim() ||
       !applicationData.restaurantName?.trim() ||
       !applicationData.category?.trim() ||
+      !applicationData.cityId?.trim() ||
       !applicationData.zoneId?.trim() ||
       !applicationData.address?.trim() ||
       !applicationData.deliveryModes ||
       applicationData.deliveryModes.length === 0
     ) {
-      showToast('⚠️ Por favor completa todos los campos requeridos y selecciona al menos una modalidad.');
+      showToast('⚠️ Por favor completa todos los campos requeridos y selecciona ciudad y zona válidas.');
       return false;
     }
 
@@ -1326,11 +1436,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
+    const foundCity = cities.find(c => c.id === applicationData.cityId && c.isActive);
+    if (!foundCity) {
+      showToast('⚠️ La ciudad seleccionada no es válida o no está activa.');
+      return false;
+    }
+
     const foundZone = zones.find(
-      z => z.id === applicationData.zoneId && z.isActive && z.cityId === 'city_armenia_quindio'
+      z => z.id === applicationData.zoneId && z.isActive && z.cityId === applicationData.cityId
     );
     if (!foundZone) {
-      showToast('⚠️ La zona seleccionada no es válida o no está activa para Armenia.');
+      showToast('⚠️ La zona seleccionada no es válida o no pertenece a la ciudad elegida.');
       return false;
     }
 
@@ -1369,14 +1485,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       restaurantName: applicationData.restaurantName.trim(),
       category: applicationData.category.trim(),
       address: applicationData.address.trim(),
+      cityId: applicationData.cityId,
+      zoneId: applicationData.zoneId,
       whatsapp: applicationData.whatsapp?.trim(),
       notes: applicationData.notes?.trim(),
       deliveryFee: finalDeliveryFee,
       deliveryRadiusKm: finalDeliveryRadiusKm,
       id: `app_${Date.now()}`,
       submittedAt: Date.now(),
-      status: 'submitted',
-      cityId: 'city_armenia_quindio'
+      status: 'submitted'
     };
 
     if (isSupabaseConfigured) {
@@ -1528,6 +1645,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{
       cities,
       zones,
+      selectedCityId,
+      selectedZoneId,
+      setSelectedCity,
+      setSelectedZone,
+      refreshCities,
+      refreshZones,
       tenants: activeTenants,
       currentTenant,
       products: activeProducts,
