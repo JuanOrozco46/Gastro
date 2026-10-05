@@ -1,65 +1,73 @@
-# Arquitectura Multi-Ciudad y Multi-Zona de GastroSync
+# Arquitectura Multi-Ciudad y Ubicación Inteligente de GastroSync
 
-## 1. Auditoría de Dependencias de Armenia (Diagnóstico Inicial)
+## 1. Auditoría y Diagnóstico de Arquitectura Geográfica
 
-### 1.1. Estado previo y acoplamiento detectado
-- **Cadenas Hardcodeadas**: Se identificaron más de 30 referencias rígidas a `"Armenia"`, `"Armenia, Quindío"`, `"Toda Armenia"`, `city_armenia_quindio`, `zone_armenia_centro`, `zone_armenia_norte`, `zone_armenia_sur` distribuidas en los componentes del cliente, formularios de solicitud, vistas administrativas y servicio de datos.
-- **Identificadores Inconsistentes**:
-  - En modo demo se utilizaba la cadena `'city_armenia_quindio'`.
-  - En la base de datos PostgreSQL de Supabase (`001_initial_schema.sql`) la ciudad de Armenia fue registrada con el UUID `'00000000-0000-0000-0000-000000000001'`.
-- **Filtros Estáticos en Componentes**: `CustomerDeliveryApp`, `PartnerApplicationModal` y `RestaurantDirectory` asumían por defecto la existencia única de Armenia y filtraban manualmente por claves de zona hardcodeadas.
+### 1.1. Estado previo y desacoplamiento de Armenia
+- **Fase 1 (Completada)**: Se eliminaron más de 30 referencias hardcodeadas a `"Armenia"` y `"city_armenia_quindio"` en componentes y servicios. El esquema de base de datos se migró con la versión `020_multi_city_architecture.sql`, soportando múltiples ciudades (Armenia, Pereira y futuras expansiones).
+- **Fase 2 (Ubicación Inteligente)**: Se incorporó soporte opcional de GPS con resolución geográfica sin dependencias externas de pago ni mapas obligatorios.
 
 ---
 
-## 2. Compatibilidad Existente
+## 2. Modelo de Ubicación Inteligente (Fase 2)
 
-- **Esquema de Base de Datos**: Las tablas `cities`, `zones`, `restaurants` y `restaurant_applications` ya contenían las relaciones de clave foránea `city_id` y `zone_id`.
-- **Tipos de Dominio**: Las interfaces `City` y `Zone` en `src/types/index.ts` y sus equivalentes `DbCity` y `DbZone` en `src/services/supabaseTypes.ts` estaban declaradas, requiriendo únicamente el atributo `slug` para estandarización de URLs y filtros.
+### 2.1. Tipado del Estado de Ubicación (`src/types/index.ts`)
+```ts
+export type LocationPermissionState =
+  | 'unknown'
+  | 'prompt'
+  | 'granted'
+  | 'denied'
+  | 'unavailable';
 
----
+export type UserLocationState = {
+  permission: LocationPermissionState;
+  latitude?: number;
+  longitude?: number;
+  cityId?: string;
+  zoneId?: string;
+  isResolving: boolean;
+  error?: string;
+};
+```
 
-## 3. Plan de Refactorización
-
-### 3.1. Modelo de Datos y Migración (`020_multi_city_architecture.sql`)
-- Creación idempotente e índices óptimos para `city_id`, `zone_id`, `is_active` y `status` en `restaurants`, `zones` y `cities`.
-- Conservación e inserción idempotente de la ciudad piloto **Armenia** (`00000000-0000-0000-0000-000000000001`) con sus 3 zonas iniciales (`Centro`, `Norte`, `Sur`).
-- Inserción de una segunda ciudad activa de prueba (**Pereira**, `00000000-0000-0000-0000-000000000002`) con zonas (`Circunvalar`, `Cerritos`, `Centro`) para probar el aislamiento multi-ciudad sin requerir datos reales.
-
-### 3.2. Servicios Remotos Tipados (`supabaseDataService.ts`)
-- `fetchLiveCities()`: Carga de ciudades activas desde Supabase sin `any`.
-- `fetchLiveZones(cityId: string)`: Carga de zonas activas filtradas por `city_id`.
-- `fetchLiveRestaurants(cityId: string, zoneId?: string | null)`: Carga de comercios filtrados por ciudad y zona.
-- `fetchLivePosts(cityId: string, zoneId?: string | null)`: Filtrado dinámico de publicaciones del feed según la ubicación seleccionada.
-- `updateRemoteRestaurantLocation(restaurantId, cityId, zoneId)`: Actualización remota segura de la ubicación de un comercio.
-
-### 3.3. Estado Global y Persistencia (`AppContext`)
-- Gestión centralizada de `selectedCityId` y `selectedZoneId`.
-- Persistencia en `localStorage` con las claves versionadas `gs_selected_city_v1` y `gs_selected_zone_v1`.
-- Validación defensiva al cargar desde `localStorage`: si la ciudad guardada no existe o está inactiva, se establece automáticamente la primera ciudad activa de la lista (Armenia por defecto de ordenamiento, sin string hardcodeado). Si la zona no pertenece a la ciudad, se resetea a `null` ("Todas las zonas").
-
-### 3.4. Componente Reutilizable `LocationSelector.tsx`
-- Selector accesible y responsivo para móvil y desktop.
-- Desplegable de ciudades activas y filtro secundario de zonas ("Todas las zonas").
+### 2.2. Módulo de Resolución Geográfica (`src/services/locationResolver.ts`)
+- **Abstracción `LocationResolver`**: Módulo desacoplado que utiliza la fórmula de Haversine para mapear coordenadas GPS a las ciudades piloto activas (Armenia y Pereira) y sus zonas urbanas.
+- **Aislamiento**: Si la coordenada detectada no coincide con ninguna ciudad cubierta (distancia > radio de cobertura de 18-20 km), devuelve `status: 'out_of_coverage'` permitiendo al usuario seleccionar manualmente sin romper la experiencia ni inventar ubicaciones ficticias.
+- **Preparado para Geocodificación Externa**: En fases futuras, este módulo puede conectarse con OpenStreetMap (Nominatim) o Google Maps Geocoding API reemplazando únicamente la función interna de `locationResolver.ts` sin alterar `AppContext`.
 
 ---
 
-## 4. Riesgos de Compatibilidad y Mitigación
+## 3. Persistencia y Privacidad
 
-1. **Desalineación de IDs entre Demo y Remoto**:
-   - *Solución*: Se homologan los IDs de Armenia (`00000000-0000-0000-0000-000000000001`) y sus zonas en los datos demo de `AppContext.tsx` para coincidir exactamente con los UUIDs reales de Supabase.
-2. **Posts sin `city_id` directo en la tabla `posts`**:
-   - *Solución*: En el servicio remoto se consultan los restaurantes de la ciudad/zona seleccionada y se filtran los posts pertenecientes a esos `restaurant_id`.
-3. **Persistencia de `localStorage` corrupta**:
-   - *Solución*: Implementación de validación estricta al deserializar en `AppContext.tsx`. Si el valor guardado no es un UUID válido activo, realiza fallback dinámico a la primera ciudad activa devuelta por la API/Demo.
+### 3.1. Claves Versionadas en `localStorage`
+- `gs_selected_city_v1`: ID de la ciudad seleccionada.
+- `gs_selected_zone_v1`: ID de la zona seleccionada (o `null` para todas las zonas).
+- `gs_location_preference_v1`: Preferencia del usuario (`'gps'` | `'manual'`).
+
+### 3.2. Políticas de Privacidad y UX
+- **No almacenamiento de coordenadas exactas**: No se guardan latitud/longitud en `localStorage`.
+- **Aviso Informativo Previo**: Antes de solicitar el permiso GPS por primera vez en `LocationSelector.tsx`, se muestra un banner explicativo: *"Usaremos tu ubicación aproximada para mostrarte restaurantes cercanos. Puedes elegir tu ciudad manualmente."*
+- **Acceso Directo a Selección Manual**: Si el permiso es denegado o falla la lectura GPS, la aplicación muestra una alerta amigable y ofrece el botón *"Elegir manualmente"*, conservando la operabilidad completa del feed, directorio y pedidos.
 
 ---
 
-## 5. Hoja de Ruta para GPS, Mapas y Cálculo de Distancias (Pendientes Futuros)
+## 4. Componente Reutilizable `LocationSelector.tsx`
 
-> [!NOTE]
-> En la Fase 1 NO se implementó geolocalización por GPS ni mapas interactivos. La selección es 100% explícita por selector de ciudad/zona.
+El componente `LocationSelector.tsx` soporta:
+- Selección de ciudad y zona mediante dropdowns accesibles.
+- Botón *"Usar mi ubicación"* con ícono dinámico y animación de carga.
+- Estados de retroalimentación accesibles (`aria-live="polite"`):
+  - *"Detectando ubicación GPS..."*
+  - *"Permiso de ubicación bloqueado."*
+  - *"Tu ubicación actual está fuera de las ciudades con cobertura activa."*
+- Cambio instantáneo entre modo GPS y modo manual.
 
-Para fases posteriores:
-- **GPS / Geocoding**: Integración de la API de Geolocation del navegador para autoseleccionar la ciudad más cercana mediante bounding box o cálculo de Haversine.
-- **Cálculo de Distancia Real**: Reemplazar la propiedad `distanceKm` simulada por distancia matemática entre coordenadas GPS de la dirección del usuario y la cocina del restaurante.
-- **Cálculo de Domicilio Dinámico**: Matriz de tarifas de domicilio por zona o por kilómetro.
+---
+
+## 5. Hoja de Ruta para Fases Futuras
+
+- **Fase 3: Geocodificación Externa y Mapas**:
+  - Integración opcional de proveedor de geocodificación inversa (ej. OpenStreetMap Nominatim o Google Geocoding API).
+  - Componente de Mapa interactivo para selección de punto de entrega en el Checkout.
+- **Fase 4: Tarifas y Tiempos de Domicilio Dinámicos**:
+  - Matriz de precios de envío basada en la distancia en kilómetros entre la cocina del comercio y la dirección del cliente.

@@ -101,11 +101,16 @@ export interface DbRestaurantApplication {
   city_id: string;
   zone_id: string;
   address: string;
+  description?: string | null;
   whatsapp: string | null;
   min_order: number | null;
   delivery_fee: number | null;
   delivery_radius_km: number | null;
   delivery_modes: string[];
+  estimated_delivery_minutes?: number | null;
+  schedule_hours?: string | null;
+  logo_url?: string | null;
+  banner_url?: string | null;
   notes: string | null;
   status: 'submitted' | 'reviewing' | 'approved' | 'rejected';
   review_note: string | null;

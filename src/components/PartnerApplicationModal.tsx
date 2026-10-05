@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/useApp';
 import { motion } from 'framer-motion';
-import { X, Building2, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck } from 'lucide-react';
+import { X, Building2, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck, Upload, Image, Clock, FileText, AlertCircle } from 'lucide-react';
 import type { OrderFulfillment } from '../types';
+import { checkDuplicatePendingApplication, uploadApplicationAsset } from '../services/supabaseDataService';
 
 interface PartnerApplicationModalProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
   const [cityId, setCityId] = useState<string>(() => {
     return selectedCityId || (activeCities.length > 0 ? activeCities[0].id : '');
   });
+
+  const selectedCityName = activeCities.find(c => c.id === cityId)?.name || 'Tu ciudad';
 
   const cityZones = zones.filter(z => z.cityId === cityId && z.isActive);
 
@@ -34,17 +37,28 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
   const [restaurantName, setRestaurantName] = useState('');
   const [category, setCategory] = useState('Hamburguesas');
   const [address, setAddress] = useState('');
+  const [description, setDescription] = useState('');
+  const [scheduleHours, setScheduleHours] = useState('');
+  const [estimatedDeliveryMinutes, setEstimatedDeliveryMinutes] = useState('');
   const [deliveryModes, setDeliveryModes] = useState<OrderFulfillment[]>(['pickup', 'restaurant_delivery']);
   
+  // Asset Uploads
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [bannerPreviewUrl, setBannerPreviewUrl] = useState<string | null>(null);
+
   // Optional fields
   const [whatsapp, setWhatsapp] = useState('');
   const [minOrder, setMinOrder] = useState('');
   const [deliveryFee, setDeliveryFee] = useState('');
   const [deliveryRadiusKm, setDeliveryRadiusKm] = useState('');
   const [notes, setNotes] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // UI state
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -71,6 +85,37 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     });
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'banner') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setErrors(prev => ({ ...prev, [type]: 'Solo se permiten imágenes en formato JPG, PNG o WEBP.' }));
+      return;
+    }
+
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setErrors(prev => ({ ...prev, [type]: 'La imagen no debe superar los 5MB de tamaño.' }));
+      return;
+    }
+
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next[type];
+      return next;
+    });
+
+    if (type === 'logo') {
+      setLogoFile(file);
+      setLogoPreviewUrl(URL.createObjectURL(file));
+    } else {
+      setBannerFile(file);
+      setBannerPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -83,11 +128,14 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     if (!zoneId) newErrors.zoneId = 'Selecciona una zona válida.';
     if (!address.trim()) newErrors.address = 'La dirección o referencia comercial es obligatoria.';
     if (deliveryModes.length === 0) newErrors.deliveryModes = 'Selecciona al menos una modalidad de atención.';
-    if (!address.trim()) newErrors.address = 'La dirección o referencia comercial es obligatoria.';
-    if (deliveryModes.length === 0) newErrors.deliveryModes = 'Selecciona al menos una modalidad de atención.';
+    if (!termsAccepted) newErrors.terms = 'Debes aceptar los Términos del Servicio para continuar.';
 
     if (minOrder !== '' && (isNaN(Number(minOrder)) || Number(minOrder) < 0)) {
       newErrors.minOrder = 'El valor debe ser un número positivo.';
+    }
+
+    if (estimatedDeliveryMinutes !== '' && (isNaN(Number(estimatedDeliveryMinutes)) || Number(estimatedDeliveryMinutes) <= 0)) {
+      newErrors.estimatedDeliveryMinutes = 'El tiempo estimado debe ser en minutos (ej: 30).';
     }
 
     if (deliveryModes.includes('restaurant_delivery')) {
@@ -103,13 +151,37 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     return Object.keys(newErrors).length === 0;
   };
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
     if (!validate()) return;
 
     setIsSubmitting(true);
     try {
+      // Check duplicate
+      const dupCheck = await checkDuplicatePendingApplication(ownerEmail, restaurantName);
+      if (dupCheck.isDuplicate) {
+        setSubmitError(dupCheck.reason || 'Ya existe una solicitud pendiente con este correo o nombre.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Upload assets if provided
+      let uploadedLogoUrl: string | undefined;
+      let uploadedBannerUrl: string | undefined;
+
+      const tempFolderId = `app_${Date.now()}`;
+
+      if (logoFile) {
+        const logoUrl = await uploadApplicationAsset(logoFile, tempFolderId);
+        if (logoUrl) uploadedLogoUrl = logoUrl;
+      }
+
+      if (bannerFile) {
+        const bannerUrl = await uploadApplicationAsset(bannerFile, tempFolderId);
+        if (bannerUrl) uploadedBannerUrl = bannerUrl;
+      }
+
       const ok = await submitRestaurantApplication({
         ownerName: ownerName.trim(),
         ownerEmail: ownerEmail.trim(),
@@ -119,17 +191,25 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
         cityId,
         zoneId,
         address: address.trim(),
+        description: description.trim() || undefined,
+        scheduleHours: scheduleHours.trim() || undefined,
+        estimatedDeliveryMinutes: estimatedDeliveryMinutes ? Number(estimatedDeliveryMinutes) : undefined,
         deliveryModes,
         whatsapp: whatsapp.trim() || undefined,
         minOrder: minOrder !== '' ? Number(minOrder) : undefined,
         deliveryFee: deliveryModes.includes('restaurant_delivery') && deliveryFee !== '' ? Number(deliveryFee) : undefined,
         deliveryRadiusKm: deliveryModes.includes('restaurant_delivery') && deliveryRadiusKm !== '' ? Number(deliveryRadiusKm) : undefined,
+        logoUrl: uploadedLogoUrl,
+        bannerUrl: uploadedBannerUrl,
         notes: notes.trim() || undefined
       });
 
       if (ok) {
         setSubmittedSuccess(true);
       }
+    } catch (err: unknown) {
+      console.error('Error submitting application:', err);
+      setSubmitError('Ocurrió un error inesperado al enviar la solicitud. Por favor intenta de nuevo.');
     } finally {
       setIsSubmitting(false);
     }
@@ -142,13 +222,22 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     setRestaurantName('');
     setCategory('Hamburguesas');
     setAddress('');
+    setDescription('');
+    setScheduleHours('');
+    setEstimatedDeliveryMinutes('');
     setDeliveryModes(['pickup', 'restaurant_delivery']);
+    setLogoFile(null);
+    setBannerFile(null);
+    setLogoPreviewUrl(null);
+    setBannerPreviewUrl(null);
     setWhatsapp('');
     setMinOrder('');
     setDeliveryFee('');
     setDeliveryRadiusKm('');
     setNotes('');
+    setTermsAccepted(false);
     setErrors({});
+    setSubmitError(null);
     setSubmittedSuccess(false);
     onClose();
   };
@@ -181,7 +270,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
         className="card"
         style={{
           width: '100%',
-          maxWidth: '620px',
+          maxWidth: '680px',
           maxHeight: '90vh',
           overflowY: 'auto',
           background: 'var(--glass-dark)',
@@ -225,11 +314,11 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
             </h3>
 
             <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-              Tu solicitud para vincular el restaurante <strong>{restaurantName}</strong> a la red local de GastroSync en Armenia, Quindío ha sido recibida correctamente (Estado: <span style={{ color: '#F59E0B', fontWeight: 800 }}>Pendiente de Revisión</span>).
+              Tu solicitud para vincular el restaurante <strong>{restaurantName}</strong> a la red local de GastroSync en <strong>{selectedCityName}</strong> ha sido recibida correctamente (Estado: <span style={{ color: '#F59E0B', fontWeight: 800 }}>Pendiente de Revisión</span>).
             </p>
 
             <div style={{ background: 'rgba(255,255,255,0.04)', padding: '1rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.75rem', lineHeight: 1.5 }}>
-              ℹ️ <strong>Estado de Solicitud:</strong> Tu solicitud fue recibida y quedará pendiente de revisión antes de activar el restaurante.
+              ℹ️ <strong>Siguientes pasos:</strong> El equipo administrativo revisará tu propuesta comercial. Una vez aprobada, recibirás las credenciales de acceso para gestionar tu menú, zonas de despacho y pedidos en tiempo real.
             </div>
 
             <button
@@ -237,7 +326,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
               className="btn btn-primary"
               style={{ padding: '12px 28px', fontSize: '0.95rem', fontWeight: 800, borderRadius: '14px', width: '100%' }}
             >
-              Volver al Inicio de Sesión
+              Entendido / Cerrar
             </button>
           </div>
         ) : (
@@ -251,7 +340,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   Únete como Restaurante Aliado
                 </h3>
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                  Solicitud de vinculación comercial · GastroSync Armenia, Quindío
+                  Solicitud de vinculación comercial · GastroSync Multi-Ciudad
                 </span>
               </div>
             </div>
@@ -260,9 +349,16 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
             <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '14px', padding: '10px 14px', fontSize: '0.8rem', color: '#FCD34D', marginBottom: '1.25rem', lineHeight: 1.45, display: 'flex', gap: '10px' }}>
               <ShieldCheck size={18} style={{ flexShrink: 0, marginTop: '2px', color: '#F59E0B' }} />
               <div>
-                <strong>Aviso de Revisión Previa:</strong> El envío de este formulario registra tu solicitud en estado pendiente. La información ingresada quedará sujeta a revisión antes de activar el restaurante.
+                <strong>Aviso de Revisión Previa:</strong> Registro formal sin contraseña inicial. Tu solicitud será evaluada por el equipo administrativo antes de activar tu perfil de restaurante.
               </div>
             </div>
+
+            {submitError && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '14px', padding: '10px 14px', fontSize: '0.82rem', color: '#FCA5A5', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <AlertCircle size={18} style={{ flexShrink: 0, color: '#EF4444' }} />
+                <span>{submitError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
@@ -332,7 +428,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   <input
                     id="restaurantName"
                     type="text"
-                    placeholder="Ej: La Trattoria Armenia"
+                    placeholder="Ej: La Trattoria"
                     value={restaurantName}
                     onChange={e => setRestaurantName(e.target.value)}
                     style={{ width: '100%', borderColor: errors.restaurantName ? '#EF4444' : undefined }}
@@ -363,11 +459,29 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                 </div>
               </div>
 
+              {/* Description */}
+              <div>
+                <label htmlFor="description" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
+                  Propuesta Gastronómica / Descripción Corta
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <FileText size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} />
+                  <textarea
+                    id="description"
+                    rows={2}
+                    placeholder="Ej: Hamburguesas artesanales de carne 100% madurada, pan brioche horneado a diario..."
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    style={{ width: '100%', paddingLeft: '38px', resize: 'vertical' }}
+                  />
+                </div>
+              </div>
+
               {/* Location */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label htmlFor="cityId" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Ciudad *
+                    Ciudad de Operación *
                   </label>
                   <select
                     id="cityId"
@@ -414,6 +528,84 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   />
                 </div>
                 {errors.address && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.address}</span>}
+              </div>
+
+              {/* Operations & Schedule */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label htmlFor="scheduleHours" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
+                    Horario de Atención (Opcional)
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <Clock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input
+                      id="scheduleHours"
+                      type="text"
+                      placeholder="Ej: Lun-Dom: 11:00 am - 10:00 pm"
+                      value={scheduleHours}
+                      onChange={e => setScheduleHours(e.target.value)}
+                      style={{ width: '100%', paddingLeft: '38px' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="estimatedDeliveryMinutes" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
+                    Tiempo de Prep. (Minutos, Opcional)
+                  </label>
+                  <input
+                    id="estimatedDeliveryMinutes"
+                    type="number"
+                    placeholder="Ej: 30"
+                    value={estimatedDeliveryMinutes}
+                    onChange={e => setEstimatedDeliveryMinutes(e.target.value)}
+                    style={{ width: '100%', borderColor: errors.estimatedDeliveryMinutes ? '#EF4444' : undefined }}
+                  />
+                  {errors.estimatedDeliveryMinutes && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.estimatedDeliveryMinutes}</span>}
+                </div>
+              </div>
+
+              {/* Branding Image Uploads */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
+                    Logo del Restaurante (JPG, PNG, max 5MB)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', cursor: 'pointer', border: '1px dashed rgba(255,255,255,0.2)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    <Upload size={16} />
+                    <span>{logoFile ? logoFile.name : 'Subir Logo'}</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={e => handleFileChange(e, 'logo')}
+                    />
+                  </label>
+                  {logoPreviewUrl && (
+                    <img src={logoPreviewUrl} alt="Logo preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', marginTop: '8px' }} />
+                  )}
+                  {errors.logo && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.logo}</span>}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
+                    Portada / Banner (JPG, PNG, max 5MB)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', cursor: 'pointer', border: '1px dashed rgba(255,255,255,0.2)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    <Image size={16} />
+                    <span>{bannerFile ? bannerFile.name : 'Subir Portada'}</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={e => handleFileChange(e, 'banner')}
+                    />
+                  </label>
+                  {bannerPreviewUrl && (
+                    <img src={bannerPreviewUrl} alt="Banner preview" style={{ width: '100px', height: '48px', objectFit: 'cover', borderRadius: '8px', marginTop: '8px' }} />
+                  )}
+                  {errors.banner && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.banner}</span>}
+                </div>
               </div>
 
               {/* Delivery Modes Checkboxes */}
@@ -526,7 +718,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
 
               <div>
                 <label htmlFor="notes" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                  Comentarios o Mensaje para GastroSync (Opcional)
+                  Comentarios o Notas Adicionales (Opcional)
                 </label>
                 <textarea
                   id="notes"
@@ -536,6 +728,22 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   onChange={e => setNotes(e.target.value)}
                   style={{ width: '100%' }}
                 />
+              </div>
+
+              {/* Terms Checkbox */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={e => setTermsAccepted(e.target.checked)}
+                    style={{ marginTop: '2px' }}
+                  />
+                  <span>
+                    Acepto los Términos del Servicio y la tarifa de comisión transparente del <strong>3% por pedido procesado</strong> en GastroSync.
+                  </span>
+                </label>
+                {errors.terms && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '4px', display: 'block' }}>{errors.terms}</span>}
               </div>
 
               {/* Submit Buttons */}
@@ -560,7 +768,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   {isSubmitting ? (
                     <>
                       <div className="spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                      Enviando...
+                      Enviando Solicitud...
                     </>
                   ) : (
                     'Enviar Solicitud de Aliado'

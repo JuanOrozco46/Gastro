@@ -1,15 +1,21 @@
 import { createContext } from 'react';
-import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, RestaurantApplication } from '../types';
+import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, RestaurantApplication, UserLocationState } from '../types';
 
 export interface AppContextType {
   cities: City[];
   zones: Zone[];
   selectedCityId: string;
   selectedZoneId: string | null;
+  userLocationState: UserLocationState;
+  locationPreference: 'gps' | 'manual';
   setSelectedCity: (cityId: string) => void;
   setSelectedZone: (zoneId: string | null) => void;
   refreshCities: () => Promise<void>;
   refreshZones: (cityId?: string) => Promise<void>;
+  requestUserLocation: () => Promise<void>;
+  clearUserLocation: () => void;
+  resolveCityFromCoordinates: (latitude: number, longitude: number) => Promise<boolean>;
+  switchToManualLocation: () => void;
   tenants: Tenant[];
   currentTenant: Tenant;
   products: Product[];

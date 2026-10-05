@@ -17,6 +17,7 @@ export const SuperAdminView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'applications' | 'settlement'>('applications');
   const [statusFilter, setStatusFilter] = useState<'all' | RestaurantApplicationStatus>('all');
+  const [cityFilter, setCityFilter] = useState<string>('all');
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
   // Activation State
@@ -59,15 +60,18 @@ export const SuperAdminView: React.FC = () => {
     );
   }
 
+  // Applications scoped by selected city (counters respect the city filter)
+  const cityScopedApps = restaurantApplications.filter(a => cityFilter === 'all' || a.cityId === cityFilter);
+
   // Counters
-  const submittedCount = restaurantApplications.filter(a => a.status === 'submitted').length;
-  const reviewingCount = restaurantApplications.filter(a => a.status === 'reviewing').length;
-  const approvedCount = restaurantApplications.filter(a => a.status === 'approved').length;
-  const rejectedCount = restaurantApplications.filter(a => a.status === 'rejected').length;
-  const pendingReviewTotal = submittedCount + reviewingCount;
+  const submittedCount = cityScopedApps.filter(a => a.status === 'submitted').length;
+  const reviewingCount = cityScopedApps.filter(a => a.status === 'reviewing').length;
+  const approvedCount = cityScopedApps.filter(a => a.status === 'approved').length;
+  const rejectedCount = cityScopedApps.filter(a => a.status === 'rejected').length;
+  const pendingReviewTotal = restaurantApplications.filter(a => a.status === 'submitted' || a.status === 'reviewing').length;
 
   // Filtered applications
-  const filteredApps = restaurantApplications
+  const filteredApps = cityScopedApps
     .filter(a => statusFilter === 'all' || a.status === statusFilter)
     .sort((a, b) => b.submittedAt - a.submittedAt);
 
@@ -76,17 +80,21 @@ export const SuperAdminView: React.FC = () => {
   };
 
   const handleReviewAction = async (appId: string, nextStatus: 'reviewing' | 'approved' | 'rejected') => {
+    if (isReviewing !== null) return; // double-click protection
     setIsReviewing(appId);
-    const note = reviewNotes[appId] || '';
-    const ok = await reviewRestaurantApplication(appId, nextStatus, note);
-    if (ok) {
-      setReviewNotes(prev => {
-        const copy = { ...prev };
-        delete copy[appId];
-        return copy;
-      });
+    try {
+      const note = reviewNotes[appId] || '';
+      const ok = await reviewRestaurantApplication(appId, nextStatus, note);
+      if (ok) {
+        setReviewNotes(prev => {
+          const copy = { ...prev };
+          delete copy[appId];
+          return copy;
+        });
+      }
+    } finally {
+      setIsReviewing(null);
     }
-    setIsReviewing(null);
   };
 
   const handleConfirmActivation = async (appId: string) => {
@@ -179,11 +187,30 @@ export const SuperAdminView: React.FC = () => {
       {/* ── TAB 1: SOLICITUDES DE ALIADOS ── */}
       {activeTab === 'applications' && (
         <div>
+          {/* City Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <label htmlFor="admin-city-filter" style={{ fontSize: '0.8rem', fontWeight: 800, color: 'white' }}>
+              <MapPin size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+              Filtrar por ciudad:
+            </label>
+            <select
+              id="admin-city-filter"
+              value={cityFilter}
+              onChange={e => setCityFilter(e.target.value)}
+              style={{ fontSize: '0.82rem', padding: '6px 12px', borderRadius: '10px', minWidth: '200px' }}
+            >
+              <option value="all">Todas las ciudades</option>
+              {cities.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Status Counter Bar */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
             <div className="card" onClick={() => setStatusFilter('all')} style={{ cursor: 'pointer', border: statusFilter === 'all' ? '1px solid var(--primary)' : undefined, background: 'var(--glass-medium)' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700 }}>Total Solicitudes</div>
-              <strong style={{ fontSize: '1.5rem', color: 'white', fontWeight: 900 }}>{restaurantApplications.length}</strong>
+              <strong style={{ fontSize: '1.5rem', color: 'white', fontWeight: 900 }}>{cityScopedApps.length}</strong>
             </div>
 
             <div className="card" onClick={() => setStatusFilter('submitted')} style={{ cursor: 'pointer', border: statusFilter === 'submitted' ? '1px solid #F59E0B' : undefined, background: 'rgba(245, 158, 11, 0.08)' }}>
@@ -214,7 +241,7 @@ export const SuperAdminView: React.FC = () => {
               style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: '12px' }}
               onClick={() => setStatusFilter('all')}
             >
-              Todas ({restaurantApplications.length})
+              Todas ({cityScopedApps.length})
             </button>
             <button
               className={`btn ${statusFilter === 'submitted' ? 'btn-secondary' : 'btn-outline'}`}
@@ -364,6 +391,24 @@ export const SuperAdminView: React.FC = () => {
 
                       </div>
 
+                      {/* Extended Business Profile */}
+                      {(app.description || app.scheduleHours || app.estimatedDeliveryMinutes !== undefined || app.logoUrl || app.bannerUrl) && (
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', padding: '12px 14px', borderRadius: '14px', marginBottom: '1.25rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                            Perfil Comercial
+                          </span>
+                          {app.description && <div style={{ color: 'white', marginBottom: '4px' }}>{app.description}</div>}
+                          {app.scheduleHours && <div>🕒 Horario: <strong style={{ color: 'white' }}>{app.scheduleHours}</strong></div>}
+                          {app.estimatedDeliveryMinutes !== undefined && <div>⏱️ Tiempo estimado: <strong style={{ color: 'white' }}>{app.estimatedDeliveryMinutes} min</strong></div>}
+                          {(app.logoUrl || app.bannerUrl) && (
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '8px', alignItems: 'center' }}>
+                              {app.logoUrl && <img src={app.logoUrl} alt={`Logo de ${app.restaurantName}`} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '10px' }} />}
+                              {app.bannerUrl && <img src={app.bannerUrl} alt={`Portada de ${app.restaurantName}`} style={{ width: '140px', height: '56px', objectFit: 'cover', borderRadius: '10px' }} />}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Comments / Notes from Applicant */}
                       {app.notes && (
                         <div style={{ background: 'rgba(245, 158, 11, 0.06)', border: '1px solid rgba(245, 158, 11, 0.15)', padding: '10px 14px', borderRadius: '12px', marginBottom: '1.25rem', fontSize: '0.82rem', color: '#FCD34D' }}>
@@ -404,7 +449,7 @@ export const SuperAdminView: React.FC = () => {
                           {/* Non-promising Disclaimer before approving */}
                           <div style={{ fontSize: '0.75rem', color: '#FCD34D', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <AlertCircle size={14} style={{ flexShrink: 0 }} />
-                            <span>⚠️ Aprobar esta solicitud guarda la decisión interna pero NO activa automáticamente un restaurante en el feed ni crea una cuenta de dueño.</span>
+                            <span>⚠️ Aprobar esta solicitud guarda la decisión interna pero NO activa automáticamente un restaurante en el feed ni crea una cuenta de dueño. La activación es un paso separado.</span>
                           </div>
 
                           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -461,7 +506,7 @@ export const SuperAdminView: React.FC = () => {
                               </div>
 
                               <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '10px 12px', borderRadius: '10px', fontSize: '0.78rem', color: '#FCD34D', marginBottom: '12px', lineHeight: 1.4 }}>
-                                ⚠️ <strong>Aviso Importante:</strong> Al confirmar, se creará el restaurante en la base de datos y <strong>se generará una contraseña temporal</strong> para el usuario si es nuevo. Deberás comunicarle esta contraseña al dueño.
+                                ⚠️ <strong>Aviso Importante:</strong> Al confirmar, se creará el restaurante en la base de datos y <strong>se enviará una invitación segura por correo</strong> a <code>{app.ownerEmail}</code> para que el dueño defina su propia contraseña. Nunca se generan ni se muestran contraseñas.
                               </div>
 
                               {activationError && (

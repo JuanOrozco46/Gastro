@@ -482,39 +482,125 @@ function formatTimeAgo(timestamp: string): string {
   return `Hace ${Math.floor(diffDays / 7)}sem`;
 }
 
+export async function checkDuplicatePendingApplication(
+  ownerEmail: string,
+  restaurantName?: string
+): Promise<{ isDuplicate: boolean; reason?: string }> {
+  if (!isSupabaseConfigured || !supabase || !ownerEmail) return { isDuplicate: false };
+  try {
+    const normalizedEmail = ownerEmail.trim().toLowerCase();
+    const { data: emailData, error: emailErr } = await supabase
+      .from('restaurant_applications')
+      .select('id')
+      .in('status', ['submitted', 'reviewing'])
+      .eq('owner_email', normalizedEmail)
+      .limit(1);
+
+    if (!emailErr && emailData && emailData.length > 0) {
+      return { isDuplicate: true, reason: 'Ya existe una solicitud pendiente registrada con este correo electrónico.' };
+    }
+
+    if (restaurantName?.trim()) {
+      const { data: nameData, error: nameErr } = await supabase
+        .from('restaurant_applications')
+        .select('id')
+        .in('status', ['submitted', 'reviewing'])
+        .ilike('restaurant_name', restaurantName.trim())
+        .limit(1);
+
+      if (!nameErr && nameData && nameData.length > 0) {
+        return { isDuplicate: true, reason: 'Ya existe una solicitud pendiente registrada con este nombre de restaurante.' };
+      }
+    }
+
+    return { isDuplicate: false };
+  } catch {
+    return { isDuplicate: false };
+  }
+}
+
+export async function uploadApplicationAsset(
+  file: File,
+  folderPath: string
+): Promise<string | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedMimeTypes.includes(file.type)) {
+    console.warn('⚠️ Tipo de archivo no permitido. Solo JPG, PNG o WEBP.');
+    return null;
+  }
+  const MAX_SIZE_BYTES = 5 * 1024 * 1024;
+  if (file.size > MAX_SIZE_BYTES) {
+    console.warn('⚠️ El archivo excede el tamaño máximo de 5MB.');
+    return null;
+  }
+
+  try {
+    const fileExt = file.name.split('.').pop() || 'png';
+    const fileName = `applications/${folderPath}/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+
+    const { data, error } = await supabase.storage
+      .from('restaurant-assets')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error || !data) {
+      console.warn('⚠️ Error al subir imagen de solicitud:', error?.message);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('restaurant-assets')
+      .getPublicUrl(fileName);
+
+    return publicUrlData.publicUrl;
+  } catch (err) {
+    console.warn('⚠️ Excepción subiendo asset de solicitud:', err);
+    return null;
+  }
+}
+
 export async function submitLiveApplication(appData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>): Promise<RestaurantApplication | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
-    // Transform local IDs into Supabase slugs to get the real UUIDs
-    const citySlug = appData.cityId.replace('city_', '').replace(/_/g, '-'); // e.g. 'armenia-quindio'
-    const zoneSlug = appData.zoneId.replace('zone_', '').replace(/_/g, '-'); // e.g. 'armenia-centro'
+    let realCityId = appData.cityId;
+    let realZoneId = appData.zoneId;
 
-    const [{ data: cityData }, { data: zoneData }] = await Promise.all([
-      supabase.from('cities').select('id').eq('slug', citySlug).single(),
-      supabase.from('zones').select('id').eq('slug', zoneSlug).single()
-    ]);
-
-    if (!cityData || !zoneData) {
-      console.warn('⚠️ No se encontraron los UUIDs reales para la ciudad o zona especificada.');
-      return null;
+    const isUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!isUuidRegex.test(realCityId)) {
+      const citySlug = appData.cityId.replace('city_', '').replace(/_/g, '-');
+      const { data: cityData } = await supabase.from('cities').select('id').eq('slug', citySlug).single();
+      if (cityData) realCityId = cityData.id;
+    }
+    if (!isUuidRegex.test(realZoneId)) {
+      const zoneSlug = appData.zoneId.replace('zone_', '').replace(/_/g, '-');
+      const { data: zoneData } = await supabase.from('zones').select('id').eq('slug', zoneSlug).single();
+      if (zoneData) realZoneId = zoneData.id;
     }
 
     const newId = crypto.randomUUID();
     const { error } = await supabase.from('restaurant_applications').insert([{
       id: newId,
       owner_name: appData.ownerName,
-      owner_email: appData.ownerEmail,
+      owner_email: appData.ownerEmail.trim().toLowerCase(),
       owner_phone: appData.ownerPhone,
       restaurant_name: appData.restaurantName,
       category: appData.category,
-      city_id: cityData.id,
-      zone_id: zoneData.id,
+      city_id: realCityId,
+      zone_id: realZoneId,
       address: appData.address,
+      description: appData.description,
       whatsapp: appData.whatsapp,
       min_order: appData.minOrder,
       delivery_modes: appData.deliveryModes,
       delivery_fee: appData.deliveryFee,
       delivery_radius_km: appData.deliveryRadiusKm,
+      estimated_delivery_minutes: appData.estimatedDeliveryMinutes,
+      schedule_hours: appData.scheduleHours,
+      logo_url: appData.logoUrl,
+      banner_url: appData.bannerUrl,
       notes: appData.notes,
       status: 'submitted'
     }]);
@@ -527,18 +613,23 @@ export async function submitLiveApplication(appData: Omit<RestaurantApplication,
     return {
       id: newId,
       ownerName: appData.ownerName,
-      ownerEmail: appData.ownerEmail,
+      ownerEmail: appData.ownerEmail.trim().toLowerCase(),
       ownerPhone: appData.ownerPhone,
       restaurantName: appData.restaurantName,
       category: appData.category,
-      cityId: cityData.id,
-      zoneId: zoneData.id,
+      cityId: realCityId,
+      zoneId: realZoneId,
       address: appData.address,
+      description: appData.description,
       whatsapp: appData.whatsapp,
       minOrder: appData.minOrder,
       deliveryModes: appData.deliveryModes,
       deliveryFee: appData.deliveryFee,
       deliveryRadiusKm: appData.deliveryRadiusKm,
+      estimatedDeliveryMinutes: appData.estimatedDeliveryMinutes,
+      scheduleHours: appData.scheduleHours,
+      logoUrl: appData.logoUrl,
+      bannerUrl: appData.bannerUrl,
       notes: appData.notes,
       status: 'submitted',
       submittedAt: Date.now(),

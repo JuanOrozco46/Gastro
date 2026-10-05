@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, BusinessUserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount } from '../types';
+import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, BusinessUserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount, UserLocationState } from '../types';
 import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
@@ -8,6 +8,7 @@ import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, f
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment } from '../services/supabaseOrderService';
+import { resolveLocationFromCoords } from '../services/locationResolver';
 
 // Internal typed authorization helpers
 const isRestaurantOwner = (user: UserAccount | null): boolean => {
@@ -264,6 +265,130 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return [...otherZones, ...liveZones];
       });
     }
+  };
+
+  const [locationPreference, setLocationPreference] = useState<'gps' | 'manual'>(() => {
+    try {
+      const saved = localStorage.getItem('gs_location_preference_v1');
+      if (saved === 'gps' || saved === 'manual') return saved;
+    } catch {}
+    return 'manual';
+  });
+
+  const [userLocationState, setUserLocationState] = useState<UserLocationState>({
+    permission: 'unknown',
+    isResolving: false
+  });
+
+  const switchToManualLocation = () => {
+    setLocationPreference('manual');
+    try {
+      localStorage.setItem('gs_location_preference_v1', 'manual');
+    } catch { /* ignore */ }
+    setUserLocationState(prev => ({ ...prev, isResolving: false }));
+  };
+
+  const clearUserLocation = () => {
+    setUserLocationState({
+      permission: 'unknown',
+      isResolving: false
+    });
+  };
+
+  const resolveCityFromCoordinates = async (latitude: number, longitude: number): Promise<boolean> => {
+    const result = resolveLocationFromCoords(latitude, longitude, cities, zones);
+    if (result.status === 'resolved' && result.cityId) {
+      setSelectedCity(result.cityId);
+      if (result.zoneId) {
+        setSelectedZone(result.zoneId);
+      }
+      setUserLocationState(prev => ({
+        ...prev,
+        cityId: result.cityId,
+        zoneId: result.zoneId,
+        error: undefined
+      }));
+      return true;
+    } else {
+      setUserLocationState(prev => ({
+        ...prev,
+        error: result.message
+      }));
+      return false;
+    }
+  };
+
+  const requestUserLocation = async (): Promise<void> => {
+    setLocationPreference('gps');
+    try {
+      localStorage.setItem('gs_location_preference_v1', 'gps');
+    } catch { /* ignore */ }
+
+    if (typeof window === 'undefined' || !navigator || !navigator.geolocation) {
+      setUserLocationState({
+        permission: 'unavailable',
+        isResolving: false,
+        error: 'Tu navegador no soporta geolocalización por GPS.'
+      });
+      return;
+    }
+
+    setUserLocationState(prev => ({
+      ...prev,
+      permission: 'prompt',
+      isResolving: true,
+      error: undefined
+    }));
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const resolution = resolveLocationFromCoords(latitude, longitude, cities, zones);
+
+        if (resolution.status === 'resolved' && resolution.cityId) {
+          setSelectedCity(resolution.cityId);
+          if (resolution.zoneId) {
+            setSelectedZone(resolution.zoneId);
+          }
+          setUserLocationState({
+            permission: 'granted',
+            latitude,
+            longitude,
+            cityId: resolution.cityId,
+            zoneId: resolution.zoneId,
+            isResolving: false,
+            error: undefined
+          });
+        } else {
+          setUserLocationState({
+            permission: 'granted',
+            latitude,
+            longitude,
+            isResolving: false,
+            error: resolution.message
+          });
+        }
+      },
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setUserLocationState({
+            permission: 'denied',
+            isResolving: false,
+            error: 'Permiso de ubicación denegado por el usuario.'
+          });
+        } else {
+          setUserLocationState({
+            permission: 'unavailable',
+            isResolving: false,
+            error: 'No se pudo obtener la ubicación GPS en este momento.'
+          });
+        }
+      },
+      {
+        timeout: 10000,
+        enableHighAccuracy: false
+      }
+    );
   };
 
   const [cartConflict, setCartConflict] = useState<{ pendingProduct: Product | null, activeTenantName: string } | null>(null);
@@ -1603,10 +1728,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: err };
     }
 
+    if (!supabase || !isSupabaseConfigured) {
+      const err = '⚠️ La activación de restaurantes requiere conexión con Supabase (no disponible en modo demo).';
+      showToast(err);
+      return { success: false, error: err };
+    }
+
     showToast('⏳ Conectando con Supabase para crear restaurante y enviar invitación...');
     
     try {
-      const { data, error } = await supabase!.functions.invoke('approve_restaurant', {
+      const { data, error } = await supabase.functions.invoke('approve_restaurant', {
         body: { applicationId: targetApp.id }
       });
 
@@ -1647,10 +1778,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       zones,
       selectedCityId,
       selectedZoneId,
+      userLocationState,
+      locationPreference,
       setSelectedCity,
       setSelectedZone,
       refreshCities,
       refreshZones,
+      requestUserLocation,
+      clearUserLocation,
+      resolveCityFromCoordinates,
+      switchToManualLocation,
       tenants: activeTenants,
       currentTenant,
       products: activeProducts,

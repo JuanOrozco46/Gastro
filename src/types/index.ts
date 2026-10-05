@@ -44,6 +44,23 @@ export interface Zone {
   isActive: boolean;
 }
 
+export type LocationPermissionState =
+  | 'unknown'
+  | 'prompt'
+  | 'granted'
+  | 'denied'
+  | 'unavailable';
+
+export type UserLocationState = {
+  permission: LocationPermissionState;
+  latitude?: number;
+  longitude?: number;
+  cityId?: string;
+  zoneId?: string;
+  isResolving: boolean;
+  error?: string;
+};
+
 export type RestaurantDeliveryMode = 'pickup' | 'restaurant_delivery' | 'table_service';
 
 export type RestaurantStatus = 'draft' | 'pending_approval' | 'active' | 'suspended';
@@ -72,11 +89,16 @@ export interface RestaurantApplication {
   cityId: string;
   zoneId: string;
   address: string;
+  description?: string;
   whatsapp?: string;
   minOrder?: number;
   deliveryModes: OrderFulfillment[];
   deliveryFee?: number;
   deliveryRadiusKm?: number;
+  estimatedDeliveryMinutes?: number;
+  scheduleHours?: string;
+  logoUrl?: string;
+  bannerUrl?: string;
   notes?: string;
   reviewedAt?: number;
   reviewedByEmail?: string;
