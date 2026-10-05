@@ -10,6 +10,7 @@ import type { SupportTicket, SupportMessage, TicketCategory } from '../services/
 import { MessageSquare, Plus, ArrowLeft, Send, CheckCircle, RefreshCcw, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { safeFormatDate } from '../utils/formatters';
 
 interface SupportCenterProps {
   initialOrderId?: string | null;
@@ -311,7 +312,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId }) 
             <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px' }}>{activeTicket.subject}</h2>
             <p style={{ color: '#E2E8F0', whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: '0.95rem' }}>{activeTicket.description}</p>
             <div style={{ marginTop: '16px', fontSize: '0.8rem', color: '#94a3b8' }}>
-              Ticket creado el {new Date(activeTicket.created_at).toLocaleString()}
+              Ticket creado el {safeFormatDate(activeTicket.created_at)}
             </div>
           </div>
 

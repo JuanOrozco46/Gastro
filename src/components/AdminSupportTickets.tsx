@@ -12,8 +12,10 @@ import type { SupportTicket, SupportMessage, TicketStatus, TicketPriority } from
 import type { Order } from '../types';
 import { MessageSquare, Send, Search, User, AlertTriangle, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { formatCop, safeFormatDate } from '../utils/formatters';
+import { ErrorBoundary } from './ErrorBoundary';
 
-export const AdminSupportTickets: React.FC = () => {
+const AdminSupportTicketsContent: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
@@ -261,7 +263,7 @@ export const AdminSupportTickets: React.FC = () => {
                 <div style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'flex', gap: '16px' }}>
                   <span>ID: {activeTicket.id}</span>
                   <span>Cat: {activeTicket.category}</span>
-                  <span>Creado: {new Date(activeTicket.created_at).toLocaleString()}</span>
+                  <span>Creado: {safeFormatDate(activeTicket.created_at)}</span>
                 </div>
               </div>
 
@@ -322,7 +324,7 @@ export const AdminSupportTickets: React.FC = () => {
                     </div>
                     <div>
                       <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Total y Pago</span>
-                      <strong style={{ color: 'white' }}>${(activeOrder.total || 0).toLocaleString('es-CO')}</strong> · {activeOrder.paymentMethod || 'N/A'}
+                      <strong style={{ color: 'white' }}>{formatCop(activeOrder.total)}</strong> · {activeOrder.paymentMethod || 'N/A'}
                     </div>
                     <div>
                       <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Estado</span>
@@ -416,3 +418,9 @@ export const AdminSupportTickets: React.FC = () => {
     </div>
   );
 };
+
+export const AdminSupportTickets: React.FC = () => (
+  <ErrorBoundary fallbackMessage="Error al cargar la interfaz de soporte de administrador.">
+    <AdminSupportTicketsContent />
+  </ErrorBoundary>
+);

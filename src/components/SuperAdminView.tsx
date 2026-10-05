@@ -8,8 +8,10 @@ import {
 } from 'lucide-react';
 import type { RestaurantApplicationStatus } from '../types';
 import { AdminSupportTickets } from './AdminSupportTickets';
+import { formatCop, formatCopOrZero, safeFormatDate } from '../utils/formatters';
+import { ErrorBoundary } from './ErrorBoundary';
 
-export const SuperAdminView: React.FC = () => {
+const SuperAdminViewContent: React.FC = () => {
   const {
     currentUser, tenants, orders, transactions,
     restaurantApplications, reviewRestaurantApplication,
@@ -332,7 +334,7 @@ export const SuperAdminView: React.FC = () => {
                         </div>
 
                         <div style={{ textAlign: 'right', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          <div>Enviada el: <strong>{new Date(app.submittedAt).toLocaleString('es-CO')}</strong></div>
+                          <div>Enviada el: <strong>{safeFormatDate(app.submittedAt)}</strong></div>
                           <code style={{ fontSize: '0.7rem', color: 'var(--tertiary)' }}>ID: {app.id}</code>
                         </div>
                       </div>
@@ -372,7 +374,7 @@ export const SuperAdminView: React.FC = () => {
                           </div>
                           {app.minOrder !== undefined && (
                             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                              Pedido Mínimo: <strong style={{ color: 'white' }}>${app.minOrder.toLocaleString('es-CO')} COP</strong>
+                              Pedido Mínimo: <strong style={{ color: 'white' }}>{formatCop(app.minOrder)}</strong>
                             </div>
                           )}
                         </div>
@@ -392,7 +394,7 @@ export const SuperAdminView: React.FC = () => {
 
                           {app.deliveryModes.includes('restaurant_delivery') && (
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '4px', marginTop: '4px' }}>
-                              {app.deliveryFee !== undefined && <div>Tarifa Domicilio: <strong style={{ color: 'white' }}>${app.deliveryFee.toLocaleString('es-CO')} COP</strong></div>}
+                              {app.deliveryFee !== undefined && <div>Tarifa Domicilio: <strong style={{ color: 'white' }}>{formatCopOrZero(app.deliveryFee)}</strong></div>}
                               {app.deliveryRadiusKm !== undefined && <div>Radio Cobertura: <strong style={{ color: 'white' }}>{app.deliveryRadiusKm} Km</strong></div>}
                             </div>
                           )}
@@ -429,7 +431,7 @@ export const SuperAdminView: React.FC = () => {
                       {app.reviewedAt && (
                         <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '10px 14px', borderRadius: '12px', marginBottom: '1.25rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                           <div>
-                            🏁 Decisión tomada el <strong>{new Date(app.reviewedAt).toLocaleString('es-CO')}</strong> por <code style={{ color: 'white' }}>{app.reviewedByEmail}</code>.
+                            🏁 Decisión tomada el <strong>{safeFormatDate(app.reviewedAt)}</strong> por <code style={{ color: 'white' }}>{app.reviewedByEmail}</code>.
                           </div>
                           {app.reviewNote && (
                             <div style={{ marginTop: '4px', color: 'white', fontStyle: 'italic' }}>
@@ -504,7 +506,7 @@ export const SuperAdminView: React.FC = () => {
                                 <span>Restaurante activado</span>
                               </div>
                               <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                                Activado el: <strong>{app.activatedAt ? new Date(app.activatedAt).toLocaleString('es-CO') : 'Recientemente'}</strong> por <code style={{ color: 'white' }}>{app.activatedByEmail}</code> · ID Tenant: <code style={{ color: 'white' }}>{app.activatedTenantId}</code>
+                                Activado el: <strong>{app.activatedAt ? safeFormatDate(app.activatedAt) : 'Recientemente'}</strong> por <code style={{ color: 'white' }}>{app.activatedByEmail}</code> · ID Tenant: <code style={{ color: 'white' }}>{app.activatedTenantId}</code>
                               </div>
                             </div>
                           ) : activatingAppId === app.id ? (
@@ -586,7 +588,7 @@ export const SuperAdminView: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Liquidado a Restaurantes (97%)</div>
-                <strong style={{ fontSize: '1.4rem', color: 'white' }}>${totalRestaurantPayouts.toLocaleString('es-CO')} COP</strong>
+                <strong style={{ fontSize: '1.4rem', color: 'white' }}>{formatCopOrZero(totalRestaurantPayouts)}</strong>
               </div>
             </div>
 
@@ -596,7 +598,7 @@ export const SuperAdminView: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Recaudación Ética (3%)</div>
-                <strong style={{ fontSize: '1.4rem', color: 'white' }}>${totalEthicalFees.toLocaleString('es-CO')} COP</strong>
+                <strong style={{ fontSize: '1.4rem', color: 'white' }}>{formatCopOrZero(totalEthicalFees)}</strong>
               </div>
             </div>
           </div>
@@ -671,9 +673,9 @@ export const SuperAdminView: React.FC = () => {
                             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Auth: #{tx.authorizationCode}</div>
                           </td>
                           <td style={{ padding: '10px', color: 'white', fontWeight: 600 }}>{methodEmoji}</td>
-                          <td style={{ padding: '10px', fontWeight: 700, color: 'white' }}>${tx.amount.toLocaleString('es-CO')}</td>
-                          <td style={{ padding: '10px', color: 'var(--secondary)', fontWeight: 700 }}>${tx.restaurantPayout.toLocaleString('es-CO')}</td>
-                          <td style={{ padding: '10px', color: 'var(--tertiary)', fontWeight: 700 }}>${tx.platformFee.toLocaleString('es-CO')}</td>
+                          <td style={{ padding: '10px', fontWeight: 700, color: 'white' }}>{formatCop(tx.amount)}</td>
+                          <td style={{ padding: '10px', color: 'var(--secondary)', fontWeight: 700 }}>{formatCop(tx.restaurantPayout)}</td>
+                          <td style={{ padding: '10px', color: 'var(--tertiary)', fontWeight: 700 }}>{formatCop(tx.platformFee)}</td>
                         </tr>
                       );
                     })}
@@ -728,3 +730,9 @@ export const SuperAdminView: React.FC = () => {
     </div>
   );
 };
+
+export const SuperAdminView: React.FC = () => (
+  <ErrorBoundary fallbackMessage="Error general en la vista de Super Admin.">
+    <SuperAdminViewContent />
+  </ErrorBoundary>
+);
