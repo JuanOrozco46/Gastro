@@ -101,14 +101,14 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
         
         {/* Banner Header */}
         <div className="gf-profile-banner" style={{ background: tenant.bannerUrl ? 'transparent' : 'linear-gradient(135deg, var(--primary-color), #FFB75E)' }}>
-          {tenant.bannerUrl && <img src={tenant.bannerUrl} alt={tenant.name} className="gf-profile-banner-img" />}
+          {tenant.bannerUrl && <img loading="lazy" decoding="async" src={tenant.bannerUrl} alt={tenant.name} className="gf-profile-banner-img" />}
           <button className="gf-profile-close-btn" onClick={onClose} aria-label="Cerrar perfil de restaurante">
             <X size={20} />
           </button>
           
           <div className="gf-profile-avatar-badge" style={{ backgroundColor: tenant.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden', padding: tenant.logoUrl ? 0 : '10px' }}>
             {tenant.logoUrl ? (
-              <img src={tenant.logoUrl} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <span>{tenant.logoEmoji || '🍽️'}</span>
             )}
@@ -200,7 +200,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
               ) : (
                 tenantPosts.map(post => (
                   <div key={post.id} className="gf-grid-card">
-                    <img src={post.image} alt={post.dishName} className="gf-grid-img" />
+                    <img loading="lazy" decoding="async" src={post.image} alt={post.dishName} className="gf-grid-img" />
                     
                     {post.mediaType === 'video' && (
                       <div className="gf-grid-video-badge">
@@ -237,7 +237,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
               {tenantProducts.map(p => (
                 <div key={p.id} className="gf-menu-item-row">
                   {p.image ? (
-                    <img src={p.image} alt={p.name} className="gf-menu-item-img" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
+                    <img loading="lazy" decoding="async" src={p.image} alt={p.name} className="gf-menu-item-img" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
                   ) : (
                     <div className="gf-menu-item-emoji">{p.emoji || '🍽️'}</div>
                   )}

@@ -1,14 +1,10 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useApp } from '../context/useApp';
-import { PaymentModal } from './PaymentModal';
 import { RestaurantDirectory } from './RestaurantDirectory';
 import { MyOrders } from './MyOrders';
-import { SupportCenter } from './SupportCenter';
 import { StoriesBar } from './StoriesBar';
-import { CommentsModal } from './CommentsModal';
-import { RestaurantProfileModal } from './RestaurantProfileModal';
 import { FloatingCartButton } from './FloatingCartButton';
-import { CartModal } from './CartModal';
+import { LocationSelector } from './LocationSelector';
 import { motion } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, ShoppingBag, Bike,
@@ -18,8 +14,20 @@ import {
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { toggleRemoteSave } from '../services/supabaseDataService';
-import { LocationSelector } from './LocationSelector';
 import type { Post, Tenant } from '../types';
+
+const PaymentModal = lazy(() => import('./PaymentModal').then(m => ({ default: m.PaymentModal })));
+const SupportCenter = lazy(() => import('./SupportCenter').then(m => ({ default: m.SupportCenter })));
+const CartModal = lazy(() => import('./CartModal').then(m => ({ default: m.CartModal })));
+const RestaurantProfileModal = lazy(() => import('./RestaurantProfileModal').then(m => ({ default: m.RestaurantProfileModal })));
+const CommentsModal = lazy(() => import('./CommentsModal').then(m => ({ default: m.CommentsModal })));
+
+const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
+  <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+    <div style={{ width: '24px', height: '24px', border: '2px solid', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
+    {message}
+  </div>
+);
 
 /* ── Format numbers ──────────────────────────────────────── */
 const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
@@ -44,7 +52,7 @@ const VideoModal: React.FC<{ post: Post; tenant?: Tenant; onClose: () => void; o
 
       <div className="video-modal-player">
         {post.mediaUrl ? (
-          <video
+          <video preload="none" poster={post.image}
             src={post.mediaUrl}
             controls
             autoPlay
@@ -55,7 +63,7 @@ const VideoModal: React.FC<{ post: Post; tenant?: Tenant; onClose: () => void; o
             <p>Este video antiguo ya no está disponible en la plataforma.</p>
           </div>
         ) : (
-          <img src={post.image} alt={post.dishName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          <img loading="lazy" decoding="async" src={post.image} alt={post.dishName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         )}
       </div>
 
@@ -63,7 +71,7 @@ const VideoModal: React.FC<{ post: Post; tenant?: Tenant; onClose: () => void; o
         <div className="video-modal-info">
           <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: tenant?.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {tenant?.logoUrl ? (
-              <img src={tenant.logoUrl} alt={tenant?.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant?.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <span className="video-modal-emoji" style={{ margin: 0 }}>{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
             )}
@@ -121,7 +129,7 @@ const PostCard: React.FC<PostCardProps> = ({
         <div className="gf-post-author" onClick={() => onOpenProfile(post.tenantId)} style={{ cursor: 'pointer' }}>
           <div className="gf-author-avatar" style={{ backgroundColor: tenant?.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden' }}>
             {tenant?.logoUrl ? (
-              <img src={tenant.logoUrl} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <span>{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
             )}
@@ -147,7 +155,7 @@ const PostCard: React.FC<PostCardProps> = ({
 
       {/* ── Media ── */}
       <div className="gf-media-wrapper">
-        <img src={post.image} alt={post.dishName} className="gf-media-img" loading="lazy" />
+        <img loading="lazy" decoding="async" src={post.image} alt={post.dishName} className="gf-media-img" />
 
         {/* Video overlay */}
         {isVideo && (
@@ -933,7 +941,9 @@ export const CustomerDeliveryApp: React.FC = () => {
       )}
 
       {activeTab === 'support' && (
+      <Suspense fallback={<FallbackLoader message="Cargando soporte..." />}>
         <SupportCenter initialOrderId={supportInitialOrder} />
+      </Suspense>
       )}
 
       {/* ── Video Modal ── */}
@@ -952,22 +962,26 @@ export const CustomerDeliveryApp: React.FC = () => {
           const selectedCommentsPost = activePosts.find(p => p.id === selectedCommentsPostId);
           if (!selectedCommentsPost) return null;
           return (
+          <Suspense fallback={null}>
             <CommentsModal
               post={selectedCommentsPost}
               tenant={tenants.find(t => t.id === selectedCommentsPost.tenantId)}
               onClose={() => setSelectedCommentsPostId(null)}
             />
+          </Suspense>
           );
         })()
       )}
 
       {/* ── Restaurant Profile Modal ── */}
       {selectedTenantProfile && (
-        <RestaurantProfileModal
-          tenantId={selectedTenantProfile}
-          onClose={() => setSelectedTenantProfile(null)}
-          onOrderProduct={handleOrder}
-        />
+        <Suspense fallback={null}>
+          <RestaurantProfileModal
+            tenantId={selectedTenantProfile}
+            onClose={() => setSelectedTenantProfile(null)}
+            onOrderProduct={handleOrder}
+          />
+        </Suspense>
       )}
 
       <FloatingCartButton 
@@ -975,22 +989,28 @@ export const CustomerDeliveryApp: React.FC = () => {
         onOpen={() => setIsMobileCartOpen(true)}
       />
 
-      <CartModal
-        isOpen={isMobileCartOpen}
-        onClose={() => setIsMobileCartOpen(false)}
-        onCheckout={() => setIsPaymentOpen(true)}
-        onContinueShopping={() => {
-          const cartTenantId = cart.length > 0 ? cart[0].product.tenantId : null;
-          const cartTenant = cartTenantId ? tenants.find(t => t.id === cartTenantId) : null;
-          if (cartTenant) {
-            setCurrentTenantBySlug(cartTenant.slug);
-            setActiveTab('directory');
-            setSelectedTenantProfile(cartTenant.id);
-          }
-        }}
-      />
+      {isMobileCartOpen && (
+        <Suspense fallback={null}>
+          <CartModal
+            isOpen={isMobileCartOpen}
+            onClose={() => setIsMobileCartOpen(false)}
+            onCheckout={() => setIsPaymentOpen(true)}
+            onContinueShopping={() => {
+              const cartTenantId = cart.length > 0 ? cart[0].product.tenantId : null;
+              const cartTenant = cartTenantId ? tenants.find(t => t.id === cartTenantId) : null;
+              if (cartTenant) {
+                setCurrentTenantBySlug(cartTenant.slug);
+                setActiveTab('directory');
+                setSelectedTenantProfile(cartTenant.id);
+              }
+            }}
+          />
+        </Suspense>
+      )}
 
-      <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} orderType="Domicilio" />
+      <Suspense fallback={<FallbackLoader message="Cargando pago..." />}>
+        {isPaymentOpen && <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} orderType="Domicilio" />}
+      </Suspense>
     </div>
   );
 };

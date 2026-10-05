@@ -4,7 +4,7 @@ import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant } from '../services/supabaseDataService';
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
@@ -926,7 +926,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateTenant = async (tenantId: string, updates: Partial<Tenant>) => {
     if (authMode === 'remote') {
-      const { updateRemoteTenant } = await import('../services/supabaseDataService');
       const updatedTenant = await updateRemoteTenant(tenantId, updates);
       if (!updatedTenant) {
         showToast('⚠️ Hubo un error al guardar los cambios en el servidor.');

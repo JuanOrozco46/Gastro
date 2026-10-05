@@ -403,7 +403,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
               >
                 {/* Card Banner Image Header */}
                 <div className="tenant-card-header">
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={tenant.bannerUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80'}
                     alt={tenant.name}
                     className="tenant-banner-img"
@@ -544,7 +544,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
           >
             {/* Modal Header */}
             <div className="modal-banner-header">
-              <img
+              <img loading="lazy" decoding="async"
                 src={selectedTenantForModal.bannerUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80'}
                 alt={selectedTenantForModal.name}
                 className="modal-banner-img"

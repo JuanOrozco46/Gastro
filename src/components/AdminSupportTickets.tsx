@@ -14,6 +14,7 @@ import { MessageSquare, Send, Search, User, AlertTriangle, Lock } from 'lucide-r
 import { supabase } from '../lib/supabase';
 import { formatCop, safeFormatDate } from '../utils/formatters';
 import { ErrorBoundary } from './ErrorBoundary';
+import { useCallback } from 'react';
 
 const AdminSupportTicketsContent: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -33,20 +34,20 @@ const AdminSupportTicketsContent: React.FC = () => {
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  const loadTickets = useCallback(() => {
+    fetchAllSupportTickets().then(({ data, error }) => {
+      if (error) setError(error);
+      else setTickets(data);
+      setLoading(false);
+    });
+  }, []);
+
   useEffect(() => {
     supabase!.auth.getUser().then(({ data }) => {
       if (data.user) setCurrentUserId(data.user.id);
     });
     loadTickets();
-  }, []);
-
-  const loadTickets = async () => {
-    setLoading(true);
-    const { data, error } = await fetchAllSupportTickets();
-    if (error) setError(error);
-    else setTickets(data);
-    setLoading(false);
-  };
+  }, [loadTickets]);
 
   const loadConversation = async (ticket: SupportTicket) => {
     setLoadingConv(true);

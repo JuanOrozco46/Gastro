@@ -91,7 +91,7 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
                 <div className={`gf-story-ring ${story.isLive ? 'is-live' : ''}`}>
                   <div className="gf-story-thumb">
                     {firstItem?.image ? (
-                      <img src={firstItem.image} alt={story.tenantName} />
+                      <img loading="lazy" decoding="async" src={firstItem.image} alt={story.tenantName} />
                     ) : (
                       <span className="gf-story-emoji-fallback">{story.emoji}</span>
                     )}
@@ -157,7 +157,7 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
                 {/* Media Content */}
                 <div className="gf-story-media-container">
                   {currentItem.mediaUrl ? (
-                    <video
+                    <video preload="none" poster={currentItem.image}
                       src={currentItem.mediaUrl}
                       autoPlay
                       muted
@@ -168,7 +168,7 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
                       <p>Este reel antiguo ya no está disponible en GastroSync.</p>
                     </div>
                   ) : (
-                    <img src={currentItem.image} alt={currentItem.dishName} className="gf-story-media-img" />
+                    <img loading="lazy" decoding="async" src={currentItem.image} alt={currentItem.dishName} className="gf-story-media-img" />
                   )}
 
                   {/* Left/Right Click zones for stories */}

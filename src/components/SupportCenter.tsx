@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   createSupportTicket, 
   fetchMySupportTickets, 
@@ -21,7 +21,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeView, setActiveView] = useState<'list' | 'create' | 'conversation'>('list');
+  const [activeView, setActiveView] = useState<'list' | 'create' | 'conversation'>(initialOrderId ? 'create' : 'list');
   const [, setSelectedTicketId] = useState<string | null>(null);
   
   // Create ticket state
@@ -39,25 +39,30 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId }) 
   const [loadingConv, setLoadingConv] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase!.auth.getUser().then(({ data }) => {
-      if (data.user) setCurrentUserId(data.user.id);
-    });
-    loadTickets();
+  const [prevInitialOrderId, setPrevInitialOrderId] = useState(initialOrderId);
+  if (initialOrderId !== prevInitialOrderId) {
+    setPrevInitialOrderId(initialOrderId);
     if (initialOrderId) {
       setActiveView('create');
       setCategory('order');
       setRelatedOrderId(initialOrderId);
     }
-  }, [initialOrderId]);
+  }
 
-  const loadTickets = async () => {
-    setLoading(true);
-    const { data, error } = await fetchMySupportTickets();
-    if (error) setError(error);
-    else setTickets(data);
-    setLoading(false);
-  };
+  const loadTickets = useCallback(() => {
+    fetchMySupportTickets().then(({ data, error }) => {
+      if (error) setError(error);
+      else setTickets(data);
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    supabase!.auth.getUser().then(({ data }) => {
+      if (data.user) setCurrentUserId(data.user.id);
+    });
+    loadTickets();
+  }, [loadTickets]);
 
   const loadConversation = async (ticketId: string) => {
     setLoadingConv(true);

@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2, AlertCircle, ShoppingBag, Bike, Utensils } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PaymentStatus } from './PaymentStatus';
-import { WompiCheckout } from './WompiCheckout';
 import type { WompiCheckoutConfig } from './WompiCheckout';
+
+const WompiCheckout = React.lazy(() => import('./WompiCheckout').then(m => ({ default: m.WompiCheckout })));
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -257,23 +258,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
           </button>
 
           {wompiConfig ? (
-            <WompiCheckout
-              config={wompiConfig}
-              onWidgetClosed={() => {
-                setPendingPaymentInfo({ 
-                  orderId: wompiConfig.orderId, 
-                  paymentId: wompiConfig.paymentId 
-                });
-                setWompiConfig(null);
-              }}
-              onCancel={() => {
-                setPendingPaymentInfo({ 
-                  orderId: wompiConfig.orderId, 
-                  paymentId: wompiConfig.paymentId 
-                });
-                setWompiConfig(null);
-              }}
-            />
+            <React.Suspense fallback={<div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>Preparando pasarela de pago...</div>}>
+              <WompiCheckout
+                config={wompiConfig}
+                onWidgetClosed={() => {
+                  setPendingPaymentInfo({ 
+                    orderId: wompiConfig.orderId, 
+                    paymentId: wompiConfig.paymentId 
+                  });
+                  setWompiConfig(null);
+                }}
+                onCancel={() => {
+                  setPendingPaymentInfo({ 
+                    orderId: wompiConfig.orderId, 
+                    paymentId: wompiConfig.paymentId 
+                  });
+                  setWompiConfig(null);
+                }}
+              />
+            </React.Suspense>
           ) : pendingPaymentInfo ? (
             <PaymentStatus
               orderId={pendingPaymentInfo.orderId}

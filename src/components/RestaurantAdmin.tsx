@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { useApp } from '../context/useApp';
 import { getOperationalTenant, getFulfillmentBadgeText, getValidOrderTransitions } from '../utils/tenantHelpers';
 import { motion } from 'framer-motion';
 import { FileUploadInput } from './FileUploadInput';
-import { FinancialAnalytics } from './FinancialAnalytics';
 import { ProfileTab } from './RestaurantAdmin/ProfileTab';
-import { SupportTab } from './RestaurantAdmin/SupportTab';
+
+const FinancialAnalytics = lazy(() => import('./FinancialAnalytics').then(m => ({ default: m.FinancialAnalytics })));
+const SupportTab = lazy(() => import('./RestaurantAdmin/SupportTab').then(m => ({ default: m.SupportTab })));
+
+const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
+  <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+    <div style={{ width: '24px', height: '24px', border: '2px solid', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
+    {message}
+  </div>
+);
 
 import {
   QrCode, Utensils, Truck, Plus, Share2, Play,
@@ -727,7 +735,9 @@ export const RestaurantAdmin: React.FC = () => {
 
       {/* ── TAB 2: FINANCIAL ANALYTICS ── */}
       {activeTab === 'analytics' && (
+      <Suspense fallback={<FallbackLoader message="Cargando analítica..." />}>
         <FinancialAnalytics tenantId={operatingTenant.id} />
+      </Suspense>
       )}
 
       {/* ── TAB 3: MENU PRODUCTS ── */}
@@ -978,7 +988,9 @@ export const RestaurantAdmin: React.FC = () => {
 
       {/* ── TAB: SOPORTE ── */}
       {activeTab === 'support' && operatingTenant && (
+      <Suspense fallback={<FallbackLoader message="Cargando soporte..." />}>
         <SupportTab restaurantId={operatingTenant.id} />
+      </Suspense>
       )}
 
     </motion.div>

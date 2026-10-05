@@ -32,7 +32,7 @@ export function safeFormatDate(dateStr: string | number | Date | null | undefine
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return 'No disponible';
     return d.toLocaleString(locale);
-  } catch (_e) {
+  } catch {
     return 'No disponible';
   }
 }

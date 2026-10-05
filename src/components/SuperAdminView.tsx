@@ -7,9 +7,17 @@ import {
   CheckCircle, Zap, Key, MessageSquare
 } from 'lucide-react';
 import type { RestaurantApplicationStatus } from '../types';
-import { AdminSupportTickets } from './AdminSupportTickets';
 import { formatCop, formatCopOrZero, safeFormatDate } from '../utils/formatters';
 import { ErrorBoundary } from './ErrorBoundary';
+
+const AdminSupportTickets = React.lazy(() => import('./AdminSupportTickets').then(m => ({ default: m.AdminSupportTickets })));
+
+const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
+  <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+    <div style={{ width: '24px', height: '24px', border: '2px solid', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
+    {message}
+  </div>
+);
 
 const SuperAdminViewContent: React.FC = () => {
   const {
@@ -413,8 +421,8 @@ const SuperAdminViewContent: React.FC = () => {
                           {app.estimatedDeliveryMinutes !== undefined && <div>⏱️ Tiempo estimado: <strong style={{ color: 'white' }}>{app.estimatedDeliveryMinutes} min</strong></div>}
                           {(app.logoUrl || app.bannerUrl) && (
                             <div style={{ display: 'flex', gap: '10px', marginTop: '8px', alignItems: 'center' }}>
-                              {app.logoUrl && <img src={app.logoUrl} alt={`Logo de ${app.restaurantName}`} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '10px' }} />}
-                              {app.bannerUrl && <img src={app.bannerUrl} alt={`Portada de ${app.restaurantName}`} style={{ width: '140px', height: '56px', objectFit: 'cover', borderRadius: '10px' }} />}
+                              {app.logoUrl && <img loading="lazy" decoding="async" src={app.logoUrl} alt={`Logo de ${app.restaurantName}`} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '10px' }} />}
+                              {app.bannerUrl && <img loading="lazy" decoding="async" src={app.bannerUrl} alt={`Portada de ${app.restaurantName}`} style={{ width: '140px', height: '56px', objectFit: 'cover', borderRadius: '10px' }} />}
                             </div>
                           )}
                         </div>
@@ -724,7 +732,9 @@ const SuperAdminViewContent: React.FC = () => {
       {/* ── TAB 3: CENTRO DE SOPORTE HUMANO ── */}
       {activeTab === 'support' && (
         <div style={{ marginTop: '1.5rem' }}>
+        <React.Suspense fallback={<FallbackLoader message="Cargando soporte..." />}>
           <AdminSupportTickets />
+        </React.Suspense>
         </div>
       )}
     </div>

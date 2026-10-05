@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   createSupportTicket, 
   fetchRestaurantSupportTickets, 
@@ -37,20 +37,20 @@ export const SupportTab: React.FC<Props> = ({ restaurantId }) => {
   const [loadingConv, setLoadingConv] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  const loadTickets = useCallback(() => {
+    fetchRestaurantSupportTickets(restaurantId).then(({ data, error }) => {
+      if (error) setError(error);
+      else setTickets(data);
+      setLoading(false);
+    });
+  }, [restaurantId]);
+
   useEffect(() => {
     supabase!.auth.getUser().then(({ data }) => {
       if (data.user) setCurrentUserId(data.user.id);
     });
     loadTickets();
-  }, [restaurantId]);
-
-  const loadTickets = async () => {
-    setLoading(true);
-    const { data, error } = await fetchRestaurantSupportTickets(restaurantId);
-    if (error) setError(error);
-    else setTickets(data);
-    setLoading(false);
-  };
+  }, [loadTickets]);
 
   const loadConversation = async (ticketId: string) => {
     setLoadingConv(true);
