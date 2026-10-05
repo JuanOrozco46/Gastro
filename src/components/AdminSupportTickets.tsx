@@ -322,7 +322,7 @@ export const AdminSupportTickets: React.FC = () => {
                     </div>
                     <div>
                       <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Total y Pago</span>
-                      <strong style={{ color: 'white' }}>${activeOrder.total.toLocaleString('es-CO')}</strong> · {activeOrder.paymentMethod}
+                      <strong style={{ color: 'white' }}>${(activeOrder.total || 0).toLocaleString('es-CO')}</strong> · {activeOrder.paymentMethod || 'N/A'}
                     </div>
                     <div>
                       <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Estado</span>
