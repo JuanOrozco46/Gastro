@@ -9,6 +9,7 @@ import {
   updateSupportPriority
 } from '../services/supportService';
 import type { SupportTicket, SupportMessage, TicketStatus, TicketPriority } from '../services/supportService';
+import type { Order } from '../types';
 import { MessageSquare, Send, Search, User, AlertTriangle, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -18,6 +19,7 @@ export const AdminSupportTickets: React.FC = () => {
   const [, setError] = useState<string | null>(null);
 
   const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isInternal, setIsInternal] = useState(false);
@@ -47,11 +49,12 @@ export const AdminSupportTickets: React.FC = () => {
   const loadConversation = async (ticket: SupportTicket) => {
     setLoadingConv(true);
     setActiveTicket(ticket);
-    const { messages, error } = await fetchSupportTicket(ticket.id);
+    const { messages, order, error } = await fetchSupportTicket(ticket.id);
     if (error) {
       alert(error);
     } else {
       setMessages(messages);
+      setActiveOrder(order || null);
     }
     setLoadingConv(false);
   };
@@ -119,8 +122,10 @@ export const AdminSupportTickets: React.FC = () => {
     switch(status) {
       case 'open': return 'Abierto';
       case 'in_review': return 'En Revisión';
-      case 'waiting_for_user': return 'Espera Usuario';
+      case 'waiting_for_customer': return 'Espera Cliente';
       case 'waiting_for_restaurant': return 'Espera Rest.';
+      case 'waiting_for_payment_provider': return 'Espera Pago';
+      case 'escalated': return 'Escalado';
       case 'resolved': return 'Resuelto';
       case 'closed': return 'Cerrado';
       default: return status;
@@ -131,8 +136,10 @@ export const AdminSupportTickets: React.FC = () => {
     switch(status) {
       case 'open': return '#3B82F6';
       case 'in_review': return '#F59E0B';
-      case 'waiting_for_user': return '#EC4899';
+      case 'waiting_for_customer': return '#EC4899';
       case 'waiting_for_restaurant': return '#8B5CF6';
+      case 'waiting_for_payment_provider': return '#6366F1';
+      case 'escalated': return '#EF4444';
       case 'resolved': return '#10B981';
       case 'closed': return '#6B7280';
       default: return '#9CA3AF';
@@ -265,12 +272,14 @@ export const AdminSupportTickets: React.FC = () => {
                   value={activeTicket.status}
                   onChange={e => handleChangeStatus(e.target.value as TicketStatus)}
                 >
-                  <option value="open">Estado: Abierto</option>
-                  <option value="in_review">Estado: En Revisión</option>
-                  <option value="waiting_for_user">Estado: Espera Usuario</option>
-                  <option value="waiting_for_restaurant">Estado: Espera Rest.</option>
-                  <option value="resolved">Estado: Resuelto</option>
-                  <option value="closed">Estado: Cerrado</option>
+                  <option value="open">Abierto</option>
+                  <option value="in_review">En Revisión</option>
+                  <option value="waiting_for_customer">Espera Cliente</option>
+                  <option value="waiting_for_restaurant">Espera Rest.</option>
+                  <option value="waiting_for_payment_provider">Espera Pago</option>
+                  <option value="escalated">Escalado</option>
+                  <option value="resolved">Resuelto</option>
+                  <option value="closed">Cerrado</option>
                 </select>
 
                 <select 
@@ -283,6 +292,7 @@ export const AdminSupportTickets: React.FC = () => {
                   <option value="normal">Prioridad: Normal</option>
                   <option value="high">Prioridad: Alta</option>
                   <option value="urgent">Prioridad: Urgente</option>
+                  <option value="critical">Prioridad: Crítica</option>
                 </select>
 
                 {activeTicket.assigned_to === currentUserId ? (
@@ -298,6 +308,34 @@ export const AdminSupportTickets: React.FC = () => {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+              
+              {/* Contexto del Pedido si existe */}
+              {activeOrder && (
+                <div style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
+                  <h4 style={{ fontSize: '0.9rem', color: '#38BDF8', fontWeight: 800, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Search size={14} /> Contexto del Pedido Asociado
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.85rem' }}>
+                    <div>
+                      <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Cliente</span>
+                      <strong style={{ color: 'white' }}>{activeOrder.customerName}</strong> ({activeOrder.customerPhone})
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Total y Pago</span>
+                      <strong style={{ color: 'white' }}>${activeOrder.total.toLocaleString('es-CO')}</strong> · {activeOrder.paymentMethod}
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Estado</span>
+                      <span className="badge badge-secondary" style={{ display: 'inline-block', fontSize: '0.75rem' }}>{activeOrder.status}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Tipo</span>
+                      <strong style={{ color: 'white' }}>{activeOrder.type}</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '12px', marginBottom: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '8px', fontWeight: 600 }}>Descripción original:</div>
                 <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: '0.95rem' }}>{activeTicket.description}</p>

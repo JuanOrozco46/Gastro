@@ -287,6 +287,7 @@ export const CustomerDeliveryApp: React.FC = () => {
 
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'feed' | 'directory' | 'orders' | 'support'>('feed');
+  const [supportInitialOrder, setSupportInitialOrder] = useState<string | null>(null);
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [videoPost, setVideoPost] = useState<Post | null>(null);
   const [selectedCommentsPostId, setSelectedCommentsPostId] = useState<string | null>(null);
@@ -924,12 +925,15 @@ export const CustomerDeliveryApp: React.FC = () => {
               </div>
             )}
           </div>
-          <MyOrders />
+          <MyOrders onNeedHelp={(orderId) => {
+            setSupportInitialOrder(orderId);
+            setActiveTab('support');
+          }} />
         </div>
       )}
 
       {activeTab === 'support' && (
-        <SupportCenter />
+        <SupportCenter initialOrderId={supportInitialOrder} />
       )}
 
       {/* ── Video Modal ── */}

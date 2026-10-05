@@ -11,7 +11,11 @@ import { MessageSquare, Plus, ArrowLeft, Send, CheckCircle, RefreshCcw, Info } f
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 
-export const SupportCenter: React.FC = () => {
+interface SupportCenterProps {
+  initialOrderId?: string | null;
+}
+
+export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId }) => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,8 +25,10 @@ export const SupportCenter: React.FC = () => {
   
   // Create ticket state
   const [category, setCategory] = useState<TicketCategory>('order');
+  const [subcategory, setSubcategory] = useState('');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
+  const [relatedOrderId, setRelatedOrderId] = useState(initialOrderId || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Conversation state
@@ -37,7 +43,12 @@ export const SupportCenter: React.FC = () => {
       if (data.user) setCurrentUserId(data.user.id);
     });
     loadTickets();
-  }, []);
+    if (initialOrderId) {
+      setActiveView('create');
+      setCategory('order');
+      setRelatedOrderId(initialOrderId);
+    }
+  }, [initialOrderId]);
 
   const loadTickets = async () => {
     setLoading(true);
@@ -69,8 +80,10 @@ export const SupportCenter: React.FC = () => {
     
     const { data, error } = await createSupportTicket({
       category,
+      subcategory: subcategory || undefined,
       subject,
-      description
+      description,
+      related_order_id: relatedOrderId || undefined
     });
 
     if (error || !data) {
@@ -80,6 +93,8 @@ export const SupportCenter: React.FC = () => {
       setCategory('order');
       setSubject('');
       setDescription('');
+      setSubcategory('');
+      setRelatedOrderId('');
       setActiveView('list');
     }
     setIsSubmitting(false);
@@ -97,8 +112,8 @@ export const SupportCenter: React.FC = () => {
       setMessages([...messages, data]);
       setNewMessage('');
       
-      // If ticket was waiting_for_user, we could auto-reopen or set open, but the user is replying.
-      if (activeTicket.status === 'waiting_for_user') {
+      // If ticket was waiting_for_customer, we could auto-reopen or set open, but the user is replying.
+      if (activeTicket.status === 'waiting_for_customer') {
         const { success } = await updateSupportTicketStatus(activeTicket.id, 'open');
         if (success) setActiveTicket({ ...activeTicket, status: 'open' });
       }
@@ -123,8 +138,10 @@ export const SupportCenter: React.FC = () => {
     switch(status) {
       case 'open': return 'Abierto';
       case 'in_review': return 'En Revisión';
-      case 'waiting_for_user': return 'Esperando tu respuesta';
+      case 'waiting_for_customer': return 'Esperando al equipo';
       case 'waiting_for_restaurant': return 'Esperando al restaurante';
+      case 'waiting_for_payment_provider': return 'Espera de Pago';
+      case 'escalated': return 'Escalado';
       case 'resolved': return 'Resuelto';
       case 'closed': return 'Cerrado';
       default: return status;
@@ -135,7 +152,10 @@ export const SupportCenter: React.FC = () => {
     switch(status) {
       case 'open': return '#3B82F6';
       case 'in_review': return '#F59E0B';
-      case 'waiting_for_user': return '#EC4899';
+      case 'waiting_for_customer': return '#EC4899';
+      case 'waiting_for_restaurant': return '#8B5CF6';
+      case 'waiting_for_payment_provider': return '#6366F1';
+      case 'escalated': return '#EF4444';
       case 'resolved': return '#10B981';
       case 'closed': return '#6B7280';
       default: return '#9CA3AF';
@@ -225,15 +245,30 @@ export const SupportCenter: React.FC = () => {
             <div>
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '0.9rem' }}>Categoría</label>
               <select className="form-input" value={category} onChange={e => setCategory(e.target.value as TicketCategory)} required>
-                <option value="order">Problema con un Pedido</option>
+                <option value="order">Problema general con Pedido</option>
+                <option value="missing_item">Artículo Faltante</option>
+                <option value="wrong_item">Artículo Equivocado</option>
+                <option value="damaged_item">Pedido en Mal Estado</option>
+                <option value="delayed_order">Pedido muy Demorado</option>
+                <option value="delivery">Problema con Repartidor</option>
                 <option value="payment">Problema de Pago / Cobros</option>
-                <option value="delivery">Problema con el Repartidor</option>
-                <option value="restaurant">Queja sobre el Restaurante</option>
-                <option value="account">Mi Cuenta</option>
+                <option value="refund_request">Solicitud de Reembolso</option>
+                <option value="restaurant">Queja sobre Restaurante</option>
+                <option value="account">Problema con mi Cuenta</option>
+                <option value="password">Recuperación de Contraseña</option>
+                <option value="menu">Error en Menú o Precios</option>
                 <option value="technical">Error Técnico en la App</option>
+                <option value="safety">Reporte de Seguridad</option>
                 <option value="other">Otro asunto</option>
               </select>
             </div>
+
+            {relatedOrderId && (
+              <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                <span style={{ fontSize: '0.85rem', color: '#38BDF8', fontWeight: 700 }}>Asociado al Pedido #{relatedOrderId.slice(0, 8)}</span>
+                <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px' }}>Este ticket se vinculará directamente a tu pedido para una revisión más rápida.</p>
+              </div>
+            )}
             
             <div>
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '0.9rem' }}>Asunto</label>

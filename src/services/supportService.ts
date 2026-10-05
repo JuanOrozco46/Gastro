@@ -1,8 +1,9 @@
 import { supabase } from '../lib/supabase';
+import type { Order } from '../types';
 
-export type TicketCategory = 'order' | 'payment' | 'restaurant' | 'delivery' | 'account' | 'menu' | 'technical' | 'other';
-export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
-export type TicketStatus = 'open' | 'in_review' | 'waiting_for_user' | 'waiting_for_restaurant' | 'resolved' | 'closed';
+export type TicketCategory = 'order' | 'missing_item' | 'wrong_item' | 'damaged_item' | 'delayed_order' | 'delivery' | 'payment' | 'refund_request' | 'restaurant' | 'account' | 'password' | 'menu' | 'technical' | 'safety' | 'other';
+export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent' | 'critical';
+export type TicketStatus = 'open' | 'in_review' | 'waiting_for_customer' | 'waiting_for_restaurant' | 'waiting_for_payment_provider' | 'escalated' | 'resolved' | 'closed';
 
 export interface SupportTicket {
   id: string;
@@ -16,6 +17,13 @@ export interface SupportTicket {
   status: TicketStatus;
   assigned_to: string | null;
   related_order_id: string | null;
+  related_payment_id: string | null;
+  requester_type: 'customer' | 'restaurant_owner' | 'restaurant_staff';
+  subcategory: string | null;
+  satisfaction_score: number | null;
+  satisfaction_comment: string | null;
+  last_customer_message_at: string | null;
+  last_agent_message_at: string | null;
   created_at: string;
   updated_at: string;
   first_response_at: string | null;
@@ -38,11 +46,14 @@ export interface SupportMessage {
 
 export async function createSupportTicket(data: {
   category: TicketCategory;
+  subcategory?: string;
   subject: string;
   description: string;
   restaurant_id?: string;
   city_id?: string;
   related_order_id?: string;
+  related_payment_id?: string;
+  requester_type?: 'customer' | 'restaurant_owner' | 'restaurant_staff';
 }): Promise<{ data: SupportTicket | null, error: string | null }> {
   if (!data.subject.trim() || !data.description.trim()) {
     return { data: null, error: 'El asunto y la descripción son obligatorios.' };
@@ -57,12 +68,15 @@ export async function createSupportTicket(data: {
 
     const { data: ticket, error } = await supabase!.from('support_tickets').insert({
       requester_user_id: user.user.id,
+      requester_type: data.requester_type || 'customer',
       category: data.category,
+      subcategory: data.subcategory || null,
       subject: data.subject.trim(),
       description: data.description.trim(),
       restaurant_id: data.restaurant_id || null,
       city_id: data.city_id || null,
-      related_order_id: data.related_order_id || null
+      related_order_id: data.related_order_id || null,
+      related_payment_id: data.related_payment_id || null
     }).select('*').single();
 
     if (error) {
@@ -119,6 +133,7 @@ export async function fetchRestaurantSupportTickets(restaurantId: string): Promi
 export async function fetchSupportTicket(ticketId: string): Promise<{
   ticket: SupportTicket | null,
   messages: SupportMessage[],
+  order?: Order | null,
   error: string | null 
 }> {
   try {
@@ -141,9 +156,30 @@ export async function fetchSupportTicket(ticketId: string): Promise<{
       console.error('Error fetching messages', msgsError);
     }
 
+    let orderData: Order | null = null;
+    if (ticketData && ticketData.related_order_id) {
+      const { data: ord } = await supabase!.from('orders').select('*').eq('id', ticketData.related_order_id).single();
+      if (ord) {
+        orderData = {
+          id: ord.id,
+          tenantId: ord.restaurant_id,
+          createdAt: new Date(ord.created_at).getTime(),
+          items: ord.items || [],
+          total: ord.total,
+          status: ord.status,
+          customerName: ord.customer_name,
+          customerPhone: ord.customer_phone,
+          fulfillment: ord.fulfillment,
+          type: ord.type || (ord.fulfillment === 'pickup' ? 'Recogida' : 'Domicilio'),
+          paymentMethod: ord.payment_method
+        } as Order;
+      }
+    }
+
     return { 
       ticket: ticketData as SupportTicket, 
       messages: (messagesData as SupportMessage[]) || [], 
+      order: orderData,
       error: null 
     };
   } catch (e: unknown) {

@@ -3,7 +3,7 @@ import { useApp } from '../context/useApp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package, Clock, CheckCircle2, ChefHat, Bike, ShoppingBag, CreditCard,
-  RefreshCw, ChevronDown, ChevronUp, MapPin, Utensils
+  RefreshCw, ChevronDown, ChevronUp, MapPin, Utensils, MessageSquare, Copy, Check
 } from 'lucide-react';
 import type { Order, OrderStatus, CustomerDeliveryAddress } from '../types';
 import { PaymentStatus } from './PaymentStatus';
@@ -120,10 +120,19 @@ interface OrderCardProps {
   tenantName: string;
   tenantEmoji: string;
   authMode: 'demo' | 'remote';
+  onNeedHelp?: (orderId: string) => void;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji, authMode }) => {
+const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji, authMode, onNeedHelp }) => {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyId = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(order.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
   const cfg = STATUS_CONFIG[order.status];
   const steps: OrderStatus[] = ['pending', 'preparing', 'ready', 'delivered'];
   const fulfillmentLabel = getFulfillmentLabel(order);
@@ -168,8 +177,20 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji, a
                 {fulfillmentLabel}
               </span>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                #{order.id} · {formatTime(order.createdAt)}
+                {formatTime(order.createdAt)}
               </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+                #{order.id.slice(0, 8)}
+              </span>
+              <button 
+                onClick={handleCopyId} 
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+                title="Copiar ID completo"
+              >
+                {copied ? <Check size={12} color="#10B981" /> : <Copy size={12} />}
+              </button>
             </div>
           </div>
         </div>
@@ -358,11 +379,29 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji, a
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Button for Help */}
+      {onNeedHelp && (
+        <button 
+          className="btn btn-outline"
+          style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px', fontSize: '0.85rem', marginTop: '12px' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onNeedHelp(order.id);
+          }}
+        >
+          <MessageSquare size={16} /> Necesito ayuda con este pedido
+        </button>
+      )}
     </motion.div>
   );
 };
 
-export const MyOrders: React.FC = () => {
+interface MyOrdersProps {
+  onNeedHelp?: (orderId: string) => void;
+}
+
+export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp }) => {
   const { orders, tenants, authMode } = useApp();
 
   const clientOrders = orders
@@ -430,6 +469,7 @@ export const MyOrders: React.FC = () => {
                   tenantName={tenant?.name || 'Restaurante Aliado'}
                   tenantEmoji={tenant?.logoEmoji || '🍽️'}
                   authMode={authMode}
+                  onNeedHelp={onNeedHelp}
                 />
               );
             })}
@@ -453,6 +493,7 @@ export const MyOrders: React.FC = () => {
                   tenantName={tenant?.name || 'Restaurante Aliado'}
                   tenantEmoji={tenant?.logoEmoji || '🍽️'}
                   authMode={authMode}
+                  onNeedHelp={onNeedHelp}
                 />
               );
             })}

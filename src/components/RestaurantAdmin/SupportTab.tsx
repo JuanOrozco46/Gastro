@@ -24,6 +24,7 @@ export const SupportTab: React.FC<Props> = ({ restaurantId }) => {
   
   // Create ticket state
   const [category, setCategory] = useState<TicketCategory>('restaurant');
+  const [subcategory, setSubcategory] = useState('');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,9 +72,11 @@ export const SupportTab: React.FC<Props> = ({ restaurantId }) => {
     
     const { data, error } = await createSupportTicket({
       category,
+      subcategory: subcategory || undefined,
       subject,
       description,
-      restaurant_id: restaurantId
+      restaurant_id: restaurantId,
+      requester_type: 'restaurant_owner'
     });
 
     if (error || !data) {
@@ -81,6 +84,7 @@ export const SupportTab: React.FC<Props> = ({ restaurantId }) => {
     } else {
       setTickets([data, ...tickets]);
       setCategory('restaurant');
+      setSubcategory('');
       setSubject('');
       setDescription('');
       setActiveView('list');
@@ -113,8 +117,10 @@ export const SupportTab: React.FC<Props> = ({ restaurantId }) => {
     switch(status) {
       case 'open': return 'Abierto';
       case 'in_review': return 'En Revisión';
-      case 'waiting_for_user': return 'Esperando al usuario';
+      case 'waiting_for_customer': return 'Esperando al cliente';
       case 'waiting_for_restaurant': return 'Esperando tu respuesta';
+      case 'waiting_for_payment_provider': return 'Espera Pago';
+      case 'escalated': return 'Escalado';
       case 'resolved': return 'Resuelto';
       case 'closed': return 'Cerrado';
       default: return status;
@@ -125,7 +131,10 @@ export const SupportTab: React.FC<Props> = ({ restaurantId }) => {
     switch(status) {
       case 'open': return '#3B82F6';
       case 'in_review': return '#F59E0B';
-      case 'waiting_for_restaurant': return '#EC4899';
+      case 'waiting_for_customer': return '#EC4899';
+      case 'waiting_for_restaurant': return '#8B5CF6';
+      case 'waiting_for_payment_provider': return '#6366F1';
+      case 'escalated': return '#EF4444';
       case 'resolved': return '#10B981';
       case 'closed': return '#6B7280';
       default: return '#9CA3AF';
@@ -216,9 +225,11 @@ export const SupportTab: React.FC<Props> = ({ restaurantId }) => {
                 <option value="account">Mi Cuenta / Perfil</option>
                 <option value="payment">Pagos y Facturación</option>
                 <option value="order">Problema con un Pedido de un cliente</option>
+                <option value="delayed_order">Pedido muy Demorado</option>
                 <option value="delivery">Problema con un Repartidor</option>
                 <option value="menu">Menú y Productos</option>
                 <option value="technical">Error Técnico</option>
+                <option value="safety">Reporte de Seguridad</option>
                 <option value="other">Otro asunto</option>
               </select>
             </div>
