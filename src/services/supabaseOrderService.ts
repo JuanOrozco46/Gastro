@@ -52,6 +52,7 @@ export async function createLiveOrder(
       p_delivery_address: order.deliveryAddress || null,
       p_table_number: (order as any).tableNumber || null,
       p_table_id: (order as any).tableId || null,
+      p_table_token: order.tableToken || null,
       p_device_id: deviceId,
       p_restaurant_notes: order.restaurantNotes || null,
       p_items: order.items.map(item => ({

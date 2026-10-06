@@ -349,6 +349,7 @@ export const TablePublicView: React.FC = () => {
         onClose={() => setIsPaymentOpen(false)}
         orderType="table_service"
         prefilledTableId={table.id}
+        prefilledTableToken={window.location.pathname.split('/mesa/')[1]}
       />
     </motion.div>
   );

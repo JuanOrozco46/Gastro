@@ -15,9 +15,10 @@ interface PaymentModalProps {
   onClose: () => void;
   orderType?: string;
   prefilledTableId?: string;
+  prefilledTableToken?: string;
 }
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'pickup', prefilledTableId }) => {
+export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'pickup', prefilledTableId, prefilledTableToken }) => {
   const { cart, currentTenant, currentUser, submitOrderWithPayment, retryRemotePayment, authMode, isSubmittingOrder, orderError } = useApp();
   const [method, setMethod] = useState<PaymentMethod>('wompi');
   const [loading, setLoading] = useState(false);
@@ -145,6 +146,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       } : undefined,
       tableNumber: fulfillment === 'table_service' ? tableNumber.trim() : undefined,
       tableId: fulfillment === 'table_service' ? prefilledTableId : undefined,
+      tableToken: fulfillment === 'table_service' ? prefilledTableToken : undefined,
       restaurantNotes: restaurantNotes.trim() || undefined
     };
 

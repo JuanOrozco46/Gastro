@@ -43,6 +43,17 @@ const MainContent: React.FC = () => {
     return <ViewLoader />;
   }
 
+  const path = window.location.pathname;
+  if (path.startsWith('/mesa/')) {
+    return (
+      <main>
+        <Suspense fallback={<ViewLoader />}>
+          <TablePublicView />
+        </Suspense>
+      </main>
+    );
+  }
+
   if (userRole === 'login') {
     return <LoginScreen />;
   }

@@ -320,6 +320,7 @@ export interface CheckoutDetails {
   deliveryAddress?: CustomerDeliveryAddress;
   tableNumber?: string;
   tableId?: string;
+  tableToken?: string;
   restaurantNotes?: string;
 }
 
@@ -346,6 +347,7 @@ export interface Order {
   deliveryAddress?: CustomerDeliveryAddress;
   tableNumber?: string;
   tableId?: string;
+  tableToken?: string;
   restaurantNotes?: string;
   cancellationReason?: string;
 }
