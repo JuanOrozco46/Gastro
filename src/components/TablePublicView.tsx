@@ -185,6 +185,20 @@ export const TablePublicView: React.FC = () => {
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '12px' }}>
                       {o.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
                     </div>
+                    {o.paymentMethod === 'cash' && (
+                      <div style={{ 
+                        padding: '8px', 
+                        borderRadius: '10px', 
+                        marginBottom: '12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        textAlign: 'center',
+                        background: o.paymentStatus === 'pending' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                        color: o.paymentStatus === 'pending' ? '#F59E0B' : '#10B981'
+                      }}>
+                        {o.paymentStatus === 'pending' ? '⏳ Pago en efectivo pendiente de confirmación' : '✅ Efectivo recibido'}
+                      </div>
+                    )}
                     {o.status === 'delivered' && restaurant.googlePlaceId && (
                       <button 
                         onClick={() => window.open(`https://search.google.com/local/writereview?placeid=${restaurant.googlePlaceId}`, '_blank')}

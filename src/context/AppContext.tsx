@@ -8,7 +8,7 @@ import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, f
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
-import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment } from '../services/supabaseOrderService';
+import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment, confirmCashPayment as confirmCashPaymentRemote } from '../services/supabaseOrderService';
 import { resolveLocationFromCoords } from '../services/locationResolver';
 
 // Internal typed authorization helpers
@@ -1277,6 +1277,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  const confirmCashPayment = async (paymentId: string, orderId: string): Promise<{ success: boolean; error?: string }> => {
+    if (authMode === 'remote') {
+      const res = await confirmCashPaymentRemote(paymentId, orderId);
+      if (res.success) {
+        setOrders(prev => prev.map(o => {
+          if (o.id === orderId) {
+            return {
+              ...o,
+              paymentStatus: 'approved',
+              payments: (o as any).payments?.map((p: any) => p.id === paymentId ? { ...p, status: 'approved' } : p)
+            };
+          }
+          return o;
+        }));
+        showToast('Pago en efectivo confirmado.');
+      } else {
+        showToast(res.error || 'Error al confirmar pago.');
+      }
+      return res;
+    }
+    showToast('El modo local no soporta esta acción.');
+    return { success: false, error: 'Local mode not supported' };
+  };
+
   const toggleProductAvailability = async (productId: string) => {
     const target = products.find(p => p.id === productId);
     if (!target) return;
@@ -1954,6 +1978,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       submitOrderWithPayment,
       retryRemotePayment,
       updateOrderStatus,
+      confirmCashPayment,
       toggleProductAvailability,
       addProduct,
       updateProduct,

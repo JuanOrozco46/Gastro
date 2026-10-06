@@ -6,7 +6,7 @@ import { PlusCircle, Clock, Flame, CheckCircle, PackageCheck, Building2, AlertCi
 import type { OrderStatus } from '../types';
 
 export const KitchenKDS: React.FC = () => {
-  const { tenants, currentUser, orders, updateOrderStatus, triggerTestOrder, drivers } = useApp();
+  const { tenants, currentUser, orders, updateOrderStatus, confirmCashPayment, triggerTestOrder, drivers } = useApp();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -17,6 +17,7 @@ export const KitchenKDS: React.FC = () => {
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
 
   if (!operatingTenant) {
     return (
@@ -68,7 +69,20 @@ export const KitchenKDS: React.FC = () => {
   const newOrders = tenantOrders.filter(o => o.status === 'pending');
   const acceptedOrders = tenantOrders.filter(o => o.status === 'accepted');
   const preparingOrders = tenantOrders.filter(o => o.status === 'preparing');
-  const readyOrders = tenantOrders.filter(o => o.status === 'ready');
+  const readyOrders = tenantOrders.filter(o => 
+    o.status === 'ready' || 
+    (o.status === 'delivered' && o.paymentMethod === 'cash' && o.paymentStatus === 'pending')
+  );
+
+
+  const handleConfirmCash = async (paymentId: string | undefined, orderId: string) => {
+    if (!paymentId) return;
+    if (!window.confirm('¿Confirmas que recibiste el efectivo completo para esta orden?')) return;
+    
+    setConfirmingPaymentId(orderId);
+    await confirmCashPayment(paymentId, orderId);
+    setConfirmingPaymentId(null);
+  };
 
   const getElapsedTime = (createdAt: number) => {
     const mins = Math.floor((now - createdAt) / 60000);
@@ -169,7 +183,7 @@ export const KitchenKDS: React.FC = () => {
               </button>
             )}
 
-            {order.status === 'ready' && (
+            {(order.status === 'ready' || order.status === 'delivered') && (
               <>
                 <div style={{ 
                   background: 'rgba(16,185,129,0.15)', 
@@ -182,19 +196,30 @@ export const KitchenKDS: React.FC = () => {
                   marginBottom: '8px'
                 }}>
                   <PackageCheck size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                  Listo para entregar
+                  {order.status === 'delivered' ? 'Entregado al cliente' : 'Listo para entregar'}
                 </div>
-                {isOwner && (
+                {isOwner && order.status === 'ready' && (
                   <button
                     className="btn btn-success btn-full"
                     disabled={updatingOrderId === order.id}
                     onClick={() => handleUpdate(order.id, order.fulfillment === 'restaurant_delivery' ? 'out_for_delivery' : 'delivered')}
-                    style={{ background: 'var(--success)', color: 'white' }}
+                    style={{ background: 'var(--success)', color: 'white', marginBottom: '8px' }}
                   >
                     {updatingOrderId === order.id ? <Loader2 size={16} className="spin" /> : <PackageCheck size={16} />} 
                     {updatingOrderId === order.id 
                       ? ' Despachando...' 
                       : order.fulfillment === 'restaurant_delivery' ? ' Despachar (Domicilio)' : ' Entregar al Cliente'}
+                  </button>
+                )}
+                {order.paymentMethod === 'cash' && order.paymentStatus === 'pending' && (
+                  <button
+                    className="btn btn-full"
+                    disabled={confirmingPaymentId === order.id}
+                    onClick={() => handleConfirmCash((order as any).payments?.[0]?.id, order.id)}
+                    style={{ background: '#F59E0B', color: 'white' }}
+                  >
+                    {confirmingPaymentId === order.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />}
+                    {confirmingPaymentId === order.id ? ' Confirmando...' : ' Confirmar efectivo recibido'}
                   </button>
                 )}
               </>

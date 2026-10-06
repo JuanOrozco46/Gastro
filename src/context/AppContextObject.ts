@@ -63,6 +63,7 @@ export interface AppContextType {
   submitOrderWithPayment: (typeOrDetails: string | CheckoutDetails, method: PaymentMethod, transaction?: Transaction) => Promise<{ success: boolean; isRemote?: boolean; orderId?: string; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }>;
   retryRemotePayment: (orderId: string) => Promise<{ success: boolean; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<boolean>;
+  confirmCashPayment: (paymentId: string, orderId: string) => Promise<{ success: boolean; error?: string }>;
   toggleProductAvailability: (productId: string) => Promise<void> | void;
   addProduct: (product: Omit<Product, 'id' | 'tenantId'>) => Promise<void> | void;
   updateProduct: (productId: string, updates: Partial<Product>) => Promise<void>;

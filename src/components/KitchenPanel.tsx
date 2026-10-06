@@ -7,7 +7,7 @@ import { PlusCircle, Clock, Flame, CheckCircle, PackageCheck, Power, Utensils, S
 import type { OrderStatus } from '../types';
 
 export const KitchenPanel: React.FC = () => {
-  const { tenants, currentUser, toggleTenantOpenStatus, orders, updateOrderStatus, products, triggerTestOrder } = useApp();
+  const { tenants, currentUser, toggleTenantOpenStatus, orders, updateOrderStatus, confirmCashPayment, products, triggerTestOrder } = useApp();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -18,6 +18,7 @@ export const KitchenPanel: React.FC = () => {
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
 
   if (!operatingTenant) {
     return (
@@ -53,7 +54,20 @@ export const KitchenPanel: React.FC = () => {
   const pendingOrders = tenantOrders.filter(o => o.status === 'pending');
   const acceptedOrders = tenantOrders.filter(o => o.status === 'accepted');
   const preparingOrders = tenantOrders.filter(o => o.status === 'preparing');
-  const readyOrders = tenantOrders.filter(o => o.status === 'ready');
+  const readyOrders = tenantOrders.filter(o => 
+    o.status === 'ready' || 
+    (o.status === 'delivered' && o.paymentMethod === 'cash' && o.paymentStatus === 'pending')
+  );
+
+
+  const handleConfirmCash = async (paymentId: string | undefined, orderId: string) => {
+    if (!paymentId) return;
+    if (!window.confirm('¿Confirmas que recibiste el efectivo completo para esta orden?')) return;
+    
+    setConfirmingPaymentId(orderId);
+    await confirmCashPayment(paymentId, orderId);
+    setConfirmingPaymentId(null);
+  };
 
   const handleUpdate = async (orderId: string, status: OrderStatus) => {
     setUpdatingOrderId(orderId);
@@ -435,8 +449,24 @@ export const KitchenPanel: React.FC = () => {
 
                       <div style={{ background: 'rgba(16,185,129,0.1)', padding: '10px', borderRadius: '12px', textAlign: 'center', fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>
                         <PackageCheck size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                        Listo para retiro por mesero / domiciliario
+                        {order.status === 'delivered' ? 'Entregado al cliente' : 'Listo para retiro por mesero / domiciliario'}
                       </div>
+
+                      {order.paymentMethod === 'cash' && order.paymentStatus === 'pending' && (
+                        <div style={{ marginTop: '12px' }}>
+                          <motion.button 
+                            whileHover={confirmingPaymentId === order.id ? {} : { scale: 1.02 }}
+                            whileTap={confirmingPaymentId === order.id ? {} : { scale: 0.98 }}
+                            className="btn btn-full" 
+                            style={{ borderRadius: '12px', fontWeight: 800, padding: '10px', background: '#F59E0B', color: 'white', border: 'none' }}
+                            disabled={confirmingPaymentId === order.id}
+                            onClick={() => handleConfirmCash((order as any).payments?.[0]?.id, order.id)}
+                          >
+                            {confirmingPaymentId === order.id ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                            {confirmingPaymentId === order.id ? ' Confirmando...' : ' Confirmar efectivo recibido'}
+                          </motion.button>
+                        </div>
+                      )}
                     </motion.div>
                   ))}
                 </AnimatePresence>

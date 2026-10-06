@@ -162,13 +162,6 @@ export async function updateLiveOrderStatus(
       p_next_status: newStatus
     });
 
-    if (!error && newStatus === 'delivered') {
-      const { data: payData } = await supabase.from('payments').select('id, provider, status').eq('order_id', orderId).single();
-      if (payData && payData.provider === 'cash' && payData.status === 'pending') {
-        await supabase.from('payments').update({ status: 'approved' }).eq('id', payData.id);
-      }
-    }
-
     if (tableId) {
       // Emitir broadcast para que la mesa reciba actualizaciones sin depender de RLS de SELECT
       supabase.channel(`table_orders_sync_${tableId}`).send({
@@ -378,4 +371,24 @@ export function subscribeToTableOrders(tableId: string, onUpdate: () => void): (
   return () => {
     supabase?.removeChannel(channel);
   };
+}
+
+export async function confirmCashPayment(paymentId: string, orderId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'Supabase no está configurado.' };
+  }
+  try {
+    const { error } = await supabase.rpc('confirm_cash_payment', {
+      p_payment_id: paymentId,
+      p_order_id: orderId
+    });
+    if (error) {
+      console.error('Error confirming cash payment:', error);
+      return { success: false, error: 'No se pudo confirmar el pago. Asegúrate de tener permisos y que el pago esté pendiente.' };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    console.error('Exception confirming cash payment:', err);
+    return { success: false, error: 'Error técnico al confirmar el pago.' };
+  }
 }
