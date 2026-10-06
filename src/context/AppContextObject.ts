@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, RestaurantApplication, UserLocationState } from '../types';
+import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, RestaurantApplication, UserLocationState, RestaurantMember } from '../types';
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
 
 export interface AppContextType {
@@ -72,6 +72,16 @@ export interface AppContextType {
   activateApprovedRestaurant: (applicationId: string) => Promise<{ success: boolean; tenantId?: string; error?: string; message?: string }>;
   showToast: (message: string) => void;
   triggerTestOrder: () => void;
+  
+  // Member Management
+  fetchRestaurantMembers: (restaurantId: string) => Promise<RestaurantMember[]>;
+  inviteRestaurantStaff: (restaurantId: string, email: string) => Promise<{ success: boolean; error?: string }>;
+  resendStaffInvitation: (memberId: string) => Promise<{ success: boolean; error?: string }>;
+  suspendRestaurantMember: (memberId: string) => Promise<{ success: boolean; error?: string }>;
+  reactivateRestaurantMember: (memberId: string) => Promise<{ success: boolean; error?: string }>;
+  revokeRestaurantMember: (memberId: string) => Promise<{ success: boolean; error?: string }>;
+  acceptRestaurantInvitation: (memberId: string) => Promise<{ success: boolean; error?: string }>;
+  
   logout: () => void;
 }
 

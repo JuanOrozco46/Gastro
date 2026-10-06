@@ -9,6 +9,7 @@ import { NotificationBell } from './NotificationBell';
 const FinancialAnalytics = lazy(() => import('./FinancialAnalytics').then(m => ({ default: m.FinancialAnalytics })));
 const SupportTab = lazy(() => import('./RestaurantAdmin/SupportTab').then(m => ({ default: m.SupportTab })));
 const MenuTab = lazy(() => import('./RestaurantAdmin/MenuTab').then(m => ({ default: m.MenuTab })));
+const TeamTab = lazy(() => import('./RestaurantAdmin/TeamTab').then(m => ({ default: m.TeamTab })));
 
 const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
   <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
@@ -20,7 +21,7 @@ const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
 import {
   QrCode, Utensils, Truck, Plus, Share2, Play,
   Eye, Heart, Sparkles, Trash2, Power, Printer,
-  MapPin, BarChart3, MessageSquare,
+  MapPin, BarChart3, MessageSquare, ShieldBan,
   AlertCircle, Package, Clock, CheckCircle
 } from 'lucide-react';
 
@@ -35,7 +36,7 @@ export const RestaurantAdmin: React.FC = () => {
 
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
-  const [activeTab, setActiveTab] = useState<'orders' | 'profile' | 'content' | 'menu' | 'analytics' | 'qr' | 'support'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'profile' | 'content' | 'menu' | 'analytics' | 'qr' | 'support' | 'team'>('orders');
   const [supportInitialTicketId, setSupportInitialTicketId] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState('4');
   
@@ -298,6 +299,12 @@ export const RestaurantAdmin: React.FC = () => {
           onClick={() => setActiveTab('qr')}
         >
           <QrCode size={16} /> 📱 QR & Repartidores
+        </button>
+        <button
+          className={`nav-tab ${activeTab === 'team' ? 'active' : ''}`}
+          onClick={() => setActiveTab('team')}
+        >
+          <ShieldBan size={16} /> 👥 Miembros
         </button>
         <button
           className={`nav-tab ${activeTab === 'support' ? 'active' : ''}`}
@@ -845,6 +852,13 @@ export const RestaurantAdmin: React.FC = () => {
           </div>
 
         </div>
+      )}
+
+      {/* ── TAB: TEAM & MEMBERS ── */}
+      {activeTab === 'team' && (
+        <Suspense fallback={<FallbackLoader message="Cargando equipo..." />}>
+          <TeamTab tenant={operatingTenant} />
+        </Suspense>
       )}
 
       {/* ── TAB: SOPORTE ── */}

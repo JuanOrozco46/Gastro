@@ -1060,3 +1060,109 @@ export async function updateRemoteTenant(tenantId: string, updates: Partial<Tena
     return null;
   }
 }
+
+// ============================================================================
+// 10. TEAM MEMBERS MANAGEMENT
+// ============================================================================
+
+import type { RestaurantMember } from '../types';
+
+export async function fetchRestaurantMembers(restaurantId: string): Promise<RestaurantMember[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('restaurant_members')
+      .select('*')
+      .eq('restaurant_id', restaurantId);
+    
+    if (error) throw error;
+    
+    return (data || []).map((db: any) => ({
+      id: db.id,
+      restaurantId: db.restaurant_id,
+      userId: db.user_id,
+      email: db.email,
+      role: db.role,
+      status: db.status,
+      invitedBy: db.invited_by,
+      invitedAt: db.invited_at,
+      acceptedAt: db.accepted_at,
+      revokedAt: db.revoked_at,
+      createdAt: db.created_at,
+      updatedAt: db.updated_at
+    }));
+  } catch (err) {
+    console.error('⚠️ Error fetching restaurant members:', err);
+    return [];
+  }
+}
+
+export async function inviteRestaurantStaff(restaurantId: string, email: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { error } = await supabase.rpc('invite_restaurant_staff', {
+      p_restaurant_id: restaurantId,
+      p_email: email
+    });
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    console.error('⚠️ Error inviting staff:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function resendStaffInvitation(memberId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { error } = await supabase.rpc('resend_restaurant_invitation', { p_member_id: memberId });
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function suspendRestaurantMember(memberId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { error } = await supabase.rpc('update_member_status', { p_member_id: memberId, p_new_status: 'suspended' });
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function reactivateRestaurantMember(memberId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { error } = await supabase.rpc('update_member_status', { p_member_id: memberId, p_new_status: 'active' });
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function revokeRestaurantMember(memberId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { error } = await supabase.rpc('update_member_status', { p_member_id: memberId, p_new_status: 'revoked' });
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function acceptRestaurantInvitation(memberId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { error } = await supabase.rpc('accept_restaurant_invitation', { p_member_id: memberId });
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}

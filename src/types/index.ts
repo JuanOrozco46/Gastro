@@ -13,6 +13,24 @@ export type OrderFulfillment = 'pickup' | 'restaurant_delivery' | 'table_service
 
 export type PaymentMethod = 'apple_pay' | 'google_pay' | 'card' | 'mercadopago' | 'wompi';
 
+export type RestaurantMemberRole = 'owner' | 'staff';
+export type RestaurantMemberStatus = 'invited' | 'active' | 'suspended' | 'revoked';
+
+export interface RestaurantMember {
+  id: string;
+  restaurantId: string;
+  userId: string | null;
+  email: string;
+  role: RestaurantMemberRole;
+  status: RestaurantMemberStatus;
+  invitedBy?: string;
+  invitedAt?: string;
+  acceptedAt?: string;
+  revokedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export type UserRole = 'login' | 'client_delivery' | 'kitchen' | 'admin' | 'table_qr' | 'platform_admin';
 
 export type BusinessUserRole = 'customer' | 'restaurant_owner' | 'restaurant_staff' | 'platform_admin';

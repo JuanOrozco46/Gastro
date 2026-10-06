@@ -4,7 +4,7 @@ import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant, fetchRestaurantMembers as fetchRemoteMembers, inviteRestaurantStaff as inviteRemoteStaff, resendStaffInvitation as resendRemoteInvitation, suspendRestaurantMember as suspendRemoteMember, reactivateRestaurantMember as reactivateRemoteMember, revokeRestaurantMember as revokeRemoteMember, acceptRestaurantInvitation as acceptRemoteInvitation } from '../services/supabaseDataService';
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
@@ -827,6 +827,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return { success: false, error: res.error || 'No se pudo enviar el correo de recuperación.' };
   };
+
+  const fetchRestaurantMembers = async (restaurantId: string) => {
+    if (authMode === 'demo') {
+      const saved = localStorage.getItem(`gs_demo_members_${restaurantId}`);
+      if (saved) {
+        try { return JSON.parse(saved); } catch {}
+      }
+      return [];
+    }
+    return await fetchRemoteMembers(restaurantId);
+  };
+
+  const inviteRestaurantStaff = async (restaurantId: string, email: string) => {
+    if (authMode === 'demo') {
+      const key = `gs_demo_members_${restaurantId}`;
+      const saved = localStorage.getItem(key);
+      let members: any[] = saved ? JSON.parse(saved) : [];
+      if (members.find(m => m.email.toLowerCase() === email.toLowerCase() && m.status !== 'revoked')) {
+        return { success: false, error: 'User already invited or active.' };
+      }
+      members.push({
+        id: `m_${Date.now()}`,
+        restaurantId,
+        userId: null,
+        email: email.toLowerCase(),
+        role: 'staff',
+        status: 'invited',
+        invitedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      });
+      localStorage.setItem(key, JSON.stringify(members));
+      return { success: true };
+    }
+    return await inviteRemoteStaff(restaurantId, email);
+  };
+
+  const resendStaffInvitation = async (memberId: string) => {
+    if (authMode === 'demo') return { success: true };
+    return await resendRemoteInvitation(memberId);
+  };
+
+  const suspendRestaurantMember = async (memberId: string) => {
+    if (authMode === 'demo') {
+      // Find in localStorage and update (simplified for demo)
+      return { success: true };
+    }
+    return await suspendRemoteMember(memberId);
+  };
+
+  const reactivateRestaurantMember = async (memberId: string) => {
+    if (authMode === 'demo') return { success: true };
+    return await reactivateRemoteMember(memberId);
+  };
+
+  const revokeRestaurantMember = async (memberId: string) => {
+    if (authMode === 'demo') return { success: true };
+    return await revokeRemoteMember(memberId);
+  };
+
+  const acceptRestaurantInvitation = async (memberId: string) => {
+    if (authMode === 'demo') return { success: true };
+    return await acceptRemoteInvitation(memberId);
+  };
+
 
   const logout = async () => {
     if (authMode === 'remote') {
@@ -1889,6 +1953,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteComment,
       showToast,
       triggerTestOrder,
+      fetchRestaurantMembers,
+      inviteRestaurantStaff,
+      resendStaffInvitation,
+      suspendRestaurantMember,
+      reactivateRestaurantMember,
+      revokeRestaurantMember,
+      acceptRestaurantInvitation,
       logout
     }}>
       {children}
