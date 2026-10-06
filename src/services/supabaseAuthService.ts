@@ -84,6 +84,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
       .from('restaurant_members')
       .select('restaurant_id, role')
       .eq('user_id', userId)
+      .eq('status', 'active')
       .maybeSingle();
 
     if (member) {
