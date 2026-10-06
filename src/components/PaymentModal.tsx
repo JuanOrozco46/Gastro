@@ -14,11 +14,12 @@ interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   orderType?: string;
+  prefilledTableId?: string;
 }
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'Recoger en local' }) => {
+export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'pickup', prefilledTableId }) => {
   const { cart, currentTenant, currentUser, submitOrderWithPayment, retryRemotePayment, authMode, isSubmittingOrder, orderError } = useApp();
-  const [method, setMethod] = useState<PaymentMethod>('apple_pay');
+  const [method, setMethod] = useState<PaymentMethod>('wompi');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -143,6 +144,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
         notes: deliveryNotes.trim() || undefined
       } : undefined,
       tableNumber: fulfillment === 'table_service' ? tableNumber.trim() : undefined,
+      tableId: fulfillment === 'table_service' ? prefilledTableId : undefined,
       restaurantNotes: restaurantNotes.trim() || undefined
     };
 
@@ -570,9 +572,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                   {[
                     { id: 'wompi', label: '🇨🇴 PSE/Nequi' },
                     { id: 'mercadopago', label: '📱 MercadoPago' },
-                    { id: 'card', label: '💳 Tarjeta' },
-                    { id: 'apple_pay', label: '🍏 Apple' },
-                    { id: 'google_pay', label: '🌐 GPay' }
+                    { id: 'card', label: '💳 Tarjeta' }
                   ].map(item => (
                     <button
                       key={item.id}

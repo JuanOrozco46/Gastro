@@ -165,6 +165,8 @@ export interface Tenant {
   ownerUserId?: string;
   acceptingOrders?: boolean;
   hours?: RestaurantHour[];
+  googlePlaceId?: string;
+  tableServiceEnabled?: boolean;
 }
 
 export interface RestaurantHour {
@@ -176,6 +178,17 @@ export interface RestaurantHour {
   closeTime?: string; // HH:mm format
   openTime2?: string; // HH:mm format (for split shifts)
   closeTime2?: string; // HH:mm format (for split shifts)
+}
+
+export interface RestaurantTable {
+  id: string;
+  restaurantId: string;
+  tableNumber: string;
+  displayName?: string;
+  capacity?: number;
+  isActive: boolean;
+  publicToken: string;
+  createdAt: string;
 }
 
 export type Restaurant = Tenant;
@@ -306,6 +319,7 @@ export interface CheckoutDetails {
   customerPhone: string;
   deliveryAddress?: CustomerDeliveryAddress;
   tableNumber?: string;
+  tableId?: string;
   restaurantNotes?: string;
 }
 
@@ -331,6 +345,7 @@ export interface Order {
   customerPhone?: string;
   deliveryAddress?: CustomerDeliveryAddress;
   tableNumber?: string;
+  tableId?: string;
   restaurantNotes?: string;
   cancellationReason?: string;
 }

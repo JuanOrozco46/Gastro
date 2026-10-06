@@ -20,10 +20,12 @@ const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
 
 import {
   QrCode, Utensils, Truck, Plus, Share2, Play,
-  Eye, Heart, Sparkles, Trash2, Power, Printer,
+  Eye, Heart, Sparkles, Trash2, Power,
   MapPin, BarChart3, MessageSquare, ShieldBan,
   AlertCircle, Package, Clock, CheckCircle
 } from 'lucide-react';
+
+import { RestaurantTablesAdmin } from './RestaurantTablesAdmin';
 
 export const RestaurantAdmin: React.FC = () => {
   const {
@@ -38,7 +40,6 @@ export const RestaurantAdmin: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'orders' | 'profile' | 'content' | 'menu' | 'analytics' | 'qr' | 'support' | 'team'>('orders');
   const [supportInitialTicketId, setSupportInitialTicketId] = useState<string | null>(null);
-  const [tableNumber, setTableNumber] = useState('4');
   
   // Modals state
   // Modals state
@@ -171,8 +172,6 @@ export const RestaurantAdmin: React.FC = () => {
       setPostHashtags('#RecetaDeLaCasa #CalidadGarantizada #Foodies');
     }
   };
-
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://gastrosync.app/r/${operatingTenant.slug}/table${tableNumber}`;
 
   return (
     <motion.div 
@@ -752,44 +751,8 @@ export const RestaurantAdmin: React.FC = () => {
       {activeTab === 'qr' && (
         <div className="grid-2" style={{ gap: '1.75rem' }}>
           
-          {/* QR Generator */}
-          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-            <div className="card-header">
-              <div className="card-title" style={{ color: 'white', fontWeight: 900 }}><QrCode size={22} style={{ color: 'var(--primary)' }} /> QR de Mesas para {operatingTenant.name}</div>
-            </div>
-
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              Imprime este QR para colocarlo en las mesas de <strong>{operatingTenant.address}</strong>.
-            </p>
-
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={{ display: 'block', fontSize: '0.85rem', color: 'white', fontWeight: 800, marginBottom: '6px' }}>
-                Número de Mesa:
-              </label>
-              <input
-                type="number"
-                value={tableNumber}
-                onChange={(e) => setTableNumber(e.target.value)}
-                style={{ width: '100%' }}
-              />
-            </div>
-
-            <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', padding: '1.75rem', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.12)' }}>
-              <img src={qrUrl} alt={`QR Mesa ${tableNumber}`} style={{ width: '170px', height: '170px', borderRadius: '16px', background: 'white', padding: '10px', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }} />
-              <p style={{ color: 'white', fontWeight: 900, fontSize: '1.05rem', marginTop: '14px' }}>
-                Mesa #{tableNumber} - {operatingTenant.name}
-              </p>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="btn btn-outline"
-                style={{ marginTop: '12px', fontSize: '0.85rem', fontWeight: 800, borderRadius: '12px', color: 'white', borderColor: 'rgba(255,255,255,0.2)' }}
-                onClick={() => alert(`Imprimiendo código QR para Mesa #${tableNumber}`)}
-              >
-                <Printer size={16} /> Imprimir / Descargar QR de Mesa
-              </motion.button>
-            </div>
-          </div>
+          {/* QR & Table Management */}
+          <RestaurantTablesAdmin tenant={operatingTenant} />
 
           {/* Delivery Drivers */}
           <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>

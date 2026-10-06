@@ -34,13 +34,25 @@ export async function createLiveOrder(
   }
 
   try {
+    let deviceId = '';
+    if (typeof window !== 'undefined') {
+      let stored = localStorage.getItem('gs_device_id');
+      if (!stored) {
+        stored = crypto.randomUUID();
+        localStorage.setItem('gs_device_id', stored);
+      }
+      deviceId = stored;
+    }
+
     const payload = {
       p_restaurant_id: order.tenantId,
       p_fulfillment: order.fulfillment || 'restaurant_delivery',
       p_customer_name: order.customerName || 'Cliente',
       p_customer_phone: order.customerPhone || '0000000000',
       p_delivery_address: order.deliveryAddress || null,
-      p_table_number: order.tableNumber || null,
+      p_table_number: (order as any).tableNumber || null,
+      p_table_id: (order as any).tableId || null,
+      p_device_id: deviceId,
       p_restaurant_notes: order.restaurantNotes || null,
       p_items: order.items.map(item => ({
         product_id: item.id,
@@ -125,7 +137,8 @@ export async function fetchLiveOrdersForCustomer(customerId: string): Promise<Or
 
 export async function updateLiveOrderStatus(
   orderId: string,
-  newStatus: OrderStatus
+  newStatus: OrderStatus,
+  tableId?: string
 ): Promise<{ success: boolean; error?: string }> {
   if (!isSupabaseConfigured || !supabase) {
     return { success: false, error: 'Supabase no está configurado.' };
@@ -140,6 +153,15 @@ export async function updateLiveOrderStatus(
       p_order_id: orderId,
       p_next_status: newStatus
     });
+
+    if (tableId) {
+      // Emitir broadcast para que la mesa reciba actualizaciones sin depender de RLS de SELECT
+      supabase.channel(`table_orders_sync_${tableId}`).send({
+        type: 'broadcast',
+        event: 'status_changed',
+        payload: { orderId, status: newStatus }
+      });
+    }
 
     if (error) {
       console.error('❌ RPC Error:', error);
@@ -297,4 +319,48 @@ export async function createRemotePayment(
     console.warn('⚠️ Excepción al invocar create-payment:', err);
     return { success: false, error: 'Error técnico al conectar con el servidor de pagos.' };
   }
+}
+
+export async function fetchLiveOrdersForTable(tableId: string): Promise<Order[]> {
+  if (!isSupabaseConfigured || !supabase || !tableId) return [];
+
+  let deviceId = '';
+  if (typeof window !== 'undefined') {
+    deviceId = localStorage.getItem('gs_device_id') || '';
+  }
+  if (!deviceId) return [];
+
+  try {
+    const { data: dbOrders, error } = await supabase.rpc('get_table_orders_for_session', {
+      p_table_id: tableId,
+      p_session_id: deviceId
+    });
+
+    if (error || !dbOrders) return [];
+
+    return (dbOrders as unknown as DbOrder[]).map(mapDbOrderToOrder);
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción al consultar pedidos de mesa seguros:', err);
+    return [];
+  }
+}
+
+export function subscribeToTableOrders(tableId: string, onUpdate: () => void): () => void {
+  if (!isSupabaseConfigured || !supabase || !tableId) return () => {};
+
+  // Escuchamos broadcasts emitidos por la cocina cuando cambian el estado del pedido
+  const channel = supabase
+    .channel(`table_orders_sync_${tableId}`)
+    .on(
+      'broadcast',
+      { event: 'status_changed' },
+      () => {
+        onUpdate();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase?.removeChannel(channel);
+  };
 }

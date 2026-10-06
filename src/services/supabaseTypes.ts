@@ -71,6 +71,19 @@ export interface DbRestaurantMember {
   created_at: string;
 }
 
+export interface DbRestaurantTable {
+  id: string;
+  restaurant_id: string;
+  table_number: string;
+  display_name: string | null;
+  capacity: number | null;
+  is_active: boolean;
+  public_token: string;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+}
+
 export interface DbProduct {
   id: string;
   restaurant_id: string;

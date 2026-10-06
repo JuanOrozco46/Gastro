@@ -9,7 +9,7 @@ import { Toast } from './components/Toast';
 // Módulos pesados importados dinámicamente para Code-Splitting
 const KitchenPanel = lazy(() => import('./components/KitchenPanel').then(m => ({ default: m.KitchenPanel })));
 const RestaurantAdmin = lazy(() => import('./components/RestaurantAdmin').then(m => ({ default: m.RestaurantAdmin })));
-const TableQRView = lazy(() => import('./components/TableQRView').then(m => ({ default: m.TableQRView })));
+const TablePublicView = lazy(() => import('./components/TablePublicView').then(m => ({ default: m.TablePublicView })));
 const SuperAdminView = lazy(() => import('./components/SuperAdminView').then(m => ({ default: m.SuperAdminView })));
 
 const ViewLoader: React.FC = () => (
@@ -54,7 +54,7 @@ const MainContent: React.FC = () => {
         {userRole === 'client_delivery' && <CustomerDeliveryApp />}
         {userRole === 'kitchen' && <KitchenPanel />}
         {userRole === 'admin' && <RestaurantAdmin />}
-        {userRole === 'table_qr' && <TableQRView />}
+        {userRole === 'table_qr' && <TablePublicView />}
         {userRole === 'platform_admin' && <SuperAdminView />}
       </Suspense>
     </main>

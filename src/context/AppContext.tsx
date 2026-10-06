@@ -418,7 +418,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [initialSession] = useState<UserAccount | null>(() => validateCachedSession());
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(initialSession);
-  const [userRole, setUserRole] = useState<UserRole>(initialSession ? initialSession.role : 'login');
+  const [userRole, setUserRole] = useState<UserRole>(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mesa/')) {
+      return 'table_qr';
+    }
+    return initialSession ? initialSession.role : 'login';
+  });
 
   const [currentTenant, setCurrentTenant] = useState<Tenant>(() => {
     if (initialSession?.tenantId) {
@@ -1254,7 +1259,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (authMode === 'remote') {
-      const res = await updateLiveOrderStatus(orderId, status);
+      const res = await updateLiveOrderStatus(orderId, status, targetOrder.tableId);
       if (!res.success) {
         showToast(res.error || 'No fue posible actualizar el pedido.');
         return false;

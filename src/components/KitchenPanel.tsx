@@ -211,6 +211,11 @@ export const KitchenPanel: React.FC = () => {
                         <span className="ticket-type" style={{ background: 'var(--primary-glass-border)', color: 'var(--primary)', fontWeight: 800 }}>
                           {getFulfillmentBadgeText(order.fulfillment, order.type)}
                         </span>
+                        {order.fulfillment === 'table_service' && (order as any).tableNumber && (
+                          <span className="badge" style={{ background: '#3B82F6', color: 'white', fontWeight: 900, fontSize: '0.85rem' }}>
+                            MESA #{(order as any).tableNumber}
+                          </span>
+                        )}
                       </div>
 
                       {order.restaurantNotes && (
@@ -308,6 +313,11 @@ export const KitchenPanel: React.FC = () => {
                         <span className="ticket-type" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#F59E0B', fontWeight: 800 }}>
                           {getFulfillmentBadgeText(order.fulfillment, order.type)}
                         </span>
+                        {order.fulfillment === 'table_service' && (order as any).tableNumber && (
+                          <span className="badge" style={{ background: '#3B82F6', color: 'white', fontWeight: 900, fontSize: '0.85rem' }}>
+                            MESA #{(order as any).tableNumber}
+                          </span>
+                        )}
                       </div>
 
                       <div className="ticket-items" style={{ margin: '12px 0' }}>
@@ -376,6 +386,11 @@ export const KitchenPanel: React.FC = () => {
                         <span className="ticket-type" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10B981', fontWeight: 800 }}>
                           {getFulfillmentBadgeText(order.fulfillment, order.type)}
                         </span>
+                        {order.fulfillment === 'table_service' && (order as any).tableNumber && (
+                          <span className="badge" style={{ background: '#3B82F6', color: 'white', fontWeight: 900, fontSize: '0.85rem' }}>
+                            MESA #{(order as any).tableNumber}
+                          </span>
+                        )}
                       </div>
 
                       <div className="ticket-items" style={{ margin: '12px 0' }}>

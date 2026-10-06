@@ -1166,3 +1166,111 @@ export async function acceptRestaurantInvitation(memberId: string): Promise<{ su
     return { success: false, error: err.message };
   }
 }
+
+// --- FASE 2 y 3: TABLE QR SERVICE ---
+export async function fetchRestaurantTables(restaurantId: string) {
+  if (!isSupabaseConfigured || !supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('restaurant_tables')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .is('archived_at', null)
+      .order('table_number', { ascending: true });
+
+    if (error) throw error;
+    return data.map(db => ({
+      id: db.id,
+      restaurantId: db.restaurant_id,
+      tableNumber: db.table_number,
+      displayName: db.display_name,
+      capacity: db.capacity,
+      isActive: db.is_active,
+      publicToken: db.public_token,
+      createdAt: db.created_at
+    }));
+  } catch (err) {
+    console.warn('⚠️ Error fetching tables:', err);
+    return [];
+  }
+}
+
+export async function createRestaurantTable(payload: { restaurantId: string; tableNumber: string; displayName?: string; capacity?: number }) {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { data, error } = await supabase
+      .from('restaurant_tables')
+      .insert({
+        restaurant_id: payload.restaurantId,
+        table_number: payload.tableNumber,
+        display_name: payload.displayName || null,
+        capacity: payload.capacity || null
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function updateRestaurantTable(id: string, payload: { tableNumber?: string; displayName?: string; capacity?: number; isActive?: boolean }) {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { error } = await supabase
+      .from('restaurant_tables')
+      .update({
+        table_number: payload.tableNumber,
+        display_name: payload.displayName,
+        capacity: payload.capacity,
+        is_active: payload.isActive,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function archiveRestaurantTable(id: string) {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { error } = await supabase
+      .from('restaurant_tables')
+      .update({ archived_at: new Date().toISOString(), is_active: false })
+      .eq('id', id);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function regenerateTableToken(tableId: string): Promise<{ success: boolean; token?: string; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { data, error } = await supabase.rpc('regenerate_table_token', { p_table_id: tableId });
+    if (error) throw error;
+    return { success: true, token: data };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function resolveTableByToken(token: string) {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'No connection' };
+  try {
+    const { data, error } = await supabase.rpc('resolve_table_by_token', { p_token: token });
+    if (error) throw error;
+    if (data && data.error) return { success: false, error: data.error };
+    return { success: true, data };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
