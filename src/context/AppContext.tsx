@@ -6,7 +6,7 @@ import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant, fetchRestaurantMembers as fetchRemoteMembers, inviteRestaurantStaff as inviteRemoteStaff, resendStaffInvitation as resendRemoteInvitation, suspendRestaurantMember as suspendRemoteMember, reactivateRestaurantMember as reactivateRemoteMember, revokeRestaurantMember as revokeRemoteMember, acceptRestaurantInvitation as acceptRemoteInvitation } from '../services/supabaseDataService';
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
-import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession } from '../services/supabaseAuthService';
+import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession, resendVerificationEmailAuth } from '../services/supabaseAuthService';
 import { DEMO_ACCOUNTS } from './demoAccounts';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment, confirmCashPayment as confirmCashPaymentRemote } from '../services/supabaseOrderService';
 import { resolveLocationFromCoords } from '../services/locationResolver';
@@ -418,6 +418,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [initialSession] = useState<UserAccount | null>(() => validateCachedSession());
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(initialSession);
+  
+  const [emailVerificationState, setEmailVerificationState] = useState<import('../types').EmailVerificationState>('not_required');
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>(() => {
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mesa/')) {
       return 'table_qr';
@@ -504,11 +507,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           let userAccount = null;
 
           if (sessionResponse.data.session?.user) {
-            userAccount = await resolveSupabaseUserProfile(
-              sessionResponse.data.session.user.id,
-              sessionResponse.data.session.user.email || '',
-              sessionResponse.data.session.user.user_metadata?.needs_password_set
-            );
+            const user = sessionResponse.data.session.user;
+            if (user.email_confirmed_at) {
+              userAccount = await resolveSupabaseUserProfile(
+                user.id,
+                user.email || '',
+                user.user_metadata?.needs_password_set
+              );
+              setEmailVerificationState('confirmed');
+            } else {
+              setEmailVerificationState('pending');
+              setPendingVerificationEmail(user.email || null);
+            }
+          } else if (sessionResponse.data.session === null && supabase) {
+            // Check if there's a user without a session (e.g. unverified)
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user && !user.email_confirmed_at) {
+              setEmailVerificationState('pending');
+              setPendingVerificationEmail(user.email || null);
+            }
           }
 
           const [liveTenants, liveProducts, livePosts, liveApps, liveCities, liveZones] = await Promise.all([
@@ -589,6 +606,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       const { data: { subscription } } = subscribeToSupabaseAuthChanges(async (event, session) => {
         if (session?.user && event !== 'INITIAL_SESSION') {
+          if (!session.user.email_confirmed_at) {
+            setEmailVerificationState('pending');
+            setPendingVerificationEmail(session.user.email || null);
+            if (window.location.pathname.startsWith('/auth/callback')) {
+              window.history.replaceState({}, document.title, '/');
+            }
+            return;
+          }
+
+          setEmailVerificationState('confirmed');
           const userAccount = await resolveSupabaseUserProfile(session.user.id, session.user.email || '', session.user.user_metadata?.needs_password_set);
           setCurrentUser(userAccount);
           setUserRole(userAccount.role);
@@ -608,6 +635,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setRemoteTenants(liveTenants);
             remoteTenantsRef.current = liveTenants;
             setTenants(liveTenants);
+          }
+          
+          if (window.location.pathname.startsWith('/auth/callback')) {
+            window.history.replaceState({}, document.title, '/');
           }
         } else if (event === 'SIGNED_OUT') {
           // Solo limpiamos datos de sesión del usuario.
@@ -774,9 +805,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setRemotePosts(livePosts);
         setRemoteProducts(liveProducts);
       }
+      if (!res.emailConfirmed) {
+        setEmailVerificationState('pending');
+        setPendingVerificationEmail(res.user.email);
+        showToast('✉️ Tu correo aún no ha sido confirmado. Revisa tu bandeja de entrada.');
+        return { success: true };
+      }
 
       setCurrentUser(res.user);
       setUserRole(res.user.role);
+      setEmailVerificationState('confirmed');
 
       if (res.user.tenantId) {
         const tenantMatch = updatedTenants.find(t => t.id === res.user!.tenantId);
@@ -812,12 +850,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const res = await signUpWithSupabase(email, pass, name);
     if (res.success && res.user) {
-      setCurrentUser(res.user);
-      setUserRole('client_delivery');
-      showToast(`🎉 ¡Cuenta creada exitosamente para ${res.user.name}!`);
+      if (res.emailConfirmed) {
+        setCurrentUser(res.user);
+        setUserRole('client_delivery');
+        setEmailVerificationState('confirmed');
+        showToast(`🎉 ¡Cuenta creada exitosamente para ${res.user.name}!`);
+      } else {
+        setEmailVerificationState('pending');
+        setPendingVerificationEmail(res.user.email);
+        showToast('✉️ Revisa tu correo para confirmar la cuenta.');
+      }
       return { success: true };
     }
     return { success: false, error: res.error || 'Error al crear la cuenta.' };
+  };
+
+  const resendVerificationEmail = async () => {
+    if (!pendingVerificationEmail) return;
+    const res = await resendVerificationEmailAuth(pendingVerificationEmail);
+    if (res.success) {
+      showToast('✉️ Correo reenviado correctamente.');
+    } else {
+      showToast(`⚠️ ${res.error || 'Error al reenviar el correo.'}`);
+    }
+  };
+
+  const refreshEmailVerification = async () => {
+    if (!supabase) return;
+    const { data: { session }, error } = await supabase.auth.refreshSession();
+    if (error || !session) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email_confirmed_at) {
+        setEmailVerificationState('confirmed');
+        const userAccount = await resolveSupabaseUserProfile(
+          user.id,
+          user.email || '',
+          user.user_metadata?.needs_password_set
+        );
+        setCurrentUser(userAccount);
+        setUserRole(userAccount.role);
+        return;
+      }
+      setEmailVerificationState('error');
+      return;
+    }
+    
+    if (session.user.email_confirmed_at) {
+      setEmailVerificationState('confirmed');
+      const userAccount = await resolveSupabaseUserProfile(
+        session.user.id,
+        session.user.email || '',
+        session.user.user_metadata?.needs_password_set
+      );
+      setCurrentUser(userAccount);
+      setUserRole(userAccount.role);
+    } else {
+      setEmailVerificationState('error');
+    }
+  };
+
+  const signOutUnverifiedUser = async () => {
+    await signOutFromSupabase();
+    setEmailVerificationState('not_required');
+    setPendingVerificationEmail(null);
+    setCurrentUser(null);
+    setUserRole('login');
   };
 
   const sendPasswordReset = async (email: string): Promise<{ success: boolean; error?: string }> => {
@@ -1551,9 +1648,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (authMode === 'remote') {
-      const success = await deleteLivePost(postId);
-      if (!success) {
-        showToast('⚠️ Error al eliminar publicación en el servidor.');
+      const res = await deleteLivePost(postId, target.tenantId);
+      if (!res.success) {
+        showToast(`⚠️ ${res.error || 'Error al eliminar publicación en el servidor.'}`);
         return;
       }
       setRemotePosts(prev => prev.filter(p => p.id !== postId));
@@ -1944,6 +2041,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       drivers,
       equityWeight,
       authMode,
+      emailVerificationState,
+      pendingVerificationEmail,
       isAuthLoading,
       isCatalogLoading,
       catalogError,
@@ -1959,6 +2058,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       loginWithCredentials,
       loginWithGoogle,
       registerAccount,
+      resendVerificationEmail,
+      refreshEmailVerification,
+      signOutUnverifiedUser,
       sendPasswordReset,
       setCurrentTenantBySlug,
       toggleTenantOpenStatus,

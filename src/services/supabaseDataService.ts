@@ -330,10 +330,13 @@ export async function fetchLivePosts(): Promise<Post[]> {
         media_type, 
         price_cop, 
         is_published, 
+        is_archived,
         created_at,
         updated_at,
         restaurants!inner(name, category, slug, status)
       `)
+      .eq('is_archived', false)
+      .eq('restaurants.status', 'active')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -955,15 +958,31 @@ export async function createLivePost(tenantId: string, title: string, desc: stri
   }
 }
 
-export async function deleteLivePost(postId: string): Promise<boolean> {
-  if (!isSupabaseConfigured || !supabase) return false;
+export async function deleteLivePost(postId: string, restaurantId: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) return { success: false, error: 'Supabase no está configurado.' };
   try {
-    const { error } = await supabase.from('posts').delete().eq('id', postId);
+    const { data, error } = await supabase.rpc('delete_restaurant_post', { 
+      p_post_id: postId, 
+      p_restaurant_id: restaurantId 
+    });
     if (error) throw error;
-    return true;
-  } catch (err) {
+    
+    if (data?.action === 'deleted' && data?.media_url) {
+      const bucketName = 'gastro-media';
+      const marker = `/object/public/${bucketName}/`;
+      const markerIndex = data.media_url.indexOf(marker);
+      if (markerIndex !== -1) {
+        const filePath = data.media_url.substring(markerIndex + marker.length);
+        if (filePath) {
+          await supabase.storage.from(bucketName).remove([filePath]);
+        }
+      }
+    }
+    
+    return { success: true };
+  } catch (err: any) {
     console.warn('⚠️ Error deleting live post:', err);
-    return false;
+    return { success: false, error: err.message || 'Error al eliminar la publicación' };
   }
 }
 

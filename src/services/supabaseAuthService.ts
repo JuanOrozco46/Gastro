@@ -10,6 +10,8 @@ export interface AuthActionResult {
   success: boolean;
   user?: AuthUser;
   error?: string;
+  sessionExists?: boolean;
+  emailConfirmed?: boolean;
 }
 
 /**
@@ -152,7 +154,12 @@ export async function signInWithSupabase(email: string, pass: string): Promise<A
     }
 
     const userAccount = await resolveSupabaseUserProfile(data.user.id, data.user.email || email, data.user.user_metadata?.needs_password_set);
-    return { success: true, user: userAccount };
+    return { 
+      success: true, 
+      user: userAccount,
+      sessionExists: !!data.session,
+      emailConfirmed: !!data.user.email_confirmed_at
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: translateAuthError(msg) };
@@ -200,7 +207,12 @@ export async function signUpWithSupabase(email: string, pass: string, fullName: 
       businessRole: 'customer'
     };
 
-    return { success: true, user: userAccount };
+    return { 
+      success: true, 
+      user: userAccount,
+      sessionExists: !!data.session,
+      emailConfirmed: !!data.user.email_confirmed_at
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: translateAuthError(msg) };
@@ -233,6 +245,32 @@ export async function signInWithGoogleOAuth(): Promise<{ success: boolean; error
     return { success: false, error: translateAuthError(msg) };
   }
 }
+
+/**
+ * Reenvía el correo de verificación.
+ */
+export async function resendVerificationEmailAuth(email: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'Supabase no está configurado.' };
+  }
+
+  try {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim().toLowerCase()
+    });
+
+    if (error) {
+      return { success: false, error: translateAuthError(error.message) };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: translateAuthError(msg) };
+  }
+}
+
 
 /**
  * Envía un correo electrónico para restablecer la contraseña a través de Supabase.

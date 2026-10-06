@@ -35,15 +35,28 @@ const ViewLoader: React.FC = () => (
 );
 
 import { ForcePasswordModal } from './components/ForcePasswordModal';
+import { EmailVerificationScreen } from './components/EmailVerificationScreen';
 
 const MainContent: React.FC = () => {
-  const { userRole, isAuthLoading } = useApp();
+  const { userRole, isAuthLoading, emailVerificationState } = useApp();
 
   if (isAuthLoading) {
     return <ViewLoader />;
   }
 
   const path = window.location.pathname;
+
+  if (path.startsWith('/auth/callback')) {
+    return (
+      <main>
+        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 text-center">
+          <ViewLoader />
+          <p className="mt-4 text-gray-400">Verificando sesión, por favor espera...</p>
+        </div>
+      </main>
+    );
+  }
+
   if (path.startsWith('/mesa/')) {
     return (
       <main>
@@ -56,6 +69,10 @@ const MainContent: React.FC = () => {
 
   if (userRole === 'login') {
     return <LoginScreen />;
+  }
+
+  if (emailVerificationState === 'pending' || emailVerificationState === 'error') {
+    return <EmailVerificationScreen />;
   }
 
   return (

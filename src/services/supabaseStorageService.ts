@@ -75,3 +75,31 @@ export async function uploadMediaFile(
   }
 }
 
+export async function deleteMediaFile(publicUrl: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'Supabase no está configurado' };
+  }
+  
+  try {
+    const bucketName = 'gastro-media';
+    const marker = `/object/public/${bucketName}/`;
+    const markerIndex = publicUrl.indexOf(marker);
+    
+    if (markerIndex === -1) {
+      return { success: false, error: 'URL no válida o no pertenece a este bucket' };
+    }
+    
+    const filePath = publicUrl.substring(markerIndex + marker.length);
+    if (!filePath) return { success: false, error: 'Path no encontrado' };
+
+    const { error } = await supabase.storage.from(bucketName).remove([filePath]);
+    if (error) {
+      console.warn('⚠️ Error al eliminar archivo de Supabase Storage:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    console.warn('⚠️ Excepción al intentar eliminar:', err);
+    return { success: false, error: 'Excepción al intentar eliminar' };
+  }
+}

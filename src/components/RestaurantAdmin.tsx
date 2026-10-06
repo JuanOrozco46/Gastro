@@ -22,7 +22,7 @@ import {
   QrCode, Utensils, Truck, Plus, Share2, Play,
   Eye, Heart, Sparkles, Trash2, Power,
   MapPin, BarChart3, MessageSquare, ShieldBan,
-  AlertCircle, Package, Clock, CheckCircle
+  AlertCircle, Package, Clock, CheckCircle, Loader2
 } from 'lucide-react';
 
 import { RestaurantTablesAdmin } from './RestaurantTablesAdmin';
@@ -33,7 +33,7 @@ export const RestaurantAdmin: React.FC = () => {
     products,
     drivers, addDriver,
     posts, createPost, deletePost,
-    orders, updateOrderStatus, authMode, showToast
+    orders, updateOrderStatus
   } = useApp();
 
   const operatingTenant = getOperationalTenant(currentUser, tenants);
@@ -58,6 +58,7 @@ export const RestaurantAdmin: React.FC = () => {
   const [postPrice, setPostPrice] = useState('25000');
   const [postDesc, setPostDesc] = useState('');
   const [postHashtags, setPostHashtags] = useState('#GastroSync #ComidaArtesanal #SaborLocal');
+  const [isDeletingPost, setIsDeletingPost] = useState<string | null>(null);
   const [postMediaType, setPostMediaType] = useState<'photo' | 'video'>('video');
   const [postImage, setPostImage] = useState('');
   const [postMediaUrl, setPostMediaUrl] = useState('');
@@ -709,20 +710,32 @@ export const RestaurantAdmin: React.FC = () => {
                         </div>
                       </div>
 
-                      <button
-                        className="btn btn-outline"
-                        style={{ padding: '6px 10px', color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '10px' }}
-                        onClick={() => {
-                          if (authMode === 'remote') {
-                            showToast('⚠️ La edición remota del catálogo estará disponible en una próxima fase.');
-                            return;
-                          }
-                          deletePost(p.id);
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          className="btn btn-outline"
+                          style={{ padding: '6px 10px', color: 'var(--text-muted)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '10px' }}
+                          disabled={true}
+                          title="Edición de publicaciones en desarrollo por seguridad de los assets"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                        <button
+                          className="btn btn-outline"
+                          style={{ padding: '6px 10px', color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '10px' }}
+                          disabled={isDeletingPost === p.id}
+                        onClick={async () => {
+                          const confirmMessage = "La publicación se archivará y dejará de aparecer públicamente (si tiene interacciones) o se eliminará de forma permanente. ¿Deseas eliminar esta publicación?";
+                          if (!window.confirm(confirmMessage)) return;
+                          
+                          setIsDeletingPost(p.id);
+                          await deletePost(p.id);
+                          setIsDeletingPost(null);
                         }}
                         title="Eliminar publicación"
                       >
-                        <Trash2 size={14} />
+                        {isDeletingPost === p.id ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
                       </button>
+                      </div>
                     </div>
                   ))
                 )}

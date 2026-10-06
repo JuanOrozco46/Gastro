@@ -28,6 +28,11 @@ export interface AppContextType {
   drivers: Driver[];
   equityWeight: number;
   authMode: 'remote' | 'demo';
+  emailVerificationState: import('../types').EmailVerificationState;
+  pendingVerificationEmail: string | null;
+  resendVerificationEmail: () => Promise<void>;
+  refreshEmailVerification: () => Promise<void>;
+  signOutUnverifiedUser: () => Promise<void>;
   isAuthLoading: boolean;
   isCatalogLoading: boolean;
   catalogError: string | null;

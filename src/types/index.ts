@@ -1,5 +1,12 @@
 // Domain models for GastroSync single-city local MVP
 
+export type EmailVerificationState =
+  | 'not_required'
+  | 'pending'
+  | 'confirmed'
+  | 'expired'
+  | 'error';
+
 export type OrderStatus =
   | 'pending'
   | 'accepted'
