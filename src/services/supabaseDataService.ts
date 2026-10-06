@@ -86,7 +86,7 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
         id, slug, name, category, description, address, phone, whatsapp, city_id, zone_id, status, is_open, 
         delivery_modes, min_order, delivery_fee, delivery_radius_km, commission_rate,
         logo_url, banner_url, logo_emoji, specialties, accepting_orders, estimated_delivery_minutes, owner_user_id,
-        restaurant_hours ( id, day_of_week, is_open, open_time, close_time, open_time2, close_time2 )
+        restaurant_hours ( id, day_of_week, is_closed, open_time, close_time, interval_index )
       `);
 
     if (error || !data) {

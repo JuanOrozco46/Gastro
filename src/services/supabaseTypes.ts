@@ -54,7 +54,14 @@ export interface DbRestaurant {
   estimated_delivery_minutes?: number;
   specialties?: string[];
   accepting_orders?: boolean;
-  restaurant_hours?: any[];
+  restaurant_hours?: {
+    id: string;
+    day_of_week: number;
+    is_closed: boolean;
+    open_time: string;
+    close_time: string;
+    interval_index: number;
+  }[];
 }
 
 export interface DbRestaurantMember {
@@ -214,11 +221,9 @@ export function mapDbRestaurantToTenant(db: DbRestaurant): Tenant {
       id: h.id,
       restaurantId: db.id,
       dayOfWeek: h.day_of_week,
-      isOpen: h.is_open,
+      isOpen: !h.is_closed,
       openTime: h.open_time,
-      closeTime: h.close_time,
-      openTime2: h.open_time2,
-      closeTime2: h.close_time2
+      closeTime: h.close_time
     })) : undefined
   };
 }
