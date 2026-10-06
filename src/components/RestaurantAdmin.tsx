@@ -86,6 +86,12 @@ export const RestaurantAdmin: React.FC = () => {
         <p style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>
           Esta cuenta no está autorizada para administrar comercios. Inicia sesión con la cuenta oficial del restaurante.
         </p>
+        <pre style={{textAlign: 'left', marginTop: '20px', fontSize: '12px', color: '#999', overflowX: 'auto'}}>
+          Debug Info:
+          currentUser.tenantId: {currentUser?.tenantId}
+          tenants length: {tenants.length}
+          tenants ids: {tenants.map(t => t.id).join(', ')}
+        </pre>
       </div>
     );
   }
