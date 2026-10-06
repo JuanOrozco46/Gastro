@@ -30,9 +30,16 @@ export const TablePublicView: React.FC = () => {
     const init = async () => {
       const res = await resolveTableByToken(token);
       if (!res.success) {
-        if (res.error === 'invalid_token') setError('El código QR es inválido o la mesa ya no está disponible.');
-        else if (res.error === 'restaurant_inactive') setError('El restaurante no se encuentra activo actualmente.');
+        if (res.error === 'invalid_token') setError('El código QR es inválido o no existe.');
+        else if (res.error === 'table_archived') setError('Esta mesa ha sido archivada o eliminada.');
+        else if (res.error === 'table_inactive') setError('Esta mesa se encuentra inactiva o deshabilitada temporalmente.');
+        else if (res.error === 'restaurant_not_found') setError('El restaurante asociado a esta mesa no existe.');
+        else if (res.error === 'restaurant_not_approved') setError('El restaurante aún no ha sido aprobado en la plataforma.');
+        else if (res.error === 'restaurant_paused') setError('El restaurante se encuentra pausado temporalmente.');
+        else if (res.error === 'restaurant_closed') setError('El restaurante se encuentra cerrado en este momento.');
+        else if (res.error === 'restaurant_not_accepting_orders') setError('El restaurante no está aceptando pedidos en este momento.');
         else if (res.error === 'table_service_disabled') setError('El servicio a la mesa no está habilitado en este restaurante.');
+        else if (res.error === 'restaurant_inactive') setError('El restaurante no se encuentra activo actualmente.');
         else setError('Error al resolver la mesa: ' + res.error);
         setIsLoading(false);
         return;

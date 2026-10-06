@@ -26,6 +26,7 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     bannerUrl: tenant.bannerUrl || '',
     estimatedDeliveryMinutes: tenant.estimatedDeliveryMinutes?.toString() || '30',
     acceptingOrders: tenant.acceptingOrders !== false,
+    tableServiceEnabled: tenant.tableServiceEnabled !== false,
     deliveryFee: tenant.deliveryFee?.toString() || '0',
     minOrder: tenant.minOrder?.toString() || '0',
     deliveryRadiusKm: tenant.deliveryRadiusKm?.toString() || '5',
@@ -159,6 +160,7 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
         bannerUrl: formData.bannerUrl,
         estimatedDeliveryMinutes: parseInt(formData.estimatedDeliveryMinutes) || 0,
         acceptingOrders: formData.acceptingOrders,
+        tableServiceEnabled: formData.tableServiceEnabled,
         deliveryFee: parseFloat(formData.deliveryFee) || 0,
         minOrder: parseFloat(formData.minOrder) || 0,
         deliveryRadiusKm: parseFloat(formData.deliveryRadiusKm) || 0,
@@ -322,6 +324,20 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
               </div>
               <button type="button" onClick={() => setFormData(prev => ({ ...prev, acceptingOrders: !prev.acceptingOrders }))} className={`btn ${formData.acceptingOrders ? 'btn-secondary' : 'btn-primary'}`}>
                 {formData.acceptingOrders ? 'Pausar Recepción' : 'Reanudar'}
+              </button>
+            </div>
+
+            <div style={{ padding: '1rem', backgroundColor: formData.tableServiceEnabled ? 'var(--success-light)' : 'var(--warning-light)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${formData.tableServiceEnabled ? 'var(--success-border)' : 'var(--warning-border)'}` }}>
+              <div>
+                <h4 style={{ margin: 0, color: formData.tableServiceEnabled ? 'var(--success-text)' : 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {formData.tableServiceEnabled ? '✅ Servicio a la Mesa Habilitado' : '🚫 Servicio a la Mesa Deshabilitado'}
+                </h4>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  {formData.tableServiceEnabled ? 'Los clientes pueden escanear el QR y ordenar desde sus mesas.' : 'Al deshabilitarlo, los códigos QR mostrarán que el servicio no está disponible.'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setFormData(prev => ({ ...prev, tableServiceEnabled: !prev.tableServiceEnabled }))} className={`btn ${formData.tableServiceEnabled ? 'btn-secondary' : 'btn-primary'}`}>
+                {formData.tableServiceEnabled ? 'Deshabilitar' : 'Habilitar'}
               </button>
             </div>
 
