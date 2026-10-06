@@ -1159,6 +1159,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { success: false };
       }
       
+      if (method === 'cash') {
+        clearCart();
+        playChime();
+        showToast(`¡Pedido enviado a ${currentTenant.name}! Paga en efectivo al personal.`);
+        return { success: true, isRemote: true, orderId: res.orderId };
+      }
+
       const paymentRes = await createRemotePayment(res.orderId, 'sandbox');
       setIsSubmittingOrder(false);
 
@@ -1171,7 +1178,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       playChime();
       showToast(`¡Pedido (${typeString}) enviado a ${currentTenant.name}! Completa el pago seguro en la URL provista.`);
       
-      // En un futuro podríamos redirigir a paymentRes.sandboxUrl si está presente.
       if (paymentRes.sandboxUrl) {
         console.log('Redirecting to sandbox UI:', paymentRes.sandboxUrl);
       }

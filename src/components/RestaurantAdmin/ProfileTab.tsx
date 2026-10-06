@@ -27,6 +27,7 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     estimatedDeliveryMinutes: tenant.estimatedDeliveryMinutes?.toString() || '30',
     acceptingOrders: tenant.acceptingOrders !== false,
     tableServiceEnabled: tenant.tableServiceEnabled !== false,
+    acceptsCash: tenant.acceptsCash !== false,
     deliveryFee: tenant.deliveryFee?.toString() || '0',
     minOrder: tenant.minOrder?.toString() || '0',
     deliveryRadiusKm: tenant.deliveryRadiusKm?.toString() || '5',
@@ -161,6 +162,7 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
         estimatedDeliveryMinutes: parseInt(formData.estimatedDeliveryMinutes) || 0,
         acceptingOrders: formData.acceptingOrders,
         tableServiceEnabled: formData.tableServiceEnabled,
+        acceptsCash: formData.acceptsCash,
         deliveryFee: parseFloat(formData.deliveryFee) || 0,
         minOrder: parseFloat(formData.minOrder) || 0,
         deliveryRadiusKm: parseFloat(formData.deliveryRadiusKm) || 0,
@@ -338,6 +340,20 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
               </div>
               <button type="button" onClick={() => setFormData(prev => ({ ...prev, tableServiceEnabled: !prev.tableServiceEnabled }))} className={`btn ${formData.tableServiceEnabled ? 'btn-secondary' : 'btn-primary'}`}>
                 {formData.tableServiceEnabled ? 'Deshabilitar' : 'Habilitar'}
+              </button>
+            </div>
+
+            <div style={{ padding: '1rem', backgroundColor: formData.acceptsCash ? 'var(--success-light)' : 'var(--warning-light)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${formData.acceptsCash ? 'var(--success-border)' : 'var(--warning-border)'}` }}>
+              <div>
+                <h4 style={{ margin: 0, color: formData.acceptsCash ? 'var(--success-text)' : 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {formData.acceptsCash ? '💵 Pago en Efectivo Habilitado' : '💳 Solo Pagos Digitales'}
+                </h4>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  {formData.acceptsCash ? 'Los clientes verán la opción de pagar en efectivo al recibir o en mesa.' : 'Se ocultará la opción de pago en efectivo. Solo pasarelas de pago digitales.'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setFormData(prev => ({ ...prev, acceptsCash: !prev.acceptsCash }))} className={`btn ${formData.acceptsCash ? 'btn-secondary' : 'btn-primary'}`}>
+                {formData.acceptsCash ? 'Deshabilitar' : 'Habilitar'}
               </button>
             </div>
 

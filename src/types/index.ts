@@ -11,7 +11,7 @@ export type OrderStatus =
 
 export type OrderFulfillment = 'pickup' | 'restaurant_delivery' | 'table_service';
 
-export type PaymentMethod = 'apple_pay' | 'google_pay' | 'card' | 'mercadopago' | 'wompi';
+export type PaymentMethod = 'cash' | 'apple_pay' | 'google_pay' | 'card' | 'mercadopago' | 'wompi';
 
 export type RestaurantMemberRole = 'owner' | 'staff';
 export type RestaurantMemberStatus = 'invited' | 'active' | 'suspended' | 'revoked';
@@ -167,6 +167,7 @@ export interface Tenant {
   hours?: RestaurantHour[];
   googlePlaceId?: string;
   tableServiceEnabled?: boolean;
+  acceptsCash?: boolean;
 }
 
 export interface RestaurantHour {

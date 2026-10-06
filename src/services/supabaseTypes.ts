@@ -175,7 +175,7 @@ export interface DbOrder {
   created_at: string;
   updated_at: string;
   order_items?: DbOrderItem[];
-  payments?: Pick<DbPayment, 'id' | 'status'>[];
+  payments?: Pick<DbPayment, 'id' | 'status' | 'provider'>[];
 }
 
 export interface DbOrderItem {
@@ -342,6 +342,7 @@ export function mapDbOrderToOrder(db: DbOrder): Order {
     restaurantNotes: db.restaurant_notes || undefined,
     cancellationReason: db.cancellation_reason || undefined,
     paymentId: db.payments?.[0]?.id,
-    paymentStatus: db.payments?.[0]?.status
+    paymentStatus: db.payments?.[0]?.status,
+    paymentMethod: (db.payments?.[0]?.provider as any) || undefined
   };
 }

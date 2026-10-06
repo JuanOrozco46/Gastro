@@ -216,6 +216,16 @@ export const KitchenPanel: React.FC = () => {
                             MESA #{(order as any).tableNumber}
                           </span>
                         )}
+                        {order.paymentMethod === 'cash' && order.paymentStatus === 'pending' && (
+                          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#F59E0B', fontWeight: 900, fontSize: '0.85rem' }}>
+                            EFECTIVO PENDIENTE
+                          </span>
+                        )}
+                        {order.paymentMethod !== 'cash' && order.paymentStatus === 'pending' && (
+                          <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#EF4444', fontWeight: 900, fontSize: '0.85rem' }}>
+                            PAGO DIGITAL PENDIENTE
+                          </span>
+                        )}
                       </div>
 
                       {order.restaurantNotes && (
@@ -318,6 +328,16 @@ export const KitchenPanel: React.FC = () => {
                             MESA #{(order as any).tableNumber}
                           </span>
                         )}
+                        {order.paymentMethod === 'cash' && order.paymentStatus === 'pending' && (
+                          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#F59E0B', fontWeight: 900, fontSize: '0.85rem' }}>
+                            EFECTIVO PENDIENTE
+                          </span>
+                        )}
+                        {order.paymentMethod !== 'cash' && order.paymentStatus === 'pending' && (
+                          <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#EF4444', fontWeight: 900, fontSize: '0.85rem' }}>
+                            PAGO DIGITAL PENDIENTE
+                          </span>
+                        )}
                       </div>
 
                       <div className="ticket-items" style={{ margin: '12px 0' }}>
@@ -389,6 +409,16 @@ export const KitchenPanel: React.FC = () => {
                         {order.fulfillment === 'table_service' && (order as any).tableNumber && (
                           <span className="badge" style={{ background: '#3B82F6', color: 'white', fontWeight: 900, fontSize: '0.85rem' }}>
                             MESA #{(order as any).tableNumber}
+                          </span>
+                        )}
+                        {order.paymentMethod === 'cash' && order.paymentStatus === 'pending' && (
+                          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#F59E0B', fontWeight: 900, fontSize: '0.85rem' }}>
+                            EFECTIVO PENDIENTE
+                          </span>
+                        )}
+                        {order.paymentMethod !== 'cash' && order.paymentStatus === 'pending' && (
+                          <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#EF4444', fontWeight: 900, fontSize: '0.85rem' }}>
+                            PAGO DIGITAL PENDIENTE
                           </span>
                         )}
                       </div>

@@ -982,6 +982,7 @@ interface DBRestaurantUpdate {
   is_open?: boolean;
   accepting_orders?: boolean;
   table_service_enabled?: boolean;
+  accepts_cash?: boolean;
   delivery_fee?: number;
   min_order?: number;
   delivery_radius_km?: number;
@@ -1010,6 +1011,7 @@ export async function updateRemoteTenant(tenantId: string, updates: Partial<Tena
     if (typeof updates.isOpen === 'boolean') dbUpdates.is_open = updates.isOpen;
     if (typeof updates.acceptingOrders === 'boolean') dbUpdates.accepting_orders = updates.acceptingOrders;
     if (typeof updates.tableServiceEnabled === 'boolean') dbUpdates.table_service_enabled = updates.tableServiceEnabled;
+    if (typeof updates.acceptsCash === 'boolean') dbUpdates.accepts_cash = updates.acceptsCash;
     if (typeof updates.deliveryFee === 'number') dbUpdates.delivery_fee = updates.deliveryFee;
     if (typeof updates.minOrder === 'number') dbUpdates.min_order = updates.minOrder;
     if (typeof updates.deliveryRadiusKm === 'number') dbUpdates.delivery_radius_km = updates.deliveryRadiusKm;

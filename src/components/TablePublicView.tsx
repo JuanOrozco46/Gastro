@@ -150,7 +150,7 @@ export const TablePublicView: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid-2" style={{ gridTemplateColumns: '2.2fr 1fr', gap: '1.75rem' }}>
+      <div className="grid-2 table-view-grid" style={{ gap: '1.75rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
           
           {tableOrders.length > 0 && (
@@ -242,9 +242,9 @@ export const TablePublicView: React.FC = () => {
                       {product.emoji}
                     </div>
 
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'white' }}>{product.name}</h4>
-                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '3px 0 6px', lineHeight: 1.4 }}>{product.desc}</p>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</h4>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '3px 0 6px', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{product.desc}</p>
                       <span style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)' }}>
                         ${product.price.toLocaleString('es-CO')} COP
                       </span>
@@ -254,7 +254,7 @@ export const TablePublicView: React.FC = () => {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="btn btn-primary"
-                      style={{ borderRadius: '12px', padding: '10px 16px', fontWeight: 800, fontSize: '0.85rem' }}
+                      style={{ borderRadius: '12px', padding: '10px 16px', fontWeight: 800, fontSize: '0.85rem', minHeight: '44px', flexShrink: 0 }}
                       onClick={() => addToCart(product)}
                     >
                       <Plus size={16} /> Pedir a Mesa
@@ -357,6 +357,7 @@ export const TablePublicView: React.FC = () => {
         orderType="table_service"
         prefilledTableId={table.id}
         prefilledTableToken={window.location.pathname.split('/mesa/')[1]}
+        entryPoint="qr"
       />
     </motion.div>
   );

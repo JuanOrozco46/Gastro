@@ -5580,3 +5580,6 @@ textarea:focus-visible,
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+@media (min-width: 768px) { .table-view-grid { grid-template-columns: 2.2fr 1fr; } }
+@media (max-width: 767px) { .table-view-grid { grid-template-columns: 1fr; } }

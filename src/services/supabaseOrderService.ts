@@ -55,6 +55,7 @@ export async function createLiveOrder(
       p_table_token: order.tableToken || null,
       p_device_id: deviceId,
       p_restaurant_notes: order.restaurantNotes || null,
+      p_payment_method: order.paymentMethod || 'wompi',
       p_items: order.items.map(item => ({
         product_id: item.id,
         quantity: item.qty
@@ -95,6 +96,9 @@ export async function fetchLiveOrdersForRestaurant(tenantId: string): Promise<Or
         id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
         order_items (
           id, order_id, product_id, product_name, unit_price_cop, quantity
+        ),
+        payments (
+          id, status, provider
         )
       `)
       .eq('restaurant_id', tenantId)
@@ -122,6 +126,9 @@ export async function fetchLiveOrdersForCustomer(customerId: string): Promise<Or
         id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
         order_items (
           id, order_id, product_id, product_name, unit_price_cop, quantity
+        ),
+        payments (
+          id, status, provider
         )
       `)
       .eq('customer_id', customerId)
@@ -154,6 +161,13 @@ export async function updateLiveOrderStatus(
       p_order_id: orderId,
       p_next_status: newStatus
     });
+
+    if (!error && newStatus === 'delivered') {
+      const { data: payData } = await supabase.from('payments').select('id, provider, status').eq('order_id', orderId).single();
+      if (payData && payData.provider === 'cash' && payData.status === 'pending') {
+        await supabase.from('payments').update({ status: 'approved' }).eq('id', payData.id);
+      }
+    }
 
     if (tableId) {
       // Emitir broadcast para que la mesa reciba actualizaciones sin depender de RLS de SELECT

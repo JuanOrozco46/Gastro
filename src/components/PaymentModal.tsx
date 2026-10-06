@@ -16,9 +16,10 @@ interface PaymentModalProps {
   orderType?: string;
   prefilledTableId?: string;
   prefilledTableToken?: string;
+  entryPoint?: 'qr' | 'feed' | 'directory';
 }
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'pickup', prefilledTableId, prefilledTableToken }) => {
+export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'pickup', prefilledTableId, prefilledTableToken, entryPoint }) => {
   const { cart, currentTenant, currentUser, submitOrderWithPayment, retryRemotePayment, authMode, isSubmittingOrder, orderError } = useApp();
   const [method, setMethod] = useState<PaymentMethod>('wompi');
   const [loading, setLoading] = useState(false);
@@ -34,6 +35,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
 
   // Default mode selection
   const initialMode: OrderFulfillment = (() => {
+    if (entryPoint === 'qr') return 'table_service';
     if (orderType.toLowerCase().includes('mesa') && allowedModes.includes('table_service')) {
       return 'table_service';
     }
@@ -371,7 +373,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
               )}
 
               {/* Step 1: Select Fulfillment Mode */}
-              <div style={{ marginBottom: '1.25rem' }}>
+              {entryPoint !== 'qr' && (
+                <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '8px' }}>
                   1. Modalidad de Entrega / Cumplimiento:
                 </label>
@@ -454,6 +457,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                   )}
                 </div>
               </div>
+              )}
 
               {/* Step 2: Form Fields per Fulfillment Mode */}
               {fulfillment === 'pickup' && (
@@ -572,6 +576,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                   border: '1px solid rgba(255, 255, 255, 0.08)' 
                 }}>
                   {[
+                    ...(currentTenant.acceptsCash !== false ? [{ id: 'cash', label: '💵 Efectivo' }] : []),
                     { id: 'wompi', label: '🇨🇴 PSE/Nequi' },
                     { id: 'mercadopago', label: '📱 MercadoPago' },
                     { id: 'card', label: '💳 Tarjeta' }
@@ -657,11 +662,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                 style={{ padding: '14px', fontSize: '0.98rem', fontWeight: 900, borderRadius: '14px' }}
                 disabled={loading || isSubmittingOrder}
               >
-                {(loading || isSubmittingOrder) ? 'Procesando...' : `Pagar $${total.toLocaleString('es-CO')} COP`}
+                {(loading || isSubmittingOrder) ? 'Procesando...' : (
+                  method === 'cash' 
+                    ? fulfillment === 'table_service' ? 'Pedir y Pagar en Mesa' 
+                      : fulfillment === 'pickup' ? 'Pedir y Pagar al Recoger' 
+                      : 'Pedir y Pagar al Recibir'
+                    : `Pagar $${total.toLocaleString('es-CO')} COP`
+                )}
               </motion.button>
 
               <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                🔒 Pago procesado de forma segura
+                {method === 'cash' ? 'Pago en efectivo pendiente de confirmación del restaurante' : '🔒 Pago procesado de forma segura'}
               </div>
             </form>
           )}
