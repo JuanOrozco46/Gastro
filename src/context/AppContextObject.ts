@@ -64,6 +64,7 @@ export interface AppContextType {
   toggleTenantOpenStatus: (tenantId: string) => Promise<void>;
   addTenant: (tenantData: Omit<Tenant, 'id' | 'slug' | 'salesWeekly' | 'rating' | 'distanceKm' | 'isNew' | 'commissionRate' | 'tablesCount' | 'isOpen'>) => Tenant;
   updateTenant: (tenantId: string, updates: Partial<Tenant>) => void;
+  syncTenantRating: (tenantId: string, ratingAvg?: number, ratingCount?: number) => void;
   toggleLikePost: (postId: string) => void;
   addComment: (postId: string, text: string, userName?: string) => Promise<boolean>;
   deleteComment: (postId: string, commentId: string) => void;

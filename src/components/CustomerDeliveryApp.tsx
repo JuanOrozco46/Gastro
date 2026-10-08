@@ -349,6 +349,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const [videoPost, setVideoPost] = useState<Post | null>(null);
   const [selectedCommentsPostId, setSelectedCommentsPostId] = useState<string | null>(null);
   const [selectedTenantProfile, setSelectedTenantProfile] = useState<string | null>(null);
+  const [selectedTenantInitialTab, setSelectedTenantInitialTab] = useState<'menu' | 'content' | 'reviews' | 'info'>('menu');
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -994,7 +995,10 @@ export const CustomerDeliveryApp: React.FC = () => {
       {activeTab === 'directory' && (
         <RestaurantDirectory
           selectedZone={selectedZoneId || 'all'}
-          onOpenTenantProfile={(tenantId) => setSelectedTenantProfile(tenantId)}
+          onOpenTenantProfile={(tenantId, tab = 'menu') => {
+            setSelectedTenantInitialTab(tab);
+            setSelectedTenantProfile(tenantId);
+          }}
           onSelectTenantAndGoToFeed={(slug) => {
             const targetTenant = tenants.find(t => t.slug === slug || t.id === slug);
             if (targetTenant) {
@@ -1019,10 +1023,16 @@ export const CustomerDeliveryApp: React.FC = () => {
               </div>
             )}
           </div>
-          <MyOrders onNeedHelp={(orderId) => {
-            setSupportInitialOrder(orderId);
-            setActiveTab('support');
-          }} />
+          <MyOrders
+            onNeedHelp={(orderId) => {
+              setSupportInitialOrder(orderId);
+              setActiveTab('support');
+            }}
+            onOpenTenantReviews={(tenantId) => {
+              setSelectedTenantInitialTab('reviews');
+              setSelectedTenantProfile(tenantId);
+            }}
+          />
         </div>
       )}
 
@@ -1064,8 +1074,11 @@ export const CustomerDeliveryApp: React.FC = () => {
         <Suspense fallback={<FallbackLoader message="Cargando local..." />}>
           <RestaurantProfileModal
             tenantId={selectedTenantProfile}
-            initialTab="menu"
-            onClose={() => setSelectedTenantProfile(null)}
+            initialTab={selectedTenantInitialTab}
+            onClose={() => {
+              setSelectedTenantProfile(null);
+              setSelectedTenantInitialTab('menu');
+            }}
             onOrderProduct={handleOrder}
             onOpenCart={() => {
               setSelectedTenantProfile(null);

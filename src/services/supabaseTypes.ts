@@ -48,12 +48,14 @@ export interface DbRestaurant {
   commission_rate: number;
   created_at: string;
   updated_at: string;
-  logo_url?: string;
-  logo_emoji?: string;
-  banner_url?: string;
+  logo_url?: string | null;
+  logo_emoji?: string | null;
+  banner_url?: string | null;
   estimated_delivery_minutes?: number;
   specialties?: string[];
   accepting_orders?: boolean;
+  rating_avg?: number | string | null;
+  rating_count?: number | null;
   restaurant_hours?: {
     id: string;
     day_of_week: number;
@@ -200,14 +202,15 @@ export interface DbPayment {
 }
 
 export function mapDbRestaurantToTenant(db: DbRestaurant): Tenant {
+  const parsedRating = db.rating_avg !== undefined && db.rating_avg !== null ? Number(db.rating_avg) : 5.0;
   return {
     id: db.id,
     slug: db.slug,
     name: db.name,
     category: db.category,
-    logoUrl: db.logo_url || undefined,
-    logoEmoji: db.logo_emoji || '🍽️',
-    bannerUrl: db.banner_url || undefined,
+    logoUrl: db.logo_url?.trim() || undefined,
+    logoEmoji: db.logo_emoji?.trim() || '🍽️',
+    bannerUrl: db.banner_url?.trim() || undefined,
     description: db.description || '',
     address: db.address,
     phone: db.phone || undefined,
@@ -226,7 +229,8 @@ export function mapDbRestaurantToTenant(db: DbRestaurant): Tenant {
     commissionRate: db.commission_rate,
     deliveryTime: db.estimated_delivery_minutes ? `${db.estimated_delivery_minutes} min` : '20-30 min',
     salesWeekly: 0,
-    rating: 5.0,
+    rating: Number.isFinite(parsedRating) ? Number(parsedRating.toFixed(1)) : 5.0,
+    reviewsCount: typeof db.rating_count === 'number' ? db.rating_count : 0,
     distanceKm: 1.2,
     isNew: true,
     tablesCount: 0,

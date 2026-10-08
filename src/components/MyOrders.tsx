@@ -3,9 +3,11 @@ import { useApp } from '../context/useApp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package, Clock, CheckCircle2, ChefHat, Bike, ShoppingBag, CreditCard,
-  RefreshCw, ChevronDown, ChevronUp, MapPin, Utensils, MessageSquare, Copy, Check
+  RefreshCw, ChevronDown, ChevronUp, MapPin, Utensils, MessageSquare, Copy, Check, Star, Send
 } from 'lucide-react';
-import type { Order, OrderStatus, CustomerDeliveryAddress } from '../types';
+import type { Order, OrderStatus, CustomerDeliveryAddress, RestaurantReview } from '../types';
+import { fetchCustomerOrderReviews, submitRestaurantReview } from '../services/supabaseDataService';
+import { resolveTenantLogoUrl } from '../utils/tenantHelpers';
 import { PaymentStatus } from './PaymentStatus';
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; icon: React.ReactNode; color: string; bg: string; step: number }> = {
@@ -119,13 +121,45 @@ interface OrderCardProps {
   order: Order;
   tenantName: string;
   tenantEmoji: string;
+  tenantLogoUrl?: string;
   authMode: 'demo' | 'remote';
+  existingReview?: RestaurantReview;
+  onReviewSaved: (orderId: string, review: RestaurantReview) => void;
   onNeedHelp?: (orderId: string) => void;
+  onOpenTenantReviews?: (tenantId: string) => void;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji, authMode, onNeedHelp }) => {
+const ORDER_REVIEW_TAGS = [
+  '🔥 Excelente sabor',
+  '⚡ Entrega rápida',
+  '📦 Buena porción',
+  '🧼 Buena presentación',
+  '💚 Atención amable'
+];
+
+const OrderCard: React.FC<OrderCardProps> = ({
+  order,
+  tenantName,
+  tenantEmoji,
+  tenantLogoUrl,
+  authMode,
+  existingReview,
+  onReviewSaved,
+  onNeedHelp,
+  onOpenTenantReviews
+}) => {
+  const { currentUser, showToast, syncTenantRating } = useApp();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [brokenLogo, setBrokenLogo] = useState(false);
+
+  // Review state
+  const [isEditingReview, setIsEditingReview] = useState(false);
+  const [rating, setRating] = useState<number>(existingReview?.rating || 5);
+  const [hoverRating, setHoverRating] = useState<number>(0);
+  const [selectedTags, setSelectedTags] = useState<string[]>(existingReview?.tags || []);
+  const [comment, setComment] = useState<string>(existingReview?.comment || '');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const handleCopyId = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -133,6 +167,85 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji, a
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const handleSaveReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) {
+      showToast('⚠️ Inicia sesión para calificar tu pedido.');
+      return;
+    }
+    if (!comment.trim() && selectedTags.length === 0) {
+      showToast('⚠️ Selecciona al menos una etiqueta o escribe un comentario sobre tu pedido.');
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    try {
+      const finalComment = comment.trim() || selectedTags.join(' · ');
+
+      if (authMode === 'demo') {
+        const demoRev: RestaurantReview = {
+          id: existingReview?.id || `rev_${Date.now()}`,
+          restaurantId: order.tenantId,
+          orderId: order.id,
+          userId: currentUser.id || currentUser.email,
+          userName: currentUser.name,
+          userHandle: currentUser.username,
+          userAvatarUrl: currentUser.avatarUrl,
+          rating,
+          comment: finalComment,
+          tags: selectedTags,
+          createdAt: new Date().toISOString(),
+          timeAgo: 'Hace un momento'
+        };
+        try {
+          const key = `gs_reviews_${order.tenantId}`;
+          const prevList: RestaurantReview[] = JSON.parse(localStorage.getItem(key) || '[]');
+          const nextList = [demoRev, ...prevList.filter(r => r.orderId !== order.id && r.id !== demoRev.id)];
+          localStorage.setItem(key, JSON.stringify(nextList));
+          const avg = nextList.reduce((acc, r) => acc + r.rating, 0) / nextList.length;
+          syncTenantRating(order.tenantId, avg, nextList.length);
+        } catch {}
+        onReviewSaved(order.id, demoRev);
+        setIsEditingReview(false);
+        showToast('⭐ ¡Gracias por calificar tu pedido!');
+        return;
+      }
+
+      const res = await submitRestaurantReview({
+        restaurantId: order.tenantId,
+        orderId: order.id,
+        userId: currentUser.id || currentUser.email,
+        rating,
+        comment: finalComment,
+        tags: selectedTags,
+        authorFallback: {
+          name: currentUser.name,
+          username: currentUser.username,
+          avatarUrl: currentUser.avatarUrl
+        }
+      });
+
+      if (!res.success || !res.review) {
+        showToast(`⚠️ ${res.error || 'No se pudo guardar tu calificación.'}`);
+        return;
+      }
+
+      syncTenantRating(order.tenantId, res.ratingAvg, res.ratingCount);
+      onReviewSaved(order.id, res.review);
+      setIsEditingReview(false);
+      showToast('⭐ ¡Tu calificación fue publicada en el perfil del restaurante!');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
   const cfg = STATUS_CONFIG[order.status];
   const steps: OrderStatus[] = ['pending', 'preparing', 'ready', 'delivered'];
   const fulfillmentLabel = getFulfillmentLabel(order);
@@ -161,14 +274,27 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji, a
             width: '48px', 
             height: '48px', 
             borderRadius: '16px', 
-            background: 'var(--primary-glass)', 
+            background: '#0F172A', 
             border: '1px solid var(--primary-glass-border)',
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
-            fontSize: '1.5rem' 
+            fontSize: '1.5rem',
+            overflow: 'hidden',
+            flexShrink: 0
           }}>
-            {tenantEmoji}
+            {tenantLogoUrl && !brokenLogo ? (
+              <img
+                loading="lazy"
+                decoding="async"
+                src={tenantLogoUrl}
+                alt={tenantName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={() => setBrokenLogo(true)}
+              />
+            ) : (
+              tenantEmoji
+            )}
           </div>
           <div>
             <h4 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white' }}>{tenantName}</h4>
@@ -380,6 +506,224 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji, a
         )}
       </AnimatePresence>
 
+      {/* Post-Order Rating & Review Section */}
+      {order.status !== 'cancelled' && (
+        <div
+          style={{
+            marginTop: '14px',
+            padding: '14px 16px',
+            borderRadius: '16px',
+            background: existingReview && !isEditingReview
+              ? 'rgba(16, 185, 129, 0.08)'
+              : 'rgba(245, 158, 11, 0.08)',
+            border: existingReview && !isEditingReview
+              ? '1px solid rgba(16, 185, 129, 0.25)'
+              : '1px solid rgba(245, 158, 11, 0.28)'
+          }}
+        >
+          {existingReview && !isEditingReview ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#10B981' }}>
+                    ✓ Tu calificación para {tenantName}:
+                  </span>
+                  <div style={{ display: 'flex', gap: '2px' }}>
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <Star
+                        key={s}
+                        size={14}
+                        fill={s <= existingReview.rating ? '#F59E0B' : 'none'}
+                        color={s <= existingReview.rating ? '#F59E0B' : '#475569'}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRating(existingReview.rating);
+                      setSelectedTags(existingReview.tags || []);
+                      setComment(existingReview.comment || '');
+                      setIsEditingReview(true);
+                    }}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      color: 'white',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Editar reseña
+                  </button>
+                  {onOpenTenantReviews && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenTenantReviews(order.tenantId)}
+                      style={{
+                        background: 'rgba(245, 158, 11, 0.16)',
+                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        color: '#FBBF24',
+                        borderRadius: '8px',
+                        padding: '4px 10px',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Ver reseñas del local
+                    </button>
+                  )}
+                </div>
+              </div>
+              {existingReview.tags && existingReview.tags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                  {existingReview.tags.map((t, idx) => (
+                    <span
+                      key={idx}
+                      style={{
+                        fontSize: '0.7rem',
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        color: '#FBBF24',
+                        fontWeight: 700
+                      }}
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {existingReview.comment && (
+                <p style={{ margin: 0, fontSize: '0.84rem', color: '#E2E8F0' }}>
+                  "{existingReview.comment}"
+                </p>
+              )}
+            </div>
+          ) : (
+            <form onSubmit={handleSaveReview} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <strong style={{ fontSize: '0.88rem', color: '#FBBF24', display: 'block' }}>
+                    ⭐ ¿Qué tal estuvo tu pedido en {tenantName}?
+                  </strong>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Tu calificación aparecerá en el apartado de Reseñas del restaurante
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {[1, 2, 3, 4, 5].map(star => {
+                    const active = star <= (hoverRating || rating);
+                    return (
+                      <button
+                        key={star}
+                        type="button"
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        onClick={() => setRating(star)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '2px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Star
+                          size={22}
+                          fill={active ? '#F59E0B' : 'none'}
+                          color={active ? '#F59E0B' : '#64748B'}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {ORDER_REVIEW_TAGS.map(tag => {
+                  const selected = selectedTags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      style={{
+                        padding: '4px 9px',
+                        borderRadius: '999px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: selected ? '1px solid #F59E0B' : '1px solid rgba(255,255,255,0.12)',
+                        background: selected ? 'rgba(245, 158, 11, 0.22)' : 'rgba(255,255,255,0.04)',
+                        color: selected ? '#FBBF24' : 'var(--text-muted)'
+                      }}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <textarea
+                  rows={2}
+                  value={comment}
+                  onChange={e => setComment(e.target.value)}
+                  placeholder="Deja tu comentario sobre el sabor, temperatura o atención..."
+                  maxLength={500}
+                  style={{
+                    flex: 1,
+                    minWidth: '200px',
+                    background: 'rgba(15, 23, 42, 0.75)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    color: 'white',
+                    fontSize: '0.82rem',
+                    resize: 'vertical'
+                  }}
+                />
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {isEditingReview && (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => setIsEditingReview(false)}
+                      style={{ borderRadius: '10px', padding: '8px 12px', fontSize: '0.78rem' }}
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={isSubmittingReview}
+                    style={{
+                      borderRadius: '10px',
+                      padding: '8px 14px',
+                      fontSize: '0.8rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Send size={14} />
+                    {isSubmittingReview ? 'Guardando...' : 'Calificar'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
       {/* Button for Help */}
       {onNeedHelp && (
         <button 
@@ -399,10 +743,44 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, tenantName, tenantEmoji, a
 
 interface MyOrdersProps {
   onNeedHelp?: (orderId: string) => void;
+  onOpenTenantReviews?: (tenantId: string) => void;
 }
 
-export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp }) => {
-  const { orders, tenants, authMode, currentUser } = useApp();
+export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp, onOpenTenantReviews }) => {
+  const { orders, tenants, posts, products, authMode, currentUser } = useApp();
+  const [orderReviewsMap, setOrderReviewsMap] = useState<Record<string, RestaurantReview>>({});
+
+  React.useEffect(() => {
+    let mounted = true;
+    const loadReviews = async () => {
+      if (!currentUser) return;
+      if (authMode === 'demo') {
+        const map: Record<string, RestaurantReview> = {};
+        for (const t of tenants) {
+          try {
+            const list: RestaurantReview[] = JSON.parse(localStorage.getItem(`gs_reviews_${t.id}`) || '[]');
+            for (const r of list) {
+              if (r.orderId && (r.userId === currentUser.id || r.userId === currentUser.email)) {
+                map[r.orderId] = r;
+              }
+            }
+          } catch {}
+        }
+        if (mounted) setOrderReviewsMap(map);
+        return;
+      }
+      if (currentUser.id) {
+        const remoteMap = await fetchCustomerOrderReviews(currentUser.id);
+        if (mounted) setOrderReviewsMap(remoteMap);
+      }
+    };
+    loadReviews();
+    return () => { mounted = false; };
+  }, [currentUser, authMode, tenants]);
+
+  const handleReviewSaved = (orderId: string, review: RestaurantReview) => {
+    setOrderReviewsMap(prev => ({ ...prev, [orderId]: review }));
+  };
 
   const clientOrders = orders
     .filter(o => {
@@ -476,8 +854,12 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp }) => {
                   order={order}
                   tenantName={tenant?.name || 'Restaurante Aliado'}
                   tenantEmoji={tenant?.logoEmoji || '🍽️'}
+                  tenantLogoUrl={resolveTenantLogoUrl(tenant, posts, products)}
                   authMode={authMode}
+                  existingReview={orderReviewsMap[order.id]}
+                  onReviewSaved={handleReviewSaved}
                   onNeedHelp={onNeedHelp}
+                  onOpenTenantReviews={onOpenTenantReviews}
                 />
               );
             })}
@@ -500,8 +882,12 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp }) => {
                   order={order}
                   tenantName={tenant?.name || 'Restaurante Aliado'}
                   tenantEmoji={tenant?.logoEmoji || '🍽️'}
+                  tenantLogoUrl={resolveTenantLogoUrl(tenant, posts, products)}
                   authMode={authMode}
+                  existingReview={orderReviewsMap[order.id]}
+                  onReviewSaved={handleReviewSaved}
                   onNeedHelp={onNeedHelp}
+                  onOpenTenantReviews={onOpenTenantReviews}
                 />
               );
             })}
@@ -511,4 +897,5 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp }) => {
     </motion.div>
   );
 };
+
 

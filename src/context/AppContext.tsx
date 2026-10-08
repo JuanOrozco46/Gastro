@@ -956,22 +956,50 @@ const location = useLocationSlice();
   };
 
   const updateTenant = async (tenantId: string, updates: Partial<Tenant>) => {
+    let remoteMerged: Partial<Tenant> = updates;
     if (authMode === 'remote') {
       const updatedTenant = await updateRemoteTenant(tenantId, updates);
       if (!updatedTenant) {
         showToast('⚠️ Hubo un error al guardar los cambios en el servidor.');
         return;
       }
-      setRemoteTenants(prev => prev.map(t => t.id === tenantId ? { ...t, ...updates } : t));
+      remoteMerged = { ...updates, ...updatedTenant };
+      setRemoteTenants(prev => {
+        const next = prev.map(t => (t.id === tenantId ? { ...t, ...remoteMerged } : t));
+        remoteTenantsRef.current = next;
+        return next;
+      });
     }
     
     // Solo actualizar la UI tras confirmación remota
-    setTenants(prev => prev.map(t => t.id === tenantId ? { ...t, ...updates } : t));
+    setTenants(prev => prev.map(t => (t.id === tenantId ? { ...t, ...remoteMerged } : t)));
     if (currentTenant.id === tenantId) {
-      setCurrentTenant(prev => ({ ...prev, ...updates }));
+      setCurrentTenant(prev => ({ ...prev, ...remoteMerged }));
     }
     
     showToast('Perfil del restaurante actualizado con éxito');
+  };
+
+  const syncTenantRating = (tenantId: string, ratingAvg?: number, ratingCount?: number) => {
+    if (!tenantId) return;
+    const patch: Partial<Tenant> = {};
+    if (typeof ratingAvg === 'number' && Number.isFinite(ratingAvg)) {
+      patch.rating = Number(ratingAvg.toFixed(2));
+    }
+    if (typeof ratingCount === 'number' && Number.isFinite(ratingCount)) {
+      patch.reviewsCount = Math.max(0, Math.round(ratingCount));
+    }
+    if (Object.keys(patch).length === 0) return;
+
+    setRemoteTenants(prev => {
+      const next = prev.map(t => (t.id === tenantId ? { ...t, ...patch } : t));
+      remoteTenantsRef.current = next;
+      return next;
+    });
+    setTenants(prev => prev.map(t => (t.id === tenantId ? { ...t, ...patch } : t)));
+    if (currentTenant.id === tenantId) {
+      setCurrentTenant(prev => ({ ...prev, ...patch }));
+    }
   };
 
   const retryRemotePayment = async (orderId: string): Promise<{ success: boolean; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }> => {
@@ -2016,6 +2044,7 @@ const location = useLocationSlice();
       toggleTenantOpenStatus,
       addTenant,
       updateTenant,
+      syncTenantRating,
       toggleLikePost,
       addComment,
       createPost,

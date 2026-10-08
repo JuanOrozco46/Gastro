@@ -182,10 +182,15 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
       const compressed = await compressImage(file, maxMB);
       const res = await uploadMediaFile(compressed.file, type, tenant.id);
       if (res.success && res.publicUrl) {
+        const uploadedUrl = res.publicUrl;
         if (type === 'profile') {
-          setFormData(prev => ({ ...prev, logoUrl: res.publicUrl as string }));
+          setFormData(prev => ({ ...prev, logoUrl: uploadedUrl }));
+          await updateTenant(tenant.id, { logoUrl: uploadedUrl });
+          showToast('Logo del restaurante actualizado y publicado.');
         } else {
-          setFormData(prev => ({ ...prev, bannerUrl: res.publicUrl as string }));
+          setFormData(prev => ({ ...prev, bannerUrl: uploadedUrl }));
+          await updateTenant(tenant.id, { bannerUrl: uploadedUrl });
+          showToast('Portada del restaurante actualizada y publicada.');
         }
       } else {
         setErrorMsg(res.error || 'Error al subir la imagen.');

@@ -1,16 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/useApp';
 import type { Tenant } from '../types';
+import { resolveTenantBannerUrl, resolveTenantLogoUrl, getCategoryFallbackBanner } from '../utils/tenantHelpers';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Store, Search, Star, MapPin, Clock, ShoppingBag, Info, CheckCircle2,
-  X, LayoutGrid, List, ShieldCheck, Flame, Plus
+  X, LayoutGrid, List, ShieldCheck, Flame, Plus, MessageSquare
 } from 'lucide-react';
 
 interface RestaurantDirectoryProps {
   selectedZone?: string;
   onSelectTenantAndGoToFeed: (slug: string) => void;
-  onOpenTenantProfile?: (tenantId: string) => void;
+  onOpenTenantProfile?: (tenantId: string, initialTab?: 'menu' | 'content' | 'reviews' | 'info') => void;
 }
 
 export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
@@ -18,7 +19,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
   onSelectTenantAndGoToFeed,
   onOpenTenantProfile
 }) => {
-  const { tenants, products, cities, zones, selectedCityId, selectedZoneId, addToCart, setCurrentTenantBySlug, isCatalogLoading, catalogError } = useApp();
+  const { tenants, products, posts, cities, zones, selectedCityId, selectedZoneId, addToCart, setCurrentTenantBySlug, isCatalogLoading, catalogError } = useApp();
 
   const activeCity = cities.find(c => c.id === selectedCityId) || cities[0];
 
@@ -29,6 +30,8 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
   const [sortBy, setSortBy] = useState<'rating' | 'distance' | 'time'>('rating');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedTenantForModal, setSelectedTenantForModal] = useState<Tenant | null>(null);
+  const [brokenLogos, setBrokenLogos] = useState<Record<string, boolean>>({});
+  const [brokenBanners, setBrokenBanners] = useState<Record<string, boolean>>({});
 
   // Extract unique categories from tenants
   const categories = useMemo(() => {
@@ -171,8 +174,13 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
             <div className="spotlight-body">
               <div className="spotlight-header">
                 <span className="spotlight-emoji" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {featuredTenant.logoUrl ? (
-                    <img src={featuredTenant.logoUrl} alt={featuredTenant.name} style={{ width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover' }} />
+                  {resolveTenantLogoUrl(featuredTenant, posts, products) && !brokenLogos[featuredTenant.id] ? (
+                    <img
+                      src={resolveTenantLogoUrl(featuredTenant, posts, products)}
+                      alt={featuredTenant.name}
+                      style={{ width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover' }}
+                      onError={() => setBrokenLogos(prev => ({ ...prev, [featuredTenant.id]: true }))}
+                    />
                   ) : (
                     featuredTenant.logoEmoji || '🍽️'
                   )}
@@ -184,7 +192,10 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
               </div>
               <p className="spotlight-desc">{featuredTenant.description}</p>
               <div className="spotlight-footer">
-                <span className="spotlight-rating">⭐ {featuredTenant.rating}</span>
+                <span className="spotlight-rating">
+                  ⭐ {Number(featuredTenant.rating || 5).toFixed(1)}
+                  {featuredTenant.reviewsCount ? ` (${featuredTenant.reviewsCount})` : ''}
+                </span>
                 <span className="spotlight-time">⏱️ {featuredTenant.deliveryTime || '20-30 min'}</span>
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -194,7 +205,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                   onClick={() => {
                     setCurrentTenantBySlug(featuredTenant.slug);
                     if (onOpenTenantProfile) {
-                      onOpenTenantProfile(featuredTenant.id);
+                      onOpenTenantProfile(featuredTenant.id, 'menu');
                     } else {
                       setSelectedTenantForModal(featuredTenant);
                     }
@@ -401,7 +412,15 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
           className={viewMode === 'grid' ? 'tenant-grid' : 'tenant-list'}
         >
           <AnimatePresence>
-            {filteredTenants.map(tenant => (
+            {filteredTenants.map(tenant => {
+              const resolvedBanner = brokenBanners[tenant.id]
+                ? getCategoryFallbackBanner(tenant.category)
+                : resolveTenantBannerUrl(tenant, posts, products);
+              const resolvedLogo = !brokenLogos[tenant.id]
+                ? resolveTenantLogoUrl(tenant, posts, products)
+                : undefined;
+
+              return (
               <motion.div 
                 layout
                 key={tenant.id}
@@ -419,12 +438,21 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
               >
                 {/* Card Banner Image Header */}
                 <div className="tenant-card-header">
-                  <img loading="lazy" decoding="async"
-                    src={tenant.bannerUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80'}
-                    alt={tenant.name}
-                    className="tenant-banner-img"
-                  />
-                  <div className="tenant-header-overlay" />
+                  <div className="tenant-banner-frame">
+                    <img
+                      loading="lazy"
+                      decoding="async"
+                      src={resolvedBanner}
+                      alt={tenant.name}
+                      className="tenant-banner-img"
+                      onError={() => {
+                        if (!brokenBanners[tenant.id]) {
+                          setBrokenBanners(prev => ({ ...prev, [tenant.id]: true }));
+                        }
+                      }}
+                    />
+                    <div className="tenant-header-overlay" />
+                  </div>
 
                   {/* Status Badge */}
                   <div className="tenant-header-badges-left">
@@ -453,10 +481,17 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
 
                   {/* Logo Emoji Floating Avatar */}
                   <div className="tenant-logo-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {tenant.logoUrl ? (
-                      <img src={tenant.logoUrl} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {resolvedLogo ? (
+                      <img
+                        loading="lazy"
+                        decoding="async"
+                        src={resolvedLogo}
+                        alt={tenant.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={() => setBrokenLogos(prev => ({ ...prev, [tenant.id]: true }))}
+                      />
                     ) : (
-                      tenant.logoEmoji || '🏪'
+                      <span>{tenant.logoEmoji || '🏪'}</span>
                     )}
                   </div>
                 </div>
@@ -472,10 +507,28 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                       <span className="tenant-category-tag">{tenant.category}</span>
                     </div>
 
-                    <div className="tenant-rating-box">
+                    <button
+                      type="button"
+                      className="tenant-rating-box"
+                      style={{ cursor: 'pointer', border: '1px solid rgba(245, 158, 11, 0.28)' }}
+                      title="Ver reseñas del restaurante"
+                      onClick={() => {
+                        setCurrentTenantBySlug(tenant.slug);
+                        if (onOpenTenantProfile) {
+                          onOpenTenantProfile(tenant.id, 'reviews');
+                        } else {
+                          setSelectedTenantForModal(tenant);
+                        }
+                      }}
+                    >
                       <Star size={14} className="star-icon" fill="#F59E0B" />
-                      <span className="rating-num" style={{ color: '#F59E0B' }}>{tenant.rating}</span>
-                    </div>
+                      <span className="rating-num" style={{ color: '#F59E0B' }}>
+                        {Number(tenant.rating || 5).toFixed(1)}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        ({tenant.reviewsCount || 0})
+                      </span>
+                    </button>
                   </div>
 
                   <p className="tenant-description">
@@ -522,7 +575,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                       onClick={() => {
                         setCurrentTenantBySlug(tenant.slug);
                         if (onOpenTenantProfile) {
-                          onOpenTenantProfile(tenant.id);
+                          onOpenTenantProfile(tenant.id, 'menu');
                         } else {
                           setSelectedTenantForModal(tenant);
                         }
@@ -532,10 +585,35 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                     </motion.button>
 
                     <button
+                      type="button"
+                      className="btn btn-outline tenant-btn-info"
+                      style={{ borderRadius: '12px', borderColor: 'rgba(245, 158, 11, 0.3)', color: '#FBBF24', gap: '5px', padding: '0 12px' }}
+                      onClick={() => {
+                        setCurrentTenantBySlug(tenant.slug);
+                        if (onOpenTenantProfile) {
+                          onOpenTenantProfile(tenant.id, 'reviews');
+                        } else {
+                          setSelectedTenantForModal(tenant);
+                        }
+                      }}
+                      title="Ver calificaciones y reseñas"
+                    >
+                      <MessageSquare size={15} />
+                      <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>Reseñas</span>
+                    </button>
+
+                    <button
+                      type="button"
                       className="btn btn-outline tenant-btn-info"
                       style={{ borderRadius: '12px', borderColor: 'rgba(255,255,255,0.15)', color: 'white' }}
-                      onClick={() => setSelectedTenantForModal(tenant)}
-                      title="Ver detalles del comercio"
+                      onClick={() => {
+                        if (onOpenTenantProfile) {
+                          onOpenTenantProfile(tenant.id, 'info');
+                        } else {
+                          setSelectedTenantForModal(tenant);
+                        }
+                      }}
+                      title="Ver detalles y horarios del comercio"
                     >
                       <Info size={16} />
                     </button>
@@ -543,7 +621,8 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                 </div>
 
               </motion.div>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </motion.div>
       )}
@@ -568,7 +647,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
             {/* Modal Header */}
             <div className="modal-banner-header">
               <img loading="lazy" decoding="async"
-                src={selectedTenantForModal.bannerUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80'}
+                src={resolveTenantBannerUrl(selectedTenantForModal, posts, products)}
                 alt={selectedTenantForModal.name}
                 className="modal-banner-img"
               />
@@ -581,8 +660,8 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
               </button>
 
               <div className="modal-logo-box" style={{ background: '#0F172A', border: '3px solid rgba(255,255,255,0.14)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {selectedTenantForModal.logoUrl ? (
-                  <img src={selectedTenantForModal.logoUrl} alt={selectedTenantForModal.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {resolveTenantLogoUrl(selectedTenantForModal, posts, products) ? (
+                  <img src={resolveTenantLogoUrl(selectedTenantForModal, posts, products)} alt={selectedTenantForModal.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   selectedTenantForModal.logoEmoji || '🏪'
                 )}

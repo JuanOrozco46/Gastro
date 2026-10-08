@@ -173,6 +173,7 @@ export interface Tenant {
   promotionBadge?: string;
   salesWeekly: number;
   rating: number;
+  reviewsCount?: number;
   distanceKm: number;
   isNew: boolean;
   commissionRate: number; // e.g. 0.03 (3%)
@@ -194,6 +195,24 @@ export interface Tenant {
   googlePlaceId?: string;
   tableServiceEnabled?: boolean;
   acceptsCash?: boolean;
+}
+
+export interface RestaurantReview {
+  id: string;
+  restaurantId: string;
+  orderId?: string;
+  userId: string;
+  userName: string;
+  userHandle?: string;
+  userAvatar?: string;
+  userAvatarUrl?: string;
+  rating: number;
+  comment: string;
+  tags?: string[];
+  ownerReply?: string;
+  ownerRepliedAt?: string;
+  createdAt: string;
+  timeAgo: string;
 }
 
 export interface RestaurantHour {

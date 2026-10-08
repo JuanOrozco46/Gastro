@@ -1,6 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { Tenant, Product, Post, RestaurantApplication, OrderFulfillment, City, Zone, RestaurantDeliveryMode, PostComment } from '../types';
+import type { Tenant, Product, Post, RestaurantApplication, OrderFulfillment, City, Zone, RestaurantDeliveryMode, PostComment, RestaurantReview } from '../types';
 import type {
   DbRestaurant, DbProduct, DbPost
 } from './supabaseTypes';
@@ -93,6 +93,7 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
         id, slug, name, category, description, address, phone, whatsapp, city_id, zone_id, status, is_open, 
         delivery_modes, min_order, delivery_fee, delivery_radius_km, commission_rate,
         logo_url, banner_url, logo_emoji, specialties, accepting_orders, estimated_delivery_minutes, owner_user_id,
+        rating_avg, rating_count,
         restaurant_hours ( id, day_of_week, is_closed, open_time, close_time, interval_index )
       `);
 
@@ -601,6 +602,8 @@ export interface ApplicationAssetFiles {
 export interface ApplicationAssetResult {
   logo: boolean;
   banner: boolean;
+  logoUrl?: string;
+  bannerUrl?: string;
   /** Mensaje legible si alguna imagen no pudo subirse o fue rechazada. */
   error?: string;
 }
@@ -624,9 +627,9 @@ async function readFunctionError(error: unknown): Promise<string> {
 }
 
 /**
- * Sube logo/banner de una solicitud YA CREADA usando URLs firmadas emitidas por la Edge
- * Function `application-assets` (bucket privado, validación de MIME/tamaño/bytes en servidor).
- * Nunca lanza: si falla, la solicitud sigue siendo válida (las imágenes son opcionales).
+ * Sube logo/banner de una solicitud YA CREADA directamente al bucket público `gastro-media`
+ * bajo `applications/{applicationId}/...` y sincroniza `logo_url` y `banner_url` en
+ * `restaurant_applications` y `restaurants`. Si falla el bucket directo, intenta la Edge Function.
  */
 export async function uploadApplicationAssets(
   applicationId: string,
@@ -650,6 +653,57 @@ export async function uploadApplicationAssets(
   }
 
   try {
+    let logoUrl: string | undefined;
+    let bannerUrl: string | undefined;
+
+    for (const { kind, file } of entries) {
+      const rawExt = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const ext = ['jpg', 'jpeg', 'png', 'webp'].includes(rawExt) ? rawExt : 'jpg';
+      const filePath = `applications/${applicationId}/${kind}_${Date.now()}.${ext}`;
+
+      const { error: directErr } = await supabase.storage
+        .from('gastro-media')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type
+        });
+
+      if (!directErr) {
+        const { data: pubData } = supabase.storage.from('gastro-media').getPublicUrl(filePath);
+        if (pubData?.publicUrl) {
+          if (kind === 'logo') logoUrl = pubData.publicUrl;
+          if (kind === 'banner') bannerUrl = pubData.publicUrl;
+        }
+      } else {
+        console.warn(`⚠️ Subida directa a gastro-media (${kind}) falló:`, directErr.message);
+      }
+    }
+
+    if (logoUrl || bannerUrl) {
+      const dbPatch: Record<string, string> = {};
+      if (logoUrl) dbPatch.logo_url = logoUrl;
+      if (bannerUrl) dbPatch.banner_url = bannerUrl;
+
+      await supabase
+        .from('restaurant_applications')
+        .update(dbPatch)
+        .eq('id', applicationId);
+
+      await supabase
+        .from('restaurants')
+        .update(dbPatch)
+        .eq('application_id', applicationId);
+
+      return {
+        logo: Boolean(logoUrl),
+        banner: Boolean(bannerUrl),
+        logoUrl,
+        bannerUrl
+      };
+    }
+
+    // Fallback a Edge Function si el bucket directo no aceptó el archivo
     const sign = await supabase.functions.invoke('application-assets', {
       body: {
         action: 'sign',
@@ -1149,29 +1203,67 @@ export async function updateRemoteTenant(tenantId: string, updates: Partial<Tena
     }
 
     if (updates.hours && Array.isArray(updates.hours)) {
-      const hoursToUpsert = updates.hours.map(h => ({
-        restaurant_id: tenantId,
-        day_of_week: h.dayOfWeek,
-        is_open: h.isOpen,
-        open_time: h.openTime || null,
-        close_time: h.closeTime || null,
-        open_time2: h.openTime2 || null,
-        close_time2: h.closeTime2 || null
-      }));
-      
-      const { error } = await supabase
+      const hoursToUpsert: Array<{
+        restaurant_id: string;
+        day_of_week: number;
+        interval_index: number;
+        is_closed: boolean;
+        open_time: string | null;
+        close_time: string | null;
+      }> = [];
+      const secondIntervalsToDelete: number[] = [];
+
+      for (const h of updates.hours) {
+        hoursToUpsert.push({
+          restaurant_id: tenantId,
+          day_of_week: h.dayOfWeek,
+          interval_index: 0,
+          is_closed: !h.isOpen,
+          open_time: h.isOpen && h.openTime ? h.openTime : null,
+          close_time: h.isOpen && h.closeTime ? h.closeTime : null
+        });
+
+        if (h.isOpen && h.openTime2 && h.closeTime2) {
+          hoursToUpsert.push({
+            restaurant_id: tenantId,
+            day_of_week: h.dayOfWeek,
+            interval_index: 1,
+            is_closed: false,
+            open_time: h.openTime2,
+            close_time: h.closeTime2
+          });
+        } else {
+          secondIntervalsToDelete.push(h.dayOfWeek);
+        }
+      }
+
+      const { error: hoursErr } = await supabase
         .from('restaurant_hours')
-        .upsert(hoursToUpsert, { onConflict: 'restaurant_id,day_of_week' });
-        
-      if (error) throw error;
-      tenantUpdated = true;
+        .upsert(hoursToUpsert, { onConflict: 'restaurant_id,day_of_week,interval_index' });
+
+      if (hoursErr) {
+        console.warn('⚠️ Error guardando horarios del restaurante:', hoursErr.message);
+      } else {
+        if (secondIntervalsToDelete.length > 0) {
+          await supabase
+            .from('restaurant_hours')
+            .delete()
+            .eq('restaurant_id', tenantId)
+            .eq('interval_index', 1)
+            .in('day_of_week', secondIntervalsToDelete);
+        }
+        tenantUpdated = true;
+      }
     }
 
     if (!tenantUpdated) return null; // No updates provided
 
     const { data, error } = await supabase
       .from('restaurants')
-      .select()
+      .select(`
+        *,
+        restaurant_hours ( id, day_of_week, is_closed, open_time, close_time, interval_index )
+      `)
       .eq('id', tenantId)
       .single();
 
@@ -1399,3 +1491,252 @@ export async function resolveTableByToken(token: string) {
     return { success: false, error: err.message };
   }
 }
+
+// ============================================================================
+// 12. RESTAURANT REVIEWS & RATINGS
+// ============================================================================
+
+interface DbRestaurantReviewRow {
+  id: string;
+  restaurant_id: string;
+  order_id?: string | null;
+  user_id: string;
+  rating: number;
+  comment: string;
+  tags?: string[] | null;
+  owner_reply?: string | null;
+  owner_replied_at?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export async function fetchRestaurantReviews(restaurantId: string): Promise<RestaurantReview[]> {
+  if (!isSupabaseConfigured || !supabase || !restaurantId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('restaurant_reviews')
+      .select('id, restaurant_id, order_id, user_id, rating, comment, tags, owner_reply, owner_replied_at, created_at, updated_at')
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: false });
+
+    if (error || !data) {
+      if (error) console.warn('⚠️ Error cargando reseñas del restaurante:', error.message);
+      return [];
+    }
+
+    const rows = data as DbRestaurantReviewRow[];
+    const userIds = Array.from(new Set(rows.map(r => r.user_id).filter(Boolean)));
+    const profileMap = await fetchProfilesMetaMap(userIds);
+
+    return rows.map(r => {
+      const meta = profileMap.get(r.user_id);
+      return {
+        id: r.id,
+        restaurantId: r.restaurant_id,
+        orderId: r.order_id || undefined,
+        userId: r.user_id,
+        userName: meta?.fullName || 'Cliente verificado',
+        userHandle: meta?.username,
+        userAvatarUrl: meta?.avatarUrl,
+        rating: Number(r.rating) || 5,
+        comment: r.comment || '',
+        tags: Array.isArray(r.tags) ? r.tags : [],
+        ownerReply: r.owner_reply || undefined,
+        ownerRepliedAt: r.owner_replied_at || undefined,
+        createdAt: r.created_at,
+        timeAgo: formatTimeAgo(r.created_at)
+      };
+    });
+  } catch (err) {
+    console.warn('⚠️ Excepción cargando reseñas del restaurante:', err);
+    return [];
+  }
+}
+
+export async function fetchCustomerOrderReviews(userId: string): Promise<Record<string, RestaurantReview>> {
+  if (!isSupabaseConfigured || !supabase || !userId) return {};
+  try {
+    const { data, error } = await supabase
+      .from('restaurant_reviews')
+      .select('id, restaurant_id, order_id, user_id, rating, comment, tags, owner_reply, owner_replied_at, created_at')
+      .eq('user_id', userId)
+      .not('order_id', 'is', null);
+
+    if (error || !data) return {};
+
+    const rows = data as DbRestaurantReviewRow[];
+    const map: Record<string, RestaurantReview> = {};
+    for (const r of rows) {
+      if (!r.order_id) continue;
+      map[r.order_id] = {
+        id: r.id,
+        restaurantId: r.restaurant_id,
+        orderId: r.order_id,
+        userId: r.user_id,
+        userName: 'Tú',
+        rating: Number(r.rating) || 5,
+        comment: r.comment || '',
+        tags: Array.isArray(r.tags) ? r.tags : [],
+        ownerReply: r.owner_reply || undefined,
+        ownerRepliedAt: r.owner_replied_at || undefined,
+        createdAt: r.created_at,
+        timeAgo: formatTimeAgo(r.created_at)
+      };
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+export async function submitRestaurantReview(payload: {
+  restaurantId: string;
+  orderId?: string;
+  userId: string;
+  rating: number;
+  comment: string;
+  tags?: string[];
+  authorFallback?: { name?: string; username?: string; avatarUrl?: string };
+}): Promise<{
+  success: boolean;
+  review?: RestaurantReview;
+  ratingAvg?: number;
+  ratingCount?: number;
+  error?: string;
+}> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'Sin conexión a la base de datos.' };
+  }
+
+  const cleanRating = Math.min(5, Math.max(1, Math.round(Number(payload.rating) || 5)));
+  const cleanComment = (payload.comment || '').trim();
+  const cleanTags = Array.isArray(payload.tags) ? payload.tags.filter(Boolean) : [];
+
+  try {
+    let savedRow: DbRestaurantReviewRow | null = null;
+
+    if (payload.orderId) {
+      const { data: existing } = await supabase
+        .from('restaurant_reviews')
+        .select('id')
+        .eq('order_id', payload.orderId)
+        .maybeSingle();
+
+      if (existing?.id) {
+        const { data: updated, error: updErr } = await supabase
+          .from('restaurant_reviews')
+          .update({
+            rating: cleanRating,
+            comment: cleanComment,
+            tags: cleanTags,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id)
+          .select('id, restaurant_id, order_id, user_id, rating, comment, tags, owner_reply, owner_replied_at, created_at, updated_at')
+          .single();
+
+        if (updErr) return { success: false, error: updErr.message };
+        savedRow = updated as DbRestaurantReviewRow;
+      }
+    }
+
+    if (!savedRow) {
+      const { data: inserted, error: insErr } = await supabase
+        .from('restaurant_reviews')
+        .insert({
+          restaurant_id: payload.restaurantId,
+          order_id: payload.orderId || null,
+          user_id: payload.userId,
+          rating: cleanRating,
+          comment: cleanComment,
+          tags: cleanTags
+        })
+        .select('id, restaurant_id, order_id, user_id, rating, comment, tags, owner_reply, owner_replied_at, created_at, updated_at')
+        .single();
+
+      if (insErr) return { success: false, error: insErr.message };
+      savedRow = inserted as DbRestaurantReviewRow;
+    }
+
+    const profileMap = await fetchProfilesMetaMap([payload.userId]);
+    const meta = profileMap.get(payload.userId);
+
+    const { data: restStats } = await supabase
+      .from('restaurants')
+      .select('rating_avg, rating_count')
+      .eq('id', payload.restaurantId)
+      .maybeSingle();
+
+    const review: RestaurantReview = {
+      id: savedRow.id,
+      restaurantId: savedRow.restaurant_id,
+      orderId: savedRow.order_id || undefined,
+      userId: savedRow.user_id,
+      userName: meta?.fullName || payload.authorFallback?.name || 'Cliente verificado',
+      userHandle: meta?.username || payload.authorFallback?.username,
+      userAvatarUrl: meta?.avatarUrl || payload.authorFallback?.avatarUrl,
+      rating: Number(savedRow.rating) || cleanRating,
+      comment: savedRow.comment || '',
+      tags: Array.isArray(savedRow.tags) ? savedRow.tags : [],
+      ownerReply: savedRow.owner_reply || undefined,
+      ownerRepliedAt: savedRow.owner_replied_at || undefined,
+      createdAt: savedRow.created_at,
+      timeAgo: formatTimeAgo(savedRow.created_at)
+    };
+
+    return {
+      success: true,
+      review,
+      ratingAvg: restStats?.rating_avg !== undefined ? Number(restStats.rating_avg) : undefined,
+      ratingCount: restStats?.rating_count !== undefined ? Number(restStats.rating_count) : undefined
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'No se pudo guardar la calificación.'
+    };
+  }
+}
+
+export async function deleteRestaurantReview(
+  reviewId: string,
+  restaurantId: string
+): Promise<{
+  success: boolean;
+  ratingAvg?: number;
+  ratingCount?: number;
+  error?: string;
+}> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'Sin conexión a la base de datos.' };
+  }
+  try {
+    const { data, error } = await supabase
+      .from('restaurant_reviews')
+      .delete()
+      .eq('id', reviewId)
+      .select('id');
+
+    if (error || !data || data.length === 0) {
+      return { success: false, error: error?.message || 'No tienes permiso para eliminar esta reseña.' };
+    }
+
+    const { data: restStats } = await supabase
+      .from('restaurants')
+      .select('rating_avg, rating_count')
+      .eq('id', restaurantId)
+      .maybeSingle();
+
+    return {
+      success: true,
+      ratingAvg: restStats?.rating_avg !== undefined ? Number(restStats.rating_avg) : undefined,
+      ratingCount: restStats?.rating_count !== undefined ? Number(restStats.rating_count) : undefined
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Error eliminando reseña.'
+    };
+  }
+}
+
