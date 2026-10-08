@@ -9,6 +9,7 @@ import {
   mapDbProductToProduct,
   mapDbPostToPost
 } from './supabaseTypes';
+import { reportDataError } from './dataErrors';
 
 /**
  * Servicio de Sincronización en Tiempo Real con Supabase.
@@ -19,7 +20,10 @@ export async function fetchLiveCities(): Promise<City[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
     const { data, error } = await supabase.from('cities').select('*').eq('is_active', true).order('name');
-    if (error || !data) return [];
+    if (error || !data) {
+      reportDataError('ciudades', 'No se pudieron cargar las ciudades.');
+      return [];
+    }
     return data.map(d => ({
       id: d.id,
       slug: d.slug,
@@ -39,7 +43,10 @@ export async function fetchLiveZones(cityId?: string): Promise<Zone[]> {
       query = query.eq('city_id', cityId);
     }
     const { data, error } = await query.order('name');
-    if (error || !data) return [];
+    if (error || !data) {
+      reportDataError('zonas', 'No se pudieron cargar las zonas de cobertura.');
+      return [];
+    }
     return data.map(d => ({
       id: d.id,
       cityId: d.city_id,
@@ -90,6 +97,7 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
       `);
 
     if (error || !data) {
+      reportDataError('restaurantes', 'No se pudieron cargar los restaurantes.');
       console.warn('⚠️ Error al cargar restaurantes de Supabase:', error);
       return [];
     }
@@ -111,7 +119,8 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
       return true;
     });
   } catch (err: unknown) {
-    console.warn('⚠️ Excepción al consultar Supabase:', err);
+    console.warn('⚠️ Excepción al consultar Supabase (restaurantes):', err);
+    reportDataError('restaurantes', 'No se pudieron cargar los restaurantes.');
     return [];
   }
 }
@@ -124,6 +133,7 @@ export async function fetchLiveProducts(): Promise<Product[]> {
       .select(`id, restaurant_id, name, description, category, price_cop, available, image_url, is_archived, sort_order, tags, preparation_time_minutes, ingredients, allergens`);
 
     if (error) {
+      reportDataError('productos', 'No se pudieron cargar los productos.');
       console.error('⚠️ Error RLS o BD al consultar Supabase (Products):', error);
       return [];
     }
@@ -148,6 +158,7 @@ export async function fetchLiveProducts(): Promise<Product[]> {
     });
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al consultar Supabase (Products):', err);
+    reportDataError('productos', 'No se pudieron cargar los productos.');
     return [];
   }
 }
@@ -296,6 +307,24 @@ export async function toggleRemoteLike(postId: string, userId: string): Promise<
   }
 }
 
+/** IDs de posts guardados por el usuario (para rehidratar el estado del feed al recargar). */
+export async function fetchRemoteSavedPosts(userId: string): Promise<string[]> {
+  if (!isSupabaseConfigured || !supabase || !userId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('saved_posts')
+      .select('post_id')
+      .eq('user_id', userId);
+    if (error || !data) {
+      console.warn('⚠️ Error cargando posts guardados:', error?.message);
+      return [];
+    }
+    return data.map((r: { post_id: string }) => r.post_id);
+  } catch {
+    return [];
+  }
+}
+
 export async function toggleRemoteSave(postId: string, userId: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
@@ -340,6 +369,7 @@ export async function fetchLivePosts(): Promise<Post[]> {
       .order('created_at', { ascending: false });
 
     if (error) {
+      reportDataError('publicaciones', 'No se pudieron cargar las publicaciones.');
       console.error('⚠️ Error RLS o BD al consultar Supabase (Posts):', error);
       return [];
     }
@@ -424,10 +454,18 @@ export async function fetchLivePosts(): Promise<Post[]> {
 
     return data.map((dbPost: import('./supabaseTypes').DbPost & { restaurants: { name: string; category: string; slug: string; status: string; } | { name: string; category: string; slug: string; status: string; }[] }) => {
       const restaurant = Array.isArray(dbPost.restaurants) ? dbPost.restaurants[0] : dbPost.restaurants;
-      
+
       if (!restaurant || restaurant.status !== 'active') {
         return null;
       }
+
+      // Los hashtags se persisten dentro de la descripción (sin columna propia):
+      // se extraen para el render de tags y se limpian del caption.
+      const rawDesc = dbPost.description || '';
+      const extractedTags = Array.from(new Set(rawDesc.match(/#[\p{L}0-9_]+/gu) || []));
+      const cleanDesc = extractedTags.length > 0
+        ? rawDesc.replace(/#[\p{L}0-9_]+/gu, '').replace(/\s{2,}/g, ' ').trim()
+        : rawDesc;
 
       const post: Post = {
         id: dbPost.id,
@@ -437,7 +475,7 @@ export async function fetchLivePosts(): Promise<Post[]> {
         tenantLogoEmoji: '🍽️',
         dishName: dbPost.title,
         dishEmoji: '🍽️',
-        desc: dbPost.description || '',
+        desc: cleanDesc,
         price: dbPost.price_cop,
         image: dbPost.media_url || '',
         mediaUrl: dbPost.media_url || undefined,
@@ -450,7 +488,8 @@ export async function fetchLivePosts(): Promise<Post[]> {
         productId: dbPost.product_id || dbPost.id,
         hasValidProduct: !!dbPost.product_id, // Flag to indicate if product exists in catalog
         status: dbPost.is_published ? 'published' : 'draft',
-        createdAt: new Date(dbPost.created_at).getTime()
+        createdAt: new Date(dbPost.created_at).getTime(),
+        hashtags: extractedTags.length > 0 ? extractedTags : undefined
       };
 
       return post;
@@ -468,6 +507,7 @@ export async function fetchLivePosts(): Promise<Post[]> {
     });
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al consultar Supabase (Posts):', err);
+    reportDataError('publicaciones', 'No se pudieron cargar las publicaciones.');
     return [];
   }
 }
@@ -712,7 +752,10 @@ export async function fetchLiveApplications(): Promise<RestaurantApplication[]> 
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !data) return [];
+    if (error || !data) {
+      reportDataError('solicitudes', 'No se pudieron cargar las solicitudes de restaurantes.');
+      return [];
+    }
 
     // Las imágenes viven en un bucket PRIVADO: se resuelven a URLs firmadas de corta vida.
     // Solo el platform_admin pasa la política de lectura; para otros usuarios no habrá URL.
@@ -756,6 +799,7 @@ export async function fetchLiveApplications(): Promise<RestaurantApplication[]> 
     })));
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al consultar aplicaciones en Supabase:', err);
+    reportDataError('solicitudes', 'No se pudieron cargar las solicitudes de restaurantes.');
     return [];
   }
 }
@@ -860,17 +904,22 @@ export async function deleteMediaFile(publicUrl: string): Promise<boolean> {
   }
 }
 
-export async function createLiveProduct(tenantId: string, name: string, desc: string, category: string, price: number, available: boolean, imageUrl?: string): Promise<Product | null> {
+export async function createLiveProduct(tenantId: string, newProd: Omit<Product, 'id' | 'tenantId'>): Promise<Product | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
     const { data, error } = await supabase.from('products').insert({
       restaurant_id: tenantId,
-      name,
-      description: desc || null,
-      category,
-      price_cop: price,
-      available,
-      image_url: imageUrl || null
+      name: newProd.name,
+      description: newProd.desc || null,
+      category: newProd.category,
+      price_cop: Math.round(newProd.price),
+      available: newProd.available,
+      image_url: newProd.image || null,
+      tags: newProd.tags?.length ? newProd.tags : null,
+      preparation_time_minutes: newProd.preparationTimeMinutes ?? null,
+      ingredients: newProd.ingredients?.length ? newProd.ingredients : null,
+      allergens: newProd.allergens?.length ? newProd.allergens : null,
+      sort_order: newProd.sortOrder ?? 0
     }).select().single();
 
     if (error || !data) throw error;
@@ -931,14 +980,19 @@ export async function deleteLiveProduct(productId: string): Promise<boolean> {
   }
 }
 
-export async function createLivePost(tenantId: string, title: string, desc: string, price: number, mediaUrl: string, mediaType: 'photo' | 'video', productId?: string, width?: number, height?: number): Promise<Post | null> {
+export async function createLivePost(tenantId: string, title: string, desc: string, price: number, mediaUrl: string, mediaType: 'photo' | 'video', productId?: string, width?: number, height?: number, hashtags?: string[]): Promise<Post | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
+    // La tabla posts no tiene columna de hashtags: se anexan a la descripción
+    // para que sobrevivan a la recarga y sigan siendo buscables en el feed.
+    const tags = (hashtags || []).filter(t => t.trim().length > 0);
+    const fullDesc = tags.length > 0 ? `${desc || ''} ${tags.join(' ')}`.trim() : (desc || null);
+
     const { data, error } = await supabase.from('posts').insert({
       restaurant_id: tenantId,
       title,
-      description: desc || null,
-      price_cop: price,
+      description: fullDesc,
+      price_cop: Math.round(price),
       media_url: mediaUrl,
       media_type: mediaType,
       is_published: true,
@@ -1116,6 +1170,7 @@ export async function fetchRestaurantMembers(restaurantId: string): Promise<Rest
     }));
   } catch (err) {
     console.error('⚠️ Error fetching restaurant members:', err);
+    reportDataError('equipo', 'No se pudo cargar el equipo del restaurante.');
     return [];
   }
 }
@@ -1214,6 +1269,7 @@ export async function fetchRestaurantTables(restaurantId: string) {
     }));
   } catch (err) {
     console.warn('⚠️ Error fetching tables:', err);
+    reportDataError('mesas', 'No se pudieron cargar las mesas.');
     return [];
   }
 }

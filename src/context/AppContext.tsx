@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, BusinessUserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount, UserLocationState } from '../types';
+import type { Product, Order, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount } from '../types';
 import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
@@ -7,392 +7,37 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant, fetchRestaurantMembers as fetchRemoteMembers, inviteRestaurantStaff as inviteRemoteStaff, resendStaffInvitation as resendRemoteInvitation, suspendRestaurantMember as suspendRemoteMember, reactivateRestaurantMember as reactivateRemoteMember, revokeRestaurantMember as revokeRemoteMember, acceptRestaurantInvitation as acceptRemoteInvitation } from '../services/supabaseDataService';
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession, resendVerificationEmailAuth } from '../services/supabaseAuthService';
-import { DEMO_ACCOUNTS } from './demoAccounts';
+import { DEMO_LOGIN_ENABLED } from './demoGate';
+import { DEFAULT_CITIES, DEFAULT_ZONES, EMPTY_TENANT, DEFAULT_TENANTS, DEFAULT_PRODUCTS, DEFAULT_POSTS, DEFAULT_STORIES, DEFAULT_ORDERS, DEFAULT_TRANSACTIONS, DEFAULT_DRIVERS } from './defaultData';
+import { useLocationSlice } from './useLocationSlice';
+import { useToastSlice } from './useToastSlice';
+import { useCartSlice } from './useCartSlice';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment, confirmCashPayment as confirmCashPaymentRemote } from '../services/supabaseOrderService';
-import { resolveLocationFromCoords } from '../services/locationResolver';
-
-// Internal typed authorization helpers
-const isRestaurantOwner = (user: UserAccount | null): boolean => {
-  if (!user) return false;
-  return user.businessRole === 'restaurant_owner' || user.role === 'admin';
-};
-
-const isRestaurantStaff = (user: UserAccount | null): boolean => {
-  if (!user) return false;
-  return user.businessRole === 'restaurant_staff' || user.role === 'kitchen';
-};
-
-const isPlatformAdmin = (user: UserAccount | null): user is UserAccount => {
-  if (!user) return false;
-  return user.businessRole === 'platform_admin';
-};
-
-const hasOwnershipOfTenant = (user: UserAccount | null, tenantId: string): boolean => {
-  if (!isRestaurantOwner(user) || !user?.tenantId) return false;
-  return user.tenantId === tenantId;
-};
-
-const validateAndGetProvisionedAccounts = (): ProvisionedOwnerAccount[] => {
-  try {
-    const saved = localStorage.getItem('gs_provisioned_owner_accounts_v1');
-    if (!saved) return [];
-    const parsed: unknown = JSON.parse(saved);
-    if (!Array.isArray(parsed)) return [];
-
-    const valid: ProvisionedOwnerAccount[] = [];
-    for (const item of parsed) {
-      if (!item || typeof item !== 'object') continue;
-      const obj = item as Record<string, unknown>;
-      if (
-        typeof obj.id === 'string' && obj.id.trim() !== '' &&
-        typeof obj.name === 'string' && obj.name.trim() !== '' &&
-        typeof obj.email === 'string' && obj.email.trim() !== '' &&
-        typeof obj.temporaryPassword === 'string' && obj.temporaryPassword.trim() !== '' &&
-        typeof obj.tenantId === 'string' && obj.tenantId.trim() !== '' &&
-        obj.businessRole === 'restaurant_owner' &&
-        obj.userRole === 'admin' &&
-        typeof obj.createdAt === 'number'
-      ) {
-        valid.push({
-          id: obj.id,
-          name: obj.name.trim(),
-          email: obj.email.trim().toLowerCase(),
-          tenantId: obj.tenantId.trim(),
-          businessRole: 'restaurant_owner',
-          userRole: 'admin',
-          createdAt: obj.createdAt
-        });
-      }
-    }
-    return valid;
-  } catch {
-    return [];
-  }
-};
-
-// Validates a cached session from localStorage for Supabase session recovery fallback.
-// In production, onAuthStateChange handles session restoration. This is a safety net.
-const validateCachedSession = (): UserAccount | null => {
-  try {
-    const saved = localStorage.getItem('gs_demo_session_v1');
-    if (!saved) return null;
-
-    const parsed: unknown = JSON.parse(saved);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      localStorage.removeItem('gs_demo_session_v1');
-      return null;
-    }
-
-    const obj = parsed as Record<string, unknown>;
-
-    if (typeof obj.name !== 'string' || obj.name.trim() === '') {
-      localStorage.removeItem('gs_demo_session_v1');
-      return null;
-    }
-    if (typeof obj.email !== 'string' || obj.email.trim() === '') {
-      localStorage.removeItem('gs_demo_session_v1');
-      return null;
-    }
-
-    const validUserRoles: UserRole[] = ['login', 'client_delivery', 'kitchen', 'admin', 'table_qr', 'platform_admin'];
-    if (typeof obj.role !== 'string' || !validUserRoles.includes(obj.role as UserRole)) {
-      localStorage.removeItem('gs_demo_session_v1');
-      return null;
-    }
-
-    const validBusinessRoles: BusinessUserRole[] = ['customer', 'restaurant_owner', 'restaurant_staff', 'platform_admin'];
-    if (obj.businessRole !== undefined && (typeof obj.businessRole !== 'string' || !validBusinessRoles.includes(obj.businessRole as BusinessUserRole))) {
-      localStorage.removeItem('gs_demo_session_v1');
-      return null;
-    }
-
-    if (obj.tenantId !== undefined && typeof obj.tenantId !== 'string') {
-      localStorage.removeItem('gs_demo_session_v1');
-      return null;
-    }
-
-    return {
-      name: obj.name.trim(),
-      email: obj.email.trim().toLowerCase(),
-      role: obj.role as UserRole,
-      businessRole: obj.businessRole as BusinessUserRole | undefined,
-      tenantId: obj.tenantId as string | undefined
-    };
-  } catch {
-    localStorage.removeItem('gs_demo_session_v1');
-    return null;
-  }
-};
-
-const DEFAULT_CITIES: City[] = [
-  {
-    id: '00000000-0000-0000-0000-000000000001',
-    name: 'Armenia',
-    slug: 'armenia-quindio',
-    countryCode: 'CO',
-    currencyCode: 'COP',
-    isActive: true
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000002',
-    name: 'Pereira',
-    slug: 'pereira-risaralda',
-    countryCode: 'CO',
-    currencyCode: 'COP',
-    isActive: true
-  }
-];
-
-const DEFAULT_ZONES: Zone[] = [
-  { id: '00000000-0000-0000-0000-000000000011', cityId: '00000000-0000-0000-0000-000000000001', name: 'Centro', slug: 'armenia-centro', isActive: true },
-  { id: '00000000-0000-0000-0000-000000000012', cityId: '00000000-0000-0000-0000-000000000001', name: 'Norte', slug: 'armenia-norte', isActive: true },
-  { id: '00000000-0000-0000-0000-000000000013', cityId: '00000000-0000-0000-0000-000000000001', name: 'Sur', slug: 'armenia-sur', isActive: true },
-  { id: '00000000-0000-0000-0000-000000000021', cityId: '00000000-0000-0000-0000-000000000002', name: 'Circunvalar', slug: 'pereira-circunvalar', isActive: true },
-  { id: '00000000-0000-0000-0000-000000000022', cityId: '00000000-0000-0000-0000-000000000002', name: 'Cerritos', slug: 'pereira-cerritos', isActive: true },
-  { id: '00000000-0000-0000-0000-000000000023', cityId: '00000000-0000-0000-0000-000000000002', name: 'Centro', slug: 'pereira-centro', isActive: true }
-];
-
-const EMPTY_TENANT: Tenant = {
-  id: 'empty_tenant',
-  slug: 'sin-restaurante',
-  name: 'Sin Restaurante',
-  category: 'General',
-  logoEmoji: '🏪',
-  bannerUrl: '',
-  description: 'No hay restaurantes registrados aún.',
-  address: 'Dirección del restaurante',
-  deliveryTime: '0 min',
-  priceRange: '$',
-  minOrder: 0,
-  specialties: [],
-  salesWeekly: 0,
-  rating: 5.0,
-  distanceKm: 0,
-  isNew: false,
-  commissionRate: 0,
-  tablesCount: 0,
-  isOpen: false,
-  cityId: '00000000-0000-0000-0000-000000000001',
-  zoneId: '00000000-0000-0000-0000-000000000011',
-  status: 'draft',
-  deliveryModes: []
-};
-
-const DEFAULT_TENANTS: Tenant[] = [];
-const DEFAULT_PRODUCTS: Product[] = [];
-const DEFAULT_POSTS: Post[] = [];
-const DEFAULT_STORIES: Story[] = [];
-const DEFAULT_ORDERS: Order[] = [];
-const DEFAULT_TRANSACTIONS: Transaction[] = [];
-const DEFAULT_DRIVERS: Driver[] = [];
-
-
+import { isRestaurantOwner, isRestaurantStaff, isPlatformAdmin, hasOwnershipOfTenant, validateAndGetProvisionedAccounts, validateCachedSession } from './authGuards';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [cities, setCities] = useState<City[]>(DEFAULT_CITIES);
-  const [zones, setZones] = useState<Zone[]>(DEFAULT_ZONES);
+const location = useLocationSlice();
+  const {
+    cities,
+    setCities,
+    zones,
+    setZones,
+    selectedCityId,
+    selectedZoneId,
+    setSelectedCityIdState,
+    setSelectedZoneIdState,
+    setSelectedCity,
+    setSelectedZone,
+    refreshCities,
+    refreshZones,
+    locationPreference,
+    userLocationState,
+    switchToManualLocation,
+    clearUserLocation,
+    resolveCityFromCoordinates,
+    requestUserLocation
+  } = location;
 
-  const [selectedCityId, setSelectedCityIdState] = useState<string>(() => {
-    try {
-      const savedCity = localStorage.getItem('gs_selected_city_v1');
-      if (savedCity && savedCity.trim()) {
-        return savedCity;
-      }
-    } catch {
-      // ignore
-    }
-    return DEFAULT_CITIES[0].id;
-  });
-
-  const [selectedZoneId, setSelectedZoneIdState] = useState<string | null>(() => {
-    try {
-      const savedZone = localStorage.getItem('gs_selected_zone_v1');
-      if (savedZone && savedZone !== 'null' && savedZone.trim()) {
-        return savedZone;
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  });
-
-  const setSelectedCity = (cityId: string) => {
-    setSelectedCityIdState(cityId);
-    try {
-      localStorage.setItem('gs_selected_city_v1', cityId);
-    } catch { /* ignore */ }
-
-    setSelectedZoneIdState(prevZoneId => {
-      if (!prevZoneId) return null;
-      const zoneBelongs = zones.some(z => z.id === prevZoneId && z.cityId === cityId && z.isActive);
-      if (!zoneBelongs) {
-        try { localStorage.removeItem('gs_selected_zone_v1'); } catch { /* ignore */ }
-        return null;
-      }
-      return prevZoneId;
-    });
-  };
-
-  const setSelectedZone = (zoneId: string | null) => {
-    setSelectedZoneIdState(zoneId);
-    try {
-      if (zoneId) {
-        localStorage.setItem('gs_selected_zone_v1', zoneId);
-      } else {
-        localStorage.removeItem('gs_selected_zone_v1');
-      }
-    } catch { /* ignore */ }
-  };
-
-  const refreshCities = async () => {
-    const liveCities = await fetchLiveCities();
-    if (liveCities.length > 0) {
-      setCities(liveCities);
-      setSelectedCityIdState(prev => {
-        const exists = liveCities.some(c => c.id === prev && c.isActive);
-        if (exists) return prev;
-        const fallback = liveCities[0].id;
-        try { localStorage.setItem('gs_selected_city_v1', fallback); } catch {}
-        return fallback;
-      });
-    }
-  };
-
-  const refreshZones = async (cityId?: string) => {
-    const liveZones = await fetchLiveZones(cityId);
-    if (liveZones.length > 0) {
-      setZones(prev => {
-        const otherZones = prev.filter(z => cityId ? z.cityId !== cityId : false);
-        return [...otherZones, ...liveZones];
-      });
-    }
-  };
-
-  const [locationPreference, setLocationPreference] = useState<'gps' | 'manual'>(() => {
-    try {
-      const saved = localStorage.getItem('gs_location_preference_v1');
-      if (saved === 'gps' || saved === 'manual') return saved;
-    } catch {}
-    return 'manual';
-  });
-
-  const [userLocationState, setUserLocationState] = useState<UserLocationState>({
-    permission: 'unknown',
-    isResolving: false
-  });
-
-  const switchToManualLocation = () => {
-    setLocationPreference('manual');
-    try {
-      localStorage.setItem('gs_location_preference_v1', 'manual');
-    } catch { /* ignore */ }
-    setUserLocationState(prev => ({ ...prev, isResolving: false }));
-  };
-
-  const clearUserLocation = () => {
-    setUserLocationState({
-      permission: 'unknown',
-      isResolving: false
-    });
-  };
-
-  const resolveCityFromCoordinates = async (latitude: number, longitude: number): Promise<boolean> => {
-    const result = resolveLocationFromCoords(latitude, longitude, cities, zones);
-    if (result.status === 'resolved' && result.cityId) {
-      setSelectedCity(result.cityId);
-      if (result.zoneId) {
-        setSelectedZone(result.zoneId);
-      }
-      setUserLocationState(prev => ({
-        ...prev,
-        cityId: result.cityId,
-        zoneId: result.zoneId,
-        error: undefined
-      }));
-      return true;
-    } else {
-      setUserLocationState(prev => ({
-        ...prev,
-        error: result.message
-      }));
-      return false;
-    }
-  };
-
-  const requestUserLocation = async (): Promise<void> => {
-    setLocationPreference('gps');
-    try {
-      localStorage.setItem('gs_location_preference_v1', 'gps');
-    } catch { /* ignore */ }
-
-    if (typeof window === 'undefined' || !navigator || !navigator.geolocation) {
-      setUserLocationState({
-        permission: 'unavailable',
-        isResolving: false,
-        error: 'Tu navegador no soporta geolocalización por GPS.'
-      });
-      return;
-    }
-
-    setUserLocationState(prev => ({
-      ...prev,
-      permission: 'prompt',
-      isResolving: true,
-      error: undefined
-    }));
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const resolution = resolveLocationFromCoords(latitude, longitude, cities, zones);
-
-        if (resolution.status === 'resolved' && resolution.cityId) {
-          setSelectedCity(resolution.cityId);
-          if (resolution.zoneId) {
-            setSelectedZone(resolution.zoneId);
-          }
-          setUserLocationState({
-            permission: 'granted',
-            latitude,
-            longitude,
-            cityId: resolution.cityId,
-            zoneId: resolution.zoneId,
-            isResolving: false,
-            error: undefined
-          });
-        } else {
-          setUserLocationState({
-            permission: 'granted',
-            latitude,
-            longitude,
-            isResolving: false,
-            error: resolution.message
-          });
-        }
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) {
-          setUserLocationState({
-            permission: 'denied',
-            isResolving: false,
-            error: 'Permiso de ubicación denegado por el usuario.'
-          });
-        } else {
-          setUserLocationState({
-            permission: 'unavailable',
-            isResolving: false,
-            error: 'No se pudo obtener la ubicación GPS en este momento.'
-          });
-        }
-      },
-      {
-        timeout: 10000,
-        enableHighAccuracy: false
-      }
-    );
-  };
-
-  const [cartConflict, setCartConflict] = useState<{ pendingProduct: Product | null, activeTenantName: string } | null>(null);
 
   const authMode: 'remote' | 'demo' = isSupabaseConfigured ? 'remote' : 'demo';
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(isSupabaseConfigured);
@@ -603,7 +248,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       initializeApp();
-      
+
       const { data: { subscription } } = subscribeToSupabaseAuthChanges(async (event, session) => {
         if (session?.user && event !== 'INITIAL_SESSION') {
           if (!session.user.email_confirmed_at) {
@@ -653,7 +298,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         subscription.unsubscribe();
       };
     }
-  }, [authMode]);
+  }, [authMode, setCities, setZones, setSelectedCityIdState, setSelectedZoneIdState]);
 
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
@@ -674,21 +319,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [drivers, setDrivers] = useState<Driver[]>(DEFAULT_DRIVERS);
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('gs_cart_v5');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
   const [equityWeight, setEquityWeight] = useState<number>(0.5);
-  const [toast, setToast] = useState<string | null>(null);
+  const { toast, showToast } = useToastSlice(authMode === 'remote');
 
-  const showToast = (message: string) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3200);
-  };
+  const {
+    cart,
+    setCart,
+    cartConflict,
+    setCartConflict,
+    addToCart,
+    clearCartAndAdd,
+    removeFromCart,
+    clearCart
+  } = useCartSlice(tenants, currentTenant, showToast);
 
   const playChime = () => {
     try {
@@ -720,10 +363,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('gs_transactions_v5', JSON.stringify(transactions));
   }, [transactions]);
-
-  useEffect(() => {
-    localStorage.setItem('gs_cart_v5', JSON.stringify(cart));
-  }, [cart]);
 
   // Carga y suscripción WebSockets en tiempo real para pedidos
   useEffect(() => {
@@ -761,10 +400,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeUnsub();
       };
     }
-  }, [currentUser, currentTenant]);
+  }, [currentUser, currentTenant, showToast]);
 
   const loginWithCredentials = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     if (authMode === 'demo') {
+      if (!DEMO_LOGIN_ENABLED) {
+        return { success: false, error: 'El modo demo no está disponible en producción. Configura Supabase para iniciar sesión.' };
+      }
+      // Carga diferida: demoAccounts.ts (con las contraseñas) queda fuera del bundle de producción.
+      const { DEMO_ACCOUNTS } = await import('./demoAccounts');
       const account = DEMO_ACCOUNTS.find(a => a.email === email.trim().toLowerCase() && a.demoPassword === pass);
       if (account) {
         const userAccount: UserAccount = {
@@ -1108,49 +752,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Perfil del restaurante actualizado con éxito');
   };
 
-  const addToCart = (product: Product) => {
-    if (product.available === false) {
-      showToast(`⚠️ "${product.name}" no se encuentra disponible por el momento.`);
-      return { success: false };
-    }
-    const prodTenant = tenants.find(t => t.id === product.tenantId) || currentTenant;
-    if (!prodTenant.isOpen) {
-      showToast(`⚠️ ${prodTenant.name} se encuentra CERRADO temporalmente.`);
-      return { success: false };
-    }
-
-    if (cart.length > 0) {
-      const activeTenantId = cart[0].product.tenantId;
-      if (activeTenantId !== product.tenantId) {
-        const activeTenant = tenants.find(t => t.id === activeTenantId);
-        const activeName = activeTenant ? activeTenant.name : 'otro restaurante';
-        setCartConflict({ pendingProduct: product, activeTenantName: activeName });
-        return { success: false, requiresClear: true, activeTenantName: activeName };
-      }
-    }
-
-    setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
-      if (existing) {
-        return prev.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
-      }
-      return [...prev, { product, quantity: 1 }];
-    });
-    showToast(`Añadido al carrito: ${product.name}`);
-    return { success: true };
-  };
-
-  const clearCartAndAdd = (product: Product) => {
-    setCart([{ product, quantity: 1 }]);
-    showToast(`Añadido al carrito: ${product.name}`);
-  };
-
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
-  };
-
-  const clearCart = () => setCart([]);
-
   const retryRemotePayment = async (orderId: string): Promise<{ success: boolean; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }> => {
     setIsSubmittingOrder(true);
     setOrderError(null);
@@ -1427,28 +1028,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const addProduct = async (newProd: Omit<Product, 'id' | 'tenantId'>) => {
+  const addProduct = async (newProd: Omit<Product, 'id' | 'tenantId'>): Promise<boolean> => {
     if (!isRestaurantOwner(currentUser) || !currentUser?.tenantId) {
       showToast('⚠️ No tienes autorización para agregar productos al menú.');
-      return;
+      return false;
     }
     const targetTenantId = currentUser.tenantId;
-    
+
     if (authMode === 'remote') {
-      const savedProd = await createLiveProduct(targetTenantId, newProd.name, newProd.desc, newProd.category, newProd.price, newProd.available, newProd.image);
+      const savedProd = await createLiveProduct(targetTenantId, newProd);
       if (!savedProd) {
-        showToast('⚠️ Error al crear producto en el servidor.');
-        return;
+        showToast('⚠️ Error al crear producto en el servidor. Verifica nombre, precio y categoría.');
+        return false;
       }
       setRemoteProducts(prev => [savedProd, ...prev]);
       setProducts(prev => [savedProd, ...prev]);
       showToast(`Producto creado exitosamente: ${savedProd.name}`);
-      return;
+      return true;
     }
 
     const prod: Product = { ...newProd, id: `p${Date.now()}`, tenantId: targetTenantId };
     setProducts(prev => [prod, ...prev]);
     showToast(`Producto creado: ${prod.name}`);
+    return true;
   };
 
   const assignDriverToOrder = (orderId: string, driverId: string) => {
@@ -1585,37 +1187,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('🗑️ Comentario eliminado');
   };
 
-  const createPost = async (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => {
+  const createPost = async (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>): Promise<boolean> => {
     if (!isRestaurantOwner(currentUser) || !currentUser?.tenantId) {
       showToast('⚠️ No tienes autorización para publicar contenido.');
-      return;
+      return false;
     }
     const targetTenantId = currentUser.tenantId;
     const targetTenant = tenants.find(t => t.id === targetTenantId);
     if (!targetTenant) {
       showToast('⚠️ Restaurante no encontrado.');
-      return;
+      return false;
     }
 
     if (authMode === 'remote') {
-      const savedPost = await createLivePost(targetTenantId, postData.dishName, postData.desc, postData.price, postData.image || '', postData.mediaType || 'photo', postData.productId, postData.width, postData.height);
+      const savedPost = await createLivePost(targetTenantId, postData.dishName, postData.desc, postData.price, postData.image || '', postData.mediaType || 'photo', postData.productId, postData.width, postData.height, postData.hashtags);
       if (!savedPost) {
         showToast('⚠️ Error al crear publicación en el servidor.');
-        return;
+        return false;
       }
-      const fullPost = {
+      const fullPost: Post = {
         ...savedPost,
         tenantName: targetTenant.name,
         tenantCategory: targetTenant.category,
         tenantLogoEmoji: targetTenant.logoEmoji || '🍽️',
         tenantAddress: targetTenant.address,
         dishName: postData.dishName,
-        dishEmoji: postData.dishEmoji || '🍽️'
+        dishEmoji: postData.dishEmoji || '🍽️',
+        // mapDbPostToPost devuelve timeAgo ISO y sin comments: se corrigen para el render inmediato.
+        timeAgo: 'Hace un momento',
+        comments: []
       };
       setRemotePosts(prev => [fullPost, ...prev]);
       setPosts(prev => [fullPost, ...prev]);
       showToast('✨ ¡Tu publicación ya está en vivo en el Feed!');
-      return;
+      return true;
     }
 
     const newPost: Post = {
@@ -1636,6 +1241,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setPosts(prev => [newPost, ...prev]);
     showToast('✨ ¡Tu publicación ya está en vivo en el Feed!');
+    return true;
   };
 
   const deletePost = async (postId: string) => {

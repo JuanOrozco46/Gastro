@@ -11,10 +11,12 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
-  const [formData, setFormData] = useState<Partial<Product>>({
+  const [formData, setFormData] = useState<Product>({
     name: '',
     desc: '',
     price: 0,
@@ -26,7 +28,9 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     preparationTimeMinutes: 15,
     tags: [],
     ingredients: [],
-    allergens: []
+    allergens: [],
+    id: '',
+    tenantId: ''
   });
 
   const [tempTags, setTempTags] = useState('');
@@ -44,8 +48,9 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
 
   const openNewForm = () => {
     setEditingProduct(null);
+    setFormError(null);
     setFormData({
-      name: '', desc: '', price: 0, category: 'Platos Principales', available: true, isArchived: false, image: '', emoji: '🍽️', preparationTimeMinutes: 15, tags: [], ingredients: [], allergens: []
+      name: '', desc: '', price: 0, category: 'Platos Principales', available: true, isArchived: false, image: '', emoji: '🍽️', preparationTimeMinutes: 15, tags: [], ingredients: [], allergens: [], id: '', tenantId: ''
     });
     setTempTags(''); setTempIngredients(''); setTempAllergens('');
     setShowForm(true);
@@ -53,6 +58,7 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
 
   const openEditForm = (p: Product) => {
     setEditingProduct(p);
+    setFormError(null);
     setFormData({ ...p });
     setTempTags(p.tags?.join(', ') || '');
     setTempIngredients(p.ingredients?.join(', ') || '');
@@ -66,35 +72,76 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
 
     setUploadingImage(true);
     try {
-      const res = await uploadMediaFile(file, 'product', tenant.id);
+      // Misma compresión que FileUploadInput: sin esto se sube el original completo.
+      const { compressImage } = await import('../../utils/imageCompression');
+      const compressed = await compressImage(file, 8);
+      const res = await uploadMediaFile(compressed.file, 'product', tenant.id);
       if (res.success && res.publicUrl) {
         setFormData(prev => ({ ...prev, image: res.publicUrl as string }));
       } else {
-        alert(res.error || 'Error subiendo imagen');
+        setFormError(res.error || 'Error subiendo imagen');
       }
     } catch (err: any) {
-      alert(err.message || 'Error');
+      setFormError(err.message || 'Error subiendo imagen');
     } finally {
       setUploadingImage(false);
     }
   };
 
+  const validateForm = (): string | null => {
+    if (!formData.name || !formData.name.trim()) {
+      return 'El nombre del producto es obligatorio.';
+    }
+    if (!Number.isFinite(formData.price) || formData.price <= 0) {
+      return 'El precio debe ser un número mayor a $0 COP.';
+    }
+    if (!Number.isInteger(formData.price)) {
+      return 'El precio debe ser un valor entero en pesos (COP), sin decimales.';
+    }
+    if (formData.preparationTimeMinutes !== undefined && formData.preparationTimeMinutes < 0) {
+      return 'El tiempo de preparación no puede ser negativo.';
+    }
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const validationError = validateForm();
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError(null);
     const finalData = {
       ...formData,
+      name: (formData.name ?? '').trim(),
+      desc: formData.desc ?? '',
+      price: Math.round(Number(formData.price ?? 0)),
+      category: formData.category ?? 'Platos Principales',
+      available: formData.available ?? true,
+      image: formData.image ?? '',
+      emoji: formData.emoji ?? '🍽️',
+      preparationTimeMinutes: formData.preparationTimeMinutes ?? 15,
       tags: tempTags.split(',').map(s => s.trim()).filter(s => s),
       ingredients: tempIngredients.split(',').map(s => s.trim()).filter(s => s),
       allergens: tempAllergens.split(',').map(s => s.trim()).filter(s => s)
     };
 
+    let ok: boolean;
     if (editingProduct) {
       await updateProduct(editingProduct.id, finalData);
+      ok = true; // updateProduct no reporta éxito; el toast de error ya lo muestra el contexto
     } else {
-      await addProduct(finalData as Omit<Product, 'id' | 'tenantId'>);
+      ok = await addProduct(finalData as Omit<Product, 'id' | 'tenantId'>);
     }
-    setShowForm(false);
-  };
+    setIsSubmitting(false);
+    if (ok) {
+      setShowForm(false);
+    }
+    return ok;
+  }
 
   const duplicateProduct = async (p: Product) => {
     await addProduct({
@@ -242,9 +289,15 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
 
               </div>
 
+              {formError && (
+                <div style={{ gridColumn: '1 / -1', padding: '10px 14px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '10px', color: '#FCA5A5', fontSize: '0.85rem', fontWeight: 600 }}>
+                  ⚠️ {formError}
+                </div>
+              )}
+
               <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-                <button type="submit" className="gf-btn-primary">
-                  <Save size={18} /> Guardar Producto
+                <button type="submit" className="gf-btn-primary" disabled={isSubmitting} style={isSubmitting ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>
+                  <Save size={18} /> {isSubmitting ? 'Guardando...' : 'Guardar Producto'}
                 </button>
               </div>
             </form>

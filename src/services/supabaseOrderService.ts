@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Order, OrderStatus } from '../types';
 import type { DbOrder } from './supabaseTypes';
 import { mapDbOrderToOrder } from './supabaseTypes';
+import { reportDataError } from './dataErrors';
 
 /**
  * Servicio de Pedidos en Tiempo Real con Supabase (PostgreSQL + WebSockets).
@@ -106,12 +107,14 @@ export async function fetchLiveOrdersForRestaurant(tenantId: string): Promise<Or
 
     if (error || !dbOrders) {
       console.warn('⚠️ Error al cargar pedidos de restaurante:', error);
+      reportDataError('pedidos', 'No se pudieron cargar los pedidos del restaurante.');
       return [];
     }
 
     return (dbOrders as unknown as DbOrder[]).map(mapDbOrderToOrder);
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al consultar pedidos:', err);
+    reportDataError('pedidos', 'No se pudieron cargar los pedidos del restaurante.');
     return [];
   }
 }
@@ -134,11 +137,15 @@ export async function fetchLiveOrdersForCustomer(customerId: string): Promise<Or
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false });
 
-    if (error || !dbOrders) return [];
+    if (error || !dbOrders) {
+      reportDataError('pedidos', 'No se pudieron cargar tus pedidos.');
+      return [];
+    }
 
     return (dbOrders as unknown as DbOrder[]).map(mapDbOrderToOrder);
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al consultar pedidos de cliente:', err);
+    reportDataError('pedidos', 'No se pudieron cargar tus pedidos.');
     return [];
   }
 }

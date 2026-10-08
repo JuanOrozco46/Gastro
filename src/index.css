@@ -3755,11 +3755,11 @@ input:focus, select:focus, textarea:focus {
   gap: 2rem;
 }
 
-/* ── Post Card ── */
+/* ── Post Card (estilo Instagram) ── */
 .gf-post-card {
   background: white;
   border: 1px solid var(--neutral-border);
-  border-radius: 24px;
+  border-radius: 16px;
   overflow: hidden;
   box-shadow: var(--shadow-card);
   transition: box-shadow 0.3s;
@@ -3774,29 +3774,52 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid #F0F4F8;
+  padding: 0.75rem 1rem;
 }
 
-.gf-post-author { display: flex; align-items: center; gap: 12px; }
+.gf-post-author { display: flex; align-items: center; gap: 10px; }
 
-.gf-author-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--primary-light), var(--tertiary-light));
+/* Anillo de historias (gradiente tipo Instagram) */
+.gf-story-ring {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  padding: 2.5px;
+  background: linear-gradient(45deg, #F58529, #DD2A7B, #8134AF, #515BD4);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
   flex-shrink: 0;
 }
 
-.gf-author-meta { display: flex; flex-direction: column; gap: 3px; }
+.gf-author-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-light), var(--tertiary-light));
+  border: 2px solid white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  overflow: hidden;
+  flex-shrink: 0;
+}
 
-.gf-author-top { display: flex; align-items: center; gap: 7px; }
+.gf-author-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
-.gf-author-name { font-size: 0.95rem; font-weight: 800; color: var(--text-main); }
+.gf-author-top { display: flex; align-items: center; gap: 6px; }
+
+.gf-author-name {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gf-author-sep { color: var(--text-light); font-weight: 700; font-size: 0.8rem; }
 
 .gf-video-chip {
   display: inline-flex;
@@ -3833,41 +3856,32 @@ input:focus, select:focus, textarea:focus {
 }
 
 .gf-post-time {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--text-light);
   font-weight: 600;
   white-space: nowrap;
 }
 
-/* Dish title */
-.gf-dish-title {
-  padding: 0.85rem 1.25rem 0;
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: var(--text-main);
-}
-
-/* Media */
+/* Media: cuadrada 4:5 a sangrado completo, cover (estilo Instagram) */
 .gf-media-wrapper {
   position: relative;
   width: 100%;
   background: #0a0f1a;
-  margin-top: 0.75rem;
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 .gf-media-img {
   width: 100%;
-  height: auto;
-  object-fit: contain;
-  transition: transform 0.5s ease;
+  height: 100%;
+  object-fit: cover;
   display: block;
 }
-
-.gf-post-card:hover .gf-media-img { transform: scale(1.025); }
 
 /* Video play overlay */
 .gf-play-overlay {
@@ -3916,25 +3930,28 @@ input:focus, select:focus, textarea:focus {
   font-variant-numeric: tabular-nums;
 }
 
-/* Price overlay */
-.gf-price-overlay {
+/* Heart burst (doble tap estilo Instagram) */
+.gf-heart-burst {
   position: absolute;
-  bottom: 14px;
-  right: 14px;
-  background: rgba(10, 15, 26, 0.9);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 14px;
-  padding: 7px 13px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0;
+  align-items: center;
+  justify-content: center;
 }
 
-.gf-price-label { font-size: 0.57rem; color: rgba(255,255,255,0.5); font-weight: 700; letter-spacing: 0.3px; }
-.gf-price-amount { font-size: 1.2rem; font-weight: 900; color: var(--tertiary); line-height: 1.1; }
-.gf-price-cop { font-size: 0.6rem; color: rgba(255,255,255,0.4); font-weight: 700; }
+@keyframes gf-like-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+.gf-action-btn.liked svg { animation: gf-like-pop 0.35s ease; }
 
 /* Views badge */
 .gf-views-badge {
@@ -3953,44 +3970,48 @@ input:focus, select:focus, textarea:focus {
   gap: 4px;
 }
 
-/* Actions row */
+/* Actions row: iconos estilo Instagram */
 .gf-actions-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.85rem 1.25rem;
+  padding: 0.35rem 0.6rem;
 }
 
-.gf-actions-left { display: flex; align-items: center; gap: 4px; }
+.gf-actions-left { display: flex; align-items: center; gap: 2px; }
 
 .gf-action-btn {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
   background: transparent;
   border: none;
   font-family: inherit;
-  font-size: 0.88rem;
-  font-weight: 700;
   cursor: pointer;
-  color: var(--text-muted);
-  padding: 7px 10px;
-  border-radius: 10px;
+  color: var(--text-main);
+  padding: 9px;
+  border-radius: 50%;
   transition: all 0.18s;
 }
 
-.gf-action-btn:hover { background: #F0F4F8; color: var(--text-main); }
+.gf-action-btn:hover { background: #F0F4F8; }
 .gf-action-btn.liked { color: #e11d48; }
 .gf-action-btn.liked:hover { background: #fff0f3; }
-.gf-action-btn.saved { color: var(--primary); }
-.gf-action-btn.saved:hover { background: var(--primary-light); }
+.gf-action-btn.saved { color: var(--text-main); }
+.gf-action-btn.saved:hover { background: #F0F4F8; }
 
 /* Caption */
 .gf-caption-block {
-  padding: 0 1.25rem 0.85rem;
+  padding: 0 1rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+}
+
+.gf-likes-count {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--text-main);
 }
 
 .gf-orders-badge {
@@ -4015,6 +4036,8 @@ input:focus, select:focus, textarea:focus {
 
 .gf-handle { color: var(--text-main); font-weight: 800; }
 
+.gf-caption-dish { color: var(--text-main); font-weight: 700; }
+
 .gf-expand-btn {
   background: none;
   border: none;
@@ -4026,50 +4049,43 @@ input:focus, select:focus, textarea:focus {
   padding: 0;
 }
 
-.gf-hashtags { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Hashtags inline, texto plano azul (estilo Instagram) */
+.gf-hashtags-inline { margin: 0; display: inline; }
 
 .gf-hashtag {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--primary);
-  background: var(--primary-light);
-  padding: 2px 8px;
-  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1863DC;
+  margin-right: 6px;
   cursor: pointer;
-  transition: background 0.2s;
 }
 
-.gf-hashtag:hover { background: var(--primary-border); }
+.gf-hashtag:hover { text-decoration: underline; }
 
 .gf-view-comments {
-  display: flex;
-  align-items: center;
-  gap: 3px;
   background: transparent;
   border: none;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--text-light);
   cursor: pointer;
   font-weight: 600;
   padding: 0;
+  margin-top: 2px;
   transition: color 0.2s;
+  width: fit-content;
+  text-align: left;
 }
 
-.gf-view-comments:hover { color: var(--primary); }
+.gf-view-comments:hover { color: var(--text-muted); }
 
 /* CTA block */
 .gf-cta-block {
-  padding: 0.85rem 1.25rem 1.25rem;
-  border-top: 1px solid #F0F4F8;
+  padding: 0 1rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
-
-.gf-stars-row { display: flex; align-items: center; gap: 3px; }
-
-.gf-stars-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-left: 4px; }
 
 .gf-order-btn {
   display: flex;

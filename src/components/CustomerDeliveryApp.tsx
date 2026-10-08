@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useMemo, lazy, Suspense, useEffect, useRef } from 'react';
 import { useApp } from '../context/useApp';
 import { RestaurantDirectory } from './RestaurantDirectory';
 import { MyOrders } from './MyOrders';
@@ -9,12 +9,12 @@ import { NotificationBell } from './NotificationBell';
 import { motion } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, ShoppingBag, Bike,
-  TrendingUp, Star, MapPin, Trash2, Plus, Minus,
-  Package, Play, Eye, X, ExternalLink, ChevronRight,
+  TrendingUp, MapPin, Trash2, Plus, Minus,
+  Package, Play, Eye, X, ExternalLink,
   Bookmark, Zap, Search, SlidersHorizontal, CheckCircle2, Building2, Clock
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
-import { toggleRemoteSave } from '../services/supabaseDataService';
+import { toggleRemoteSave, fetchRemoteSavedPosts } from '../services/supabaseDataService';
 import type { Post, Tenant, Product } from '../types';
 
 const PaymentModal = lazy(() => import('./PaymentModal').then(m => ({ default: m.PaymentModal })));
@@ -115,7 +115,26 @@ const PostCard: React.FC<PostCardProps> = ({
   post, tenant, product, onLike, onOrder, onPlayVideo, saved, onSave, onOpenComments, onOpenProfile, onShare
 }) => {
   const [expanded, setExpanded] = useState(false);
+  const [showHeartBurst, setShowHeartBurst] = useState(false);
+  const lastTapRef = useRef(0);
+  const heartTimerRef = useRef<number | null>(null);
   const isVideo = post.mediaType === 'video';
+
+  // Doble tap sobre la media = like (patrón Instagram), con animación de corazón.
+  const handleMediaTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      lastTapRef.current = 0;
+      if (!post.isLiked) onLike(post.id);
+      setShowHeartBurst(true);
+      if (heartTimerRef.current) window.clearTimeout(heartTimerRef.current);
+      heartTimerRef.current = window.setTimeout(() => setShowHeartBurst(false), 900);
+    } else {
+      lastTapRef.current = now;
+    }
+  };
+
+  const handle = `@${post.tenantName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
 
   return (
     <motion.article
@@ -123,23 +142,26 @@ const PostCard: React.FC<PostCardProps> = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      whileHover={{ y: -4 }}
     >
 
-      {/* ── Header ── */}
+      {/* ── Header (autor con anillo de historias) ── */}
       <header className="gf-post-header">
         <div className="gf-post-author" onClick={() => onOpenProfile(post.tenantId)} style={{ cursor: 'pointer' }}>
-          <div className="gf-author-avatar" style={{ backgroundColor: tenant?.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden' }}>
-            {tenant?.logoUrl ? (
-              <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <span>{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
-            )}
+          <div className="gf-story-ring">
+            <div className="gf-author-avatar" style={{ backgroundColor: tenant?.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden' }}>
+              {tenant?.logoUrl ? (
+                <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span>{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
+              )}
+            </div>
           </div>
           <div className="gf-author-meta">
             <div className="gf-author-top">
               <strong className="gf-author-name">{tenant?.name || post.tenantName}</strong>
-              {isVideo && <span className="gf-video-chip"><Play size={9} fill="currentColor" /> VIDEO</span>}
+              <span className="gf-author-sep">·</span>
+              <span className="gf-post-time">{post.timeAgo}</span>
+              {isVideo && <span className="gf-video-chip"><Play size={8} fill="currentColor" /> VIDEO</span>}
             </div>
             <div className="gf-author-sub">
               <span className="gf-category-pill">{tenant?.category || post.tenantCategory}</span>
@@ -149,22 +171,22 @@ const PostCard: React.FC<PostCardProps> = ({
             </div>
           </div>
         </div>
-        <div className="gf-post-time">{post.timeAgo}</div>
       </header>
 
-      {/* ── Dish title ── */}
-      <h3 className="gf-dish-title">{post.dishEmoji} {post.dishName}</h3>
-
-      {/* ── Media ── */}
-      <div 
-        className="gf-media-wrapper" 
-        style={post.width && post.height ? { aspectRatio: `${post.width} / ${post.height}` } : undefined}
+      {/* ── Media cuadrada a sangrado completo, doble tap = like ── */}
+      <div
+        className="gf-media-wrapper"
+        style={{ aspectRatio: post.width && post.height ? `${post.width} / ${post.height}` : '4 / 5' }}
+        onClick={handleMediaTap}
       >
         <img loading="lazy" decoding="async" src={post.image} alt={post.dishName} className="gf-media-img" />
 
         {/* Video overlay */}
         {isVideo && (
-          <button className="gf-play-overlay" onClick={() => onPlayVideo(post)}>
+          <button
+            className="gf-play-overlay"
+            onClick={(e) => { e.stopPropagation(); onPlayVideo(post); }}
+          >
             <div className="gf-play-btn">
               <Play size={24} fill="white" />
             </div>
@@ -174,12 +196,20 @@ const PostCard: React.FC<PostCardProps> = ({
           </button>
         )}
 
-        {/* Price overlay */}
-        <div className="gf-price-overlay">
-          <span className="gf-price-label">desde</span>
-          <span className="gf-price-amount">${post.price.toLocaleString('es-CO')}</span>
-          <span className="gf-price-cop">COP</span>
-        </div>
+        {/* Heart burst (doble tap) */}
+        <AnimatePresence>
+          {showHeartBurst && (
+            <motion.div
+              className="gf-heart-burst"
+              initial={{ scale: 0, opacity: 0.9 }}
+              animate={{ scale: 1.15, opacity: 1 }}
+              exit={{ scale: 1.3, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 16 }}
+            >
+              <Heart size={96} fill="white" strokeWidth={0} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Stats overlay top-left */}
         {post.viewCount && post.viewCount > 1000 && (
@@ -189,34 +219,36 @@ const PostCard: React.FC<PostCardProps> = ({
         )}
       </div>
 
-      {/* ── Actions ── */}
+      {/* ── Actions: solo iconos, como Instagram ── */}
       <div className="gf-actions-row">
         <div className="gf-actions-left">
           <button
-            className={`gf-action-btn ${post.isLiked ? 'liked' : ''}`}
+            className={`gf-action-btn gf-action-icon ${post.isLiked ? 'liked' : ''}`}
             onClick={() => onLike(post.id)}
+            aria-label="Me gusta"
           >
-            <Heart size={22} fill={post.isLiked ? '#e11d48' : 'none'} strokeWidth={post.isLiked ? 0 : 2} />
-            <span>{fmt(post.likes)}</span>
+            <Heart size={24} fill={post.isLiked ? '#e11d48' : 'none'} strokeWidth={post.isLiked ? 0 : 1.8} />
           </button>
-          <button className="gf-action-btn" onClick={() => onOpenComments(post)}>
-            <MessageCircle size={22} />
-            <span>{post.commentsCount}</span>
+          <button className="gf-action-btn gf-action-icon" onClick={() => onOpenComments(post)} aria-label="Comentar">
+            <MessageCircle size={24} strokeWidth={1.8} />
           </button>
-          <button className="gf-action-btn" onClick={() => onShare(post)}>
-            <Share2 size={20} />
+          <button className="gf-action-btn gf-action-icon" onClick={() => onShare(post)} aria-label="Compartir">
+            <Share2 size={22} strokeWidth={1.8} />
           </button>
         </div>
         <button
-          className={`gf-action-btn ${saved ? 'saved' : ''}`}
+          className={`gf-action-btn gf-action-icon ${saved ? 'saved' : ''}`}
           onClick={() => onSave(post.id)}
+          aria-label="Guardar"
         >
-          <Bookmark size={20} fill={saved ? 'var(--primary)' : 'none'} />
+          <Bookmark size={22} fill={saved ? 'var(--text-main)' : 'none'} strokeWidth={1.8} />
         </button>
       </div>
 
-      {/* ── Caption ── */}
+      {/* ── Likes + Caption ── */}
       <div className="gf-caption-block">
+        <div className="gf-likes-count">{fmt(post.likes)} Me gusta</div>
+
         {post.ordersFromPost && post.ordersFromPost > 10 && (
           <div className="gf-orders-badge">
             <Zap size={11} /> {post.ordersFromPost} personas pidieron esto hoy
@@ -225,8 +257,9 @@ const PostCard: React.FC<PostCardProps> = ({
 
         <p className="gf-caption-text">
           <strong className="gf-handle" onClick={() => onOpenProfile(post.tenantId)} style={{ cursor: 'pointer' }}>
-            @{post.tenantName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}{' '}
+            {handle}{' '}
           </strong>
+          <span className="gf-caption-dish">{post.dishEmoji} {post.dishName}</span>{' — '}
           {expanded ? post.desc : post.desc.slice(0, 100)}
           {post.desc.length > 100 && (
             <button className="gf-expand-btn" onClick={() => setExpanded(v => !v)}>
@@ -235,47 +268,49 @@ const PostCard: React.FC<PostCardProps> = ({
           )}
         </p>
 
-        {post.hashtags && (
-          <div className="gf-hashtags">
+        {post.hashtags && post.hashtags.length > 0 && (
+          <p className="gf-hashtags-inline">
             {post.hashtags.map(h => <span key={h} className="gf-hashtag">{h}</span>)}
-          </div>
+          </p>
         )}
 
         <button className="gf-view-comments" onClick={() => onOpenComments(post)}>
           {post.commentsCount > 0
             ? `Ver los ${post.commentsCount} comentarios`
-            : 'Escribir el primer comentario'} <ChevronRight size={13} />
+            : 'Escribir el primer comentario'}
         </button>
       </div>
 
       {/* ── CTA ── */}
-      <div className="gf-cta-block">
-        <div className="gf-stars-row">
-          {[1,2,3,4,5].map(i => <Star key={i} size={12} fill="#E6942B" strokeWidth={0} />)}
-          <span className="gf-stars-label">· {post.commentsCount} reseñas</span>
-        </div>
-        {(!post.productId || post.productId === post.id) ? (
-          <div style={{ 
+      {(!post.productId || post.productId === post.id) ? (
+        <div className="gf-cta-block">
+          <div style={{
             padding: '12px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)',
             borderRadius: '12px', fontSize: '0.8rem', color: '#F59E0B', textAlign: 'center', fontWeight: 600
           }}>
             📋 Solo para referencia - No disponible para pedido
           </div>
-        ) : !product ? (
-          <div style={{ 
+        </div>
+      ) : !product ? (
+        <div className="gf-cta-block">
+          <div style={{
             padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)',
             borderRadius: '12px', fontSize: '0.8rem', color: '#EF4444', textAlign: 'center', fontWeight: 600
           }}>
             🚫 Este producto ya no está disponible
           </div>
-        ) : !product.available ? (
-          <div style={{ 
+        </div>
+      ) : !product.available ? (
+        <div className="gf-cta-block">
+          <div style={{
             padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)',
             borderRadius: '12px', fontSize: '0.8rem', color: '#EF4444', textAlign: 'center', fontWeight: 600
           }}>
             ⚠️ Agotado temporalmente
           </div>
-        ) : (
+        </div>
+      ) : (
+        <div className="gf-cta-block">
           <button
             className="gf-order-btn"
             onClick={() => onOrder(post.productId, post.tenantId)}
@@ -284,13 +319,13 @@ const PostCard: React.FC<PostCardProps> = ({
             <span>Añadir al Carrito</span>
             <span className="gf-order-price">${post.price.toLocaleString('es-CO')}</span>
           </button>
-        )}
-        {isVideo && (
-          <button className="gf-watch-btn" onClick={() => onPlayVideo(post)}>
-            <Play size={14} fill="currentColor" /> Ver video del plato
-          </button>
-        )}
-      </div>
+          {isVideo && (
+            <button className="gf-watch-btn" onClick={() => onPlayVideo(post)}>
+              <Play size={14} fill="currentColor" /> Ver video del plato
+            </button>
+          )}
+        </div>
+      )}
 
     </motion.article>
   );
@@ -323,6 +358,16 @@ export const CustomerDeliveryApp: React.FC = () => {
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'price_low' | 'price_high'>('recent');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // --- Saved posts hydration (persist across filter/sort changes) ---
+  useEffect(() => {
+    const userId = currentUser?.id;
+    if (!userId) return;
+    (async () => {
+      const ids = await fetchRemoteSavedPosts(userId);
+      setSavedPosts(new Set(ids));
+    })();
+  }, [currentUser]);
+
   const activeCity = cities.find(c => c.id === selectedCityId) || cities[0];
 
   const tenantMap = useMemo(() => {
@@ -338,23 +383,27 @@ export const CustomerDeliveryApp: React.FC = () => {
   const activePosts = authMode === 'remote' ? remotePosts : posts;
 
   const zoneFilteredPosts = useMemo(() => {
-    return activePosts.reduce<Post[]>((acc, post) => {
-      const tenant = tenantMap.get(post.tenantId);
-      if (!tenant || tenant.status !== 'active' || !activeCity || tenant.cityId !== activeCity.id) {
+      return activePosts.reduce<Post[]>((acc, post) => {
+        const tenant = tenantMap.get(post.tenantId);
+        if (!tenant || tenant.status !== 'active') {
+          return acc;
+        }
+        const city = activeCity ?? cities.find(c => c.isActive) ?? cities[0] ?? { id: 'fallback-city', name: 'Fallback', slug: 'fallback', countryCode: 'CO', currencyCode: 'COP', isActive: true };
+        if (!city || tenant.cityId !== city.id) {
+          return acc;
+        }
+        if (selectedZoneId && tenant.zoneId !== selectedZoneId) {
+          return acc;
+        }
+        acc.push({
+          ...post,
+          tenantName: tenant.name,
+          tenantCategory: tenant.category,
+          tenantLogoEmoji: tenant.logoEmoji || '🍽️'
+        });
         return acc;
-      }
-      if (selectedZoneId && tenant.zoneId !== selectedZoneId) {
-        return acc;
-      }
-      acc.push({
-        ...post,
-        tenantName: tenant.name,
-        tenantCategory: tenant.category,
-        tenantLogoEmoji: tenant.logoEmoji || '🍽️'
-      });
-      return acc;
-    }, []);
-  }, [activePosts, tenantMap, selectedZoneId, activeCity]);
+      }, []);
+    }, [activePosts, tenantMap, selectedZoneId, activeCity, cities]);
 
   const activeTenantsInZoneCount = useMemo(() => {
     return tenants.filter(t => {

@@ -10,7 +10,10 @@ export interface DemoAccount {
   tenantId?: string;
 }
 
-export const COMMON_DEMO_PASSWORD = 'GastroSyncDemo2026!';
+// Doble defensa: aunque el chunk llegara a emitirse en producción, la
+// contraseña real no existe en builds de producción (import.meta.env.DEV es
+// estáticamente false y el literal se elimina del bundle).
+export const COMMON_DEMO_PASSWORD = import.meta.env.DEV ? 'GastroSyncDemo2026!' : '';
 
 export const DEMO_ACCOUNTS: DemoAccount[] = [
   {

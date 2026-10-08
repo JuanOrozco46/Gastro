@@ -56,10 +56,10 @@ export interface AppContextType {
   toggleLikePost: (postId: string) => void;
   addComment: (postId: string, text: string, userName?: string) => Promise<boolean>;
   deleteComment: (postId: string, commentId: string) => void;
-  createPost: (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => Promise<void> | void;
+  createPost: (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => Promise<boolean> | void;
   deletePost: (postId: string) => Promise<void> | void;
   addDriver: (driver: Omit<Driver, 'id' | 'tenantId' | 'status'>) => void;
-  deleteProduct: (productId: string) => Promise<void> | void;
+  deleteProduct: (productId: string) => Promise<void>;
   setEquityWeight: (weight: number) => void;
   addToCart: (product: Product) => { success: boolean; requiresClear?: boolean; activeTenantName?: string; } | void;
   clearCartAndAdd: (product: Product) => void;
@@ -70,7 +70,7 @@ export interface AppContextType {
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<boolean>;
   confirmCashPayment: (paymentId: string, orderId: string) => Promise<{ success: boolean; error?: string }>;
   toggleProductAvailability: (productId: string) => Promise<void> | void;
-  addProduct: (product: Omit<Product, 'id' | 'tenantId'>) => Promise<void> | void;
+  addProduct: (product: Omit<Product, 'id' | 'tenantId'>) => Promise<boolean>;
   updateProduct: (productId: string, updates: Partial<Product>) => Promise<void>;
   assignDriverToOrder: (orderId: string, driverId: string) => void;
   submitRestaurantApplication: (applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>, assets?: ApplicationAssetFiles) => Promise<boolean>;

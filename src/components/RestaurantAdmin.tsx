@@ -59,6 +59,8 @@ export const RestaurantAdmin: React.FC = () => {
   const [postDesc, setPostDesc] = useState('');
   const [postHashtags, setPostHashtags] = useState('#GastroSync #ComidaArtesanal #SaborLocal');
   const [isDeletingPost, setIsDeletingPost] = useState<string | null>(null);
+  const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+  const [postFormError, setPostFormError] = useState<string | null>(null);
   const [postMediaType, setPostMediaType] = useState<'photo' | 'video'>('video');
   const [postImage, setPostImage] = useState('');
   const [postMediaUrl, setPostMediaUrl] = useState('');
@@ -118,7 +120,28 @@ export const RestaurantAdmin: React.FC = () => {
 
   const handleCreatePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!postDishName || !postDesc || !postPrice) return;
+    setPostFormError(null);
+
+    // Validación antes de tocar el servidor: precio entero positivo y medio cargado.
+    const parsedPrice = parseFloat(postPrice);
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      setPostFormError('El precio debe ser un número mayor a $0 COP.');
+      return;
+    }
+    if (!Number.isInteger(parsedPrice)) {
+      setPostFormError('El precio debe ser entero en pesos (COP), sin decimales.');
+      return;
+    }
+    if (!postMediaUrl) {
+      setPostFormError(postMediaType === 'video'
+        ? 'Debes subir el archivo de video antes de publicar.'
+        : 'Debes subir la foto del plato antes de publicar.');
+      return;
+    }
+    if (!postDishName.trim() || !postDesc.trim()) {
+      setPostFormError('El nombre del plato y la descripción son obligatorios.');
+      return;
+    }
 
     const hashtagsArr = postHashtags
       .split(' ')
@@ -128,21 +151,22 @@ export const RestaurantAdmin: React.FC = () => {
     const existingProduct = postProductId ? tenantProducts.find(p => p.id === postProductId) : tenantProducts.find(p => p.name.toLowerCase().includes(postDishName.toLowerCase()));
     const productId = existingProduct ? existingProduct.id : undefined;
 
-    const finalImage = postMediaType === 'photo' && postMediaUrl
+    const finalImage = postMediaType === 'photo'
       ? postMediaUrl
-      : (postImage || operatingTenant.bannerUrl || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=900&q=85');
+      : (postImage || operatingTenant.bannerUrl || '');
 
-    await createPost({
+    setIsSubmittingPost(true);
+    const ok = await createPost({
       tenantId: operatingTenant.id,
       tenantName: operatingTenant.name,
       tenantCategory: operatingTenant.category,
       tenantLogoEmoji: operatingTenant.logoEmoji || '🍽️',
       tenantAddress: operatingTenant.address,
-      dishName: postDishName,
+      dishName: postDishName.trim(),
       dishEmoji: postDishEmoji,
-      desc: postDesc,
+      desc: postDesc.trim(),
       hashtags: hashtagsArr,
-      price: parseFloat(postPrice),
+      price: Math.round(parsedPrice),
       image: finalImage,
       mediaType: postMediaType,
       mediaUrl: postMediaUrl,
@@ -151,14 +175,18 @@ export const RestaurantAdmin: React.FC = () => {
       width: postMediaWidth,
       height: postMediaHeight
     });
+    setIsSubmittingPost(false);
 
-    setPostDishName('');
-    setPostProductId('');
-    setPostDesc('');
-    setPostMediaUrl('');
-    setPostMediaWidth(undefined);
-    setPostMediaHeight(undefined);
-    setPostImage('');
+    // Solo se limpia el formulario si la publicación se creó; en error los datos quedan intactos.
+    if (ok) {
+      setPostDishName('');
+      setPostProductId('');
+      setPostDesc('');
+      setPostMediaUrl('');
+      setPostMediaWidth(undefined);
+      setPostMediaHeight(undefined);
+      setPostImage('');
+    }
   };
 
   const applyStoryPreset = (type: string) => {
@@ -628,14 +656,21 @@ export const RestaurantAdmin: React.FC = () => {
                 />
               </div>
 
-              <motion.button 
+              {postFormError && (
+                <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '10px', color: '#FCA5A5', fontSize: '0.85rem', fontWeight: 600 }}>
+                  ⚠️ {postFormError}
+                </div>
+              )}
+
+              <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                type="submit" 
-                className="btn btn-primary" 
-                style={{ width: '100%', padding: '14px', marginTop: '8px', fontSize: '0.95rem', fontWeight: 900, borderRadius: '14px' }}
+                type="submit"
+                className="btn btn-primary"
+                disabled={isSubmittingPost}
+                style={isSubmittingPost ? { width: '100%', padding: '14px', marginTop: '8px', fontSize: '0.95rem', fontWeight: 900, borderRadius: '14px', opacity: 0.6, cursor: 'not-allowed' } : { width: '100%', padding: '14px', marginTop: '8px', fontSize: '0.95rem', fontWeight: 900, borderRadius: '14px' }}
               >
-                <Sparkles size={18} /> Publicar Contenido en el Feed de la Zona
+                <Sparkles size={18} /> {isSubmittingPost ? 'Publicando...' : 'Publicar Contenido en el Feed de la Zona'}
               </motion.button>
 
             </form>
@@ -663,8 +698,18 @@ export const RestaurantAdmin: React.FC = () => {
                 </div>
                 <h4 style={{ margin: '8px 0', color: 'white', fontSize: '0.95rem', fontWeight: 800 }}>{postDishEmoji} {postDishName || 'Nombre de tu plato'}</h4>
                 
-                <div style={{ height: '180px', borderRadius: '14px', overflow: 'hidden', position: 'relative' }}>
-                  <img src={postImage} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div style={{ height: '180px', borderRadius: '14px', overflow: 'hidden', position: 'relative', background: 'rgba(255,255,255,0.04)' }}>
+                  {postMediaUrl ? (
+                    postMediaType === 'video' ? (
+                      <video src={postMediaUrl} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <img src={postMediaUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    )
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      Sube una foto o video para ver la vista previa
+                    </div>
+                  )}
                   {postMediaType === 'video' && (
                     <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(255,85,51,0.5)' }}>
