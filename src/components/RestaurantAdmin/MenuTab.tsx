@@ -1,13 +1,42 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/useApp';
 import type { Tenant, Product } from '../../types';
-import { Plus, Edit2, Trash2, Archive, Copy, Eye, EyeOff, Image as ImageIcon, Save, X, Utensils, CheckCircle, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Archive,
+  Copy,
+  Eye,
+  EyeOff,
+  Save,
+  X,
+  Utensils,
+  CheckCircle,
+  ArrowUp,
+  ArrowDown,
+  Sparkles,
+  Check,
+  DollarSign,
+  Clock,
+  FileText,
+  Tag,
+  AlertCircle,
+  Upload
+} from 'lucide-react';
 import { uploadMediaFile } from '../../services/supabaseStorageService';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const DISH_CATEGORIES: Array<{ label: string; value: Product['category'] }> = [
+  { label: '🍽️ Platos Principales', value: 'Platos Principales' },
+  { label: '🥟 Entradas', value: 'Entradas' },
+  { label: '🥤 Bebidas', value: 'Bebidas' },
+  { label: '🍰 Postres', value: 'Postres' }
+];
+
 export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const { products, addProduct, updateProduct, deleteProduct, toggleProductAvailability } = useApp();
-  
+
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -15,7 +44,6 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form State
   const [formData, setFormData] = useState<Product>({
     name: '',
     desc: '',
@@ -50,9 +78,24 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     setEditingProduct(null);
     setFormError(null);
     setFormData({
-      name: '', desc: '', price: 0, category: 'Platos Principales', available: true, isArchived: false, image: '', emoji: '🍽️', preparationTimeMinutes: 15, tags: [], ingredients: [], allergens: [], id: '', tenantId: ''
+      name: '',
+      desc: '',
+      price: 0,
+      category: 'Platos Principales',
+      available: true,
+      isArchived: false,
+      image: '',
+      emoji: '🍽️',
+      preparationTimeMinutes: 15,
+      tags: [],
+      ingredients: [],
+      allergens: [],
+      id: '',
+      tenantId: ''
     });
-    setTempTags(''); setTempIngredients(''); setTempAllergens('');
+    setTempTags('');
+    setTempIngredients('');
+    setTempAllergens('');
     setShowForm(true);
   };
 
@@ -71,8 +114,8 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     if (!file) return;
 
     setUploadingImage(true);
+    setFormError(null);
     try {
-      // Misma compresión que FileUploadInput: sin esto se sube el original completo.
       const { compressImage } = await import('../../utils/imageCompression');
       const compressed = await compressImage(file, 8);
       const res = await uploadMediaFile(compressed.file, 'product', tenant.id);
@@ -81,8 +124,8 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
       } else {
         setFormError(res.error || 'Error subiendo imagen');
       }
-    } catch (err: any) {
-      setFormError(err.message || 'Error subiendo imagen');
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Error subiendo imagen');
     } finally {
       setUploadingImage(false);
     }
@@ -90,7 +133,7 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
 
   const validateForm = (): string | null => {
     if (!formData.name || !formData.name.trim()) {
-      return 'El nombre del producto es obligatorio.';
+      return 'El nombre del plato es obligatorio.';
     }
     if (!Number.isFinite(formData.price) || formData.price <= 0) {
       return 'El precio debe ser un número mayor a $0 COP.';
@@ -124,15 +167,24 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
       image: formData.image ?? '',
       emoji: formData.emoji ?? '🍽️',
       preparationTimeMinutes: formData.preparationTimeMinutes ?? 15,
-      tags: tempTags.split(',').map(s => s.trim()).filter(s => s),
-      ingredients: tempIngredients.split(',').map(s => s.trim()).filter(s => s),
-      allergens: tempAllergens.split(',').map(s => s.trim()).filter(s => s)
+      tags: tempTags
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s),
+      ingredients: tempIngredients
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s),
+      allergens: tempAllergens
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s)
     };
 
     let ok: boolean;
     if (editingProduct) {
       await updateProduct(editingProduct.id, finalData);
-      ok = true; // updateProduct no reporta éxito; el toast de error ya lo muestra el contexto
+      ok = true;
     } else {
       ok = await addProduct(finalData as Omit<Product, 'id' | 'tenantId'>);
     }
@@ -141,7 +193,7 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
       setShowForm(false);
     }
     return ok;
-  }
+  };
 
   const duplicateProduct = async (p: Product) => {
     await addProduct({
@@ -174,7 +226,6 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
       return;
     }
 
-    // Assign new sortOrders and update all sequentially (simplified approach)
     for (let i = 0; i < list.length; i++) {
       if (list[i].sortOrder !== i) {
         await updateProduct(list[i].id, { sortOrder: i });
@@ -182,175 +233,495 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     }
   };
 
+  const step1Done = Boolean(formData.name.trim() && formData.category);
+  const step2Done = Boolean(Number.isFinite(formData.price) && formData.price > 0);
+  const displayedProducts = activeSubTab === 'active' ? activeProducts : archivedProducts;
+
   return (
-    <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-      <div className="card-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <div className="card-title" style={{ color: 'white', fontWeight: 900, fontSize: '1.2rem' }}>
-          <Utensils size={22} style={{ color: 'var(--primary)' }} /> Menú de {tenant.name}
+    <div className="rpa-card">
+      {/* Header Editorial */}
+      <div className="rpa-card-header">
+        <div className="rpa-card-header-left">
+          <div className="rpa-card-icon">
+            <Utensils size={22} />
+          </div>
+          <div>
+            <span className="pam-eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>
+              <Sparkles size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Carta Gastronómica Digital
+            </span>
+            <h3 className="rpa-card-title">Menú de {tenant.name}</h3>
+            <p className="rpa-card-subtitle">
+              Gestiona tus platos, precios, fotos, disponibilidad en tiempo real y orden de aparición.
+            </p>
+          </div>
         </div>
-        {!showForm && (
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-primary" onClick={openNewForm}>
-            <Plus size={16} /> Nuevo Producto
-          </motion.button>
-        )}
+
+        <button
+          type="button"
+          className={showForm ? 'pam-btn-ghost' : 'pam-btn-primary'}
+          onClick={() => (showForm ? setShowForm(false) : openNewForm())}
+        >
+          {showForm ? (
+            <>
+              <X size={16} /> Cerrar Formulario
+            </>
+          ) : (
+            <>
+              <Plus size={16} /> Nuevo Plato
+            </>
+          )}
+        </button>
       </div>
 
-      <AnimatePresence>
-        {showForm && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
-            <form onSubmit={handleSubmit} style={{ padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h3 style={{ color: 'white', margin: 0 }}>{editingProduct ? 'Editar Producto' : 'Crear Producto'}</h3>
-                <button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary" style={{ padding: '6px' }}><X size={18} /></button>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                
-                {/* Left Col */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Nombre</label>
-                    <input type="text" className="gf-input" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Descripción</label>
-                    <textarea className="gf-input" value={formData.desc} onChange={e => setFormData({ ...formData, desc: e.target.value })} style={{ minHeight: '80px' }} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Precio (COP)</label>
-                      <input type="number" className="gf-input" value={formData.price} onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} required />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Categoría</label>
-                      <select className="gf-input" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value as any })}>
-                        <option value="Platos Principales">Platos Principales</option>
-                        <option value="Entradas">Entradas</option>
-                        <option value="Bebidas">Bebidas</option>
-                        <option value="Postres">Postres</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Tiempo Prep. (Min)</label>
-                      <input type="number" className="gf-input" value={formData.preparationTimeMinutes} onChange={e => setFormData({ ...formData, preparationTimeMinutes: Number(e.target.value) })} />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Emoji Opcional</label>
-                      <input type="text" className="gf-input" value={formData.emoji} onChange={e => setFormData({ ...formData, emoji: e.target.value })} maxLength={2} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Col */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Foto del Producto</label>
-                    <div 
-                      style={{ height: '140px', borderRadius: '12px', border: formData.image ? 'none' : '2px dashed var(--neutral-border)', backgroundColor: 'var(--surface-color)', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                      onClick={() => !uploadingImage && fileInputRef.current?.click()}
-                    >
-                      {formData.image ? (
-                        <>
-                          <img src={formData.image} alt="Producto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: '8px' }}>
-                            <button type="button" onClick={(e) => { e.stopPropagation(); setFormData(p => ({...p, image: ''})); }} style={{ background: 'rgba(239,68,68,0.8)', color: 'white', border: 'none', padding: '6px', borderRadius: '4px', cursor: 'pointer' }}><X size={16} /></button>
-                          </div>
-                        </>
-                      ) : (
-                        <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                          {uploadingImage ? <div className="spinner" style={{ margin: '0 auto 8px' }} /> : <ImageIcon size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />}
-                          <p style={{ margin: 0, fontSize: '0.85rem' }}>{uploadingImage ? 'Subiendo...' : 'Clic para subir imagen'}</p>
-                        </div>
-                      )}
-                      <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleFileUpload} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Etiquetas (ej. Nuevo, Vegano) separadas por coma</label>
-                    <input type="text" className="gf-input" value={tempTags} onChange={e => setTempTags(e.target.value)} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Ingredientes (separados por coma)</label>
-                    <input type="text" className="gf-input" value={tempIngredients} onChange={e => setTempIngredients(e.target.value)} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Alérgenos (ej. Maní, Gluten) separados por coma</label>
-                    <input type="text" className="gf-input" value={tempAllergens} onChange={e => setTempAllergens(e.target.value)} />
-                  </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 'auto' }}>
-                    <input type="checkbox" id="availableCheck" checked={formData.available} onChange={e => setFormData({ ...formData, available: e.target.checked })} style={{ transform: 'scale(1.2)' }} />
-                    <label htmlFor="availableCheck" style={{ color: 'white', cursor: 'pointer' }}>Disponible para ordenar</label>
-                  </div>
-                </div>
-
-              </div>
-
-              {formError && (
-                <div style={{ gridColumn: '1 / -1', padding: '10px 14px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '10px', color: '#FCA5A5', fontSize: '0.85rem', fontWeight: 600 }}>
-                  ⚠️ {formError}
-                </div>
-              )}
-
-              <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-                <button type="submit" className="gf-btn-primary" disabled={isSubmitting} style={isSubmitting ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>
-                  <Save size={18} /> {isSubmitting ? 'Guardando...' : 'Guardar Producto'}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div style={{ padding: '1rem', display: 'flex', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <button className={`btn ${activeSubTab === 'active' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveSubTab('active')}>Activos ({activeProducts.length})</button>
-        <button className={`btn ${activeSubTab === 'archived' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveSubTab('archived')}>Archivados ({archivedProducts.length})</button>
+      {/* Subtabs */}
+      <div className="rpa-subtabs">
+        <button
+          type="button"
+          className={`rpa-subtab ${activeSubTab === 'active' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('active')}
+        >
+          <Utensils size={15} /> Platos Activos ({activeProducts.length})
+        </button>
+        <button
+          type="button"
+          className={`rpa-subtab ${activeSubTab === 'archived' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('archived')}
+        >
+          <Archive size={15} /> Archivados ({archivedProducts.length})
+        </button>
       </div>
 
-      <div style={{ padding: '1rem' }}>
-        {(activeSubTab === 'active' ? activeProducts : archivedProducts).length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>No hay productos en esta lista.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {(activeSubTab === 'active' ? activeProducts : archivedProducts).map((product, index) => (
-              <div key={product.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                {activeSubTab === 'active' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <button onClick={() => handleReorder(index, 'up')} disabled={index === 0} style={{ background: 'transparent', border: 'none', color: index === 0 ? 'rgba(255,255,255,0.1)' : 'var(--text-muted)', cursor: index === 0 ? 'default' : 'pointer' }}><ArrowUp size={16}/></button>
-                    <button onClick={() => handleReorder(index, 'down')} disabled={index === activeProducts.length - 1} style={{ background: 'transparent', border: 'none', color: index === activeProducts.length - 1 ? 'rgba(255,255,255,0.1)' : 'var(--text-muted)', cursor: index === activeProducts.length - 1 ? 'default' : 'pointer' }}><ArrowDown size={16}/></button>
+      <div className="rpa-card-body">
+        {/* Formulario Editorial de Crear / Editar Plato */}
+        <AnimatePresence>
+          {showForm && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {formError && (
+                  <div className="pam-callout error">
+                    <AlertCircle size={18} />
+                    <span>{formError}</span>
                   </div>
                 )}
-                
-                <div style={{ width: '60px', height: '60px', borderRadius: '8px', background: 'var(--surface-color)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {product.image ? <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '1.5rem' }}>{product.emoji}</span>}
+
+                {/* Sección 1: Identidad del Plato */}
+                <section className="pam-section">
+                  <div className="pam-section-head">
+                    <div className={`pam-step ${step1Done ? 'done' : ''}`}>
+                      {step1Done ? <Check size={15} strokeWidth={3} /> : 1}
+                    </div>
+                    <div>
+                      <h4>{editingProduct ? `Editando: ${editingProduct.name}` : '1. Identidad del Plato y Categoría'}</h4>
+                      <p>Define el nombre, categoría de la carta y descripción gastronómica.</p>
+                    </div>
+                  </div>
+
+                  <div className="pam-grid">
+                    <div className="pam-field">
+                      <label>
+                        Nombre del Plato <em>*</em>
+                      </label>
+                      <div className="pam-input-wrap">
+                        <Utensils size={16} className="pam-icon" />
+                        <input
+                          type="text"
+                          className="pam-input"
+                          value={formData.name}
+                          onChange={e => setFormData({ ...formData, name: e.target.value })}
+                          placeholder="Ej. Hamburguesa Artesanal Trufada"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pam-field">
+                      <label>
+                        Emoji del Plato <span className="pam-opt">Icono rápido</span>
+                      </label>
+                      <div className="pam-input-wrap">
+                        <input
+                          type="text"
+                          className="pam-input no-icon"
+                          value={formData.emoji}
+                          onChange={e => setFormData({ ...formData, emoji: e.target.value })}
+                          maxLength={2}
+                          style={{ textAlign: 'center', fontSize: '1.15rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pam-field pam-span-2">
+                      <label>
+                        Categoría en el Menú <em>*</em>
+                      </label>
+                      <div className="pam-chips">
+                        {DISH_CATEGORIES.map(cat => (
+                          <button
+                            key={cat.value}
+                            type="button"
+                            className={`pam-chip ${formData.category === cat.value ? 'active' : ''}`}
+                            onClick={() => setFormData({ ...formData, category: cat.value })}
+                          >
+                            {cat.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pam-field pam-span-2">
+                      <label>
+                        Descripción del Plato <span className="pam-opt">Ingredientes y preparación</span>
+                      </label>
+                      <div className="pam-input-wrap">
+                        <FileText size={16} className="pam-icon top" />
+                        <textarea
+                          className="pam-input"
+                          rows={3}
+                          value={formData.desc}
+                          onChange={e => setFormData({ ...formData, desc: e.target.value })}
+                          placeholder="Ej. 180g de carne madurada, queso cheddar fundido, tocineta ahumada y pan brioche artesanal..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Sección 2: Precio, Foto y Detalles */}
+                <section className="pam-section">
+                  <div className="pam-section-head">
+                    <div className={`pam-step ${step2Done ? 'done' : ''}`}>
+                      {step2Done ? <Check size={15} strokeWidth={3} /> : 2}
+                    </div>
+                    <div>
+                      <h4>2. Precio, Fotografía y Detalles Técnicos</h4>
+                      <p>Configura el valor en pesos colombianos, tiempo en cocina y foto del plato.</p>
+                    </div>
+                  </div>
+
+                  <div className="pam-grid">
+                    <div className="pam-field">
+                      <label>
+                        Precio de Venta <em>*</em>
+                      </label>
+                      <div className="pam-input-wrap">
+                        <DollarSign size={16} className="pam-icon" />
+                        <input
+                          type="number"
+                          className="pam-input with-suffix"
+                          value={formData.price || ''}
+                          onChange={e => setFormData({ ...formData, price: Number(e.target.value) })}
+                          placeholder="25000"
+                          min="100"
+                          step="500"
+                          required
+                        />
+                        <span className="pam-suffix">COP</span>
+                      </div>
+                    </div>
+
+                    <div className="pam-field">
+                      <label>
+                        Tiempo de Preparación <span className="pam-opt">Minutos</span>
+                      </label>
+                      <div className="pam-input-wrap">
+                        <Clock size={16} className="pam-icon" />
+                        <input
+                          type="number"
+                          className="pam-input with-suffix"
+                          value={formData.preparationTimeMinutes ?? 15}
+                          onChange={e =>
+                            setFormData({ ...formData, preparationTimeMinutes: Number(e.target.value) })
+                          }
+                          min="1"
+                        />
+                        <span className="pam-suffix">min</span>
+                      </div>
+                    </div>
+
+                    <div className="pam-field pam-span-2">
+                      <label>
+                        Fotografía del Plato <span className="pam-opt">Optimización automática WebP</span>
+                      </label>
+                      <div
+                        className={`pam-drop ${formData.image ? 'has-file' : ''}`}
+                        style={{ height: '165px' }}
+                        onClick={() => !uploadingImage && fileInputRef.current?.click()}
+                      >
+                        {formData.image ? (
+                          <>
+                            <img src={formData.image} alt="Plato" />
+                            <span className="pam-drop-change">
+                              {uploadingImage ? 'Subiendo...' : 'Cambiar foto'}
+                            </span>
+                          </>
+                        ) : (
+                          <div className="pam-drop-empty">
+                            <Upload size={24} />
+                            <strong>{uploadingImage ? 'Subiendo y optimizando...' : 'Subir foto del plato'}</strong>
+                            <span>JPG, PNG o WEBP · Se muestra en tu menú y pedidos</span>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          style={{ display: 'none' }}
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleFileUpload}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pam-field">
+                      <label>
+                        Etiquetas <span className="pam-opt">Separadas por coma</span>
+                      </label>
+                      <div className="pam-input-wrap">
+                        <Tag size={16} className="pam-icon" />
+                        <input
+                          type="text"
+                          className="pam-input"
+                          value={tempTags}
+                          onChange={e => setTempTags(e.target.value)}
+                          placeholder="Ej. Más vendido, Artesanal, Picante"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pam-field">
+                      <label>
+                        Alérgenos <span className="pam-opt">Opcional</span>
+                      </label>
+                      <div className="pam-input-wrap">
+                        <AlertCircle size={16} className="pam-icon" />
+                        <input
+                          type="text"
+                          className="pam-input"
+                          value={tempAllergens}
+                          onChange={e => setTempAllergens(e.target.value)}
+                          placeholder="Ej. Gluten, Lácteos, Maní"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pam-field pam-span-2">
+                      <label>
+                        Ingredientes Destacados <span className="pam-opt">Separados por coma</span>
+                      </label>
+                      <div className="pam-input-wrap">
+                        <Utensils size={16} className="pam-icon" />
+                        <input
+                          type="text"
+                          className="pam-input"
+                          value={tempIngredients}
+                          onChange={e => setTempIngredients(e.target.value)}
+                          placeholder="Ej. Pan brioche, Carne angus, Queso cheddar, Cebolla caramelizada"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pam-field pam-span-2">
+                      <div className={`rpa-switch-card ${formData.available ? 'on' : 'off'}`}>
+                        <div className="rpa-switch-info">
+                          <h5>
+                            {formData.available ? '🟢 Plato Disponible para Ordenar' : '⏸️ Marcar como Agotado'}
+                          </h5>
+                          <p>
+                            {formData.available
+                              ? 'Los clientes pueden agregar este plato al carrito inmediatamente.'
+                              : 'El plato seguirá visible en la carta pero con etiqueta de Agotado.'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className={`rpa-toggle-pill ${formData.available ? 'on' : ''}`}
+                          onClick={() => setFormData({ ...formData, available: !formData.available })}
+                        >
+                          <div className="rpa-toggle-knob" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                    <button type="button" className="pam-btn-ghost" onClick={() => setShowForm(false)}>
+                      Cancelar
+                    </button>
+                    <button type="submit" className="pam-btn-primary" disabled={isSubmitting || uploadingImage}>
+                      <Save size={16} />
+                      <span>{isSubmitting ? 'Guardando...' : editingProduct ? 'Actualizar Plato' : 'Guardar en el Menú'}</span>
+                    </button>
+                  </div>
+                </section>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Lista de Platos */}
+        {displayedProducts.length === 0 ? (
+          <div className="pam-section" style={{ alignItems: 'center', textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+            <Utensils size={36} style={{ color: 'var(--primary)', opacity: 0.6 }} />
+            <h4 style={{ margin: '6px 0 2px', color: 'var(--text-main)', fontWeight: 800 }}>
+              {activeSubTab === 'active'
+                ? 'Aún no tienes platos activos en tu menú'
+                : 'No tienes platos archivados'}
+            </h4>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+              {activeSubTab === 'active'
+                ? 'Haz clic en "Nuevo Plato" arriba a la derecha para agregar tu primera especialidad.'
+                : 'Los platos que archives aparecerán aquí por si deseas restaurarlos más adelante.'}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {displayedProducts.map((product, index) => (
+              <div key={product.id} className="rpa-item-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
+                  {activeSubTab === 'active' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <button
+                        type="button"
+                        className="rpa-icon-btn"
+                        style={{ width: '26px', height: '24px', borderRadius: '6px' }}
+                        onClick={() => handleReorder(index, 'up')}
+                        disabled={index === 0}
+                        title="Subir posición"
+                      >
+                        <ArrowUp size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="rpa-icon-btn"
+                        style={{ width: '26px', height: '24px', borderRadius: '6px' }}
+                        onClick={() => handleReorder(index, 'down')}
+                        disabled={index === activeProducts.length - 1}
+                        title="Bajar posición"
+                      >
+                        <ArrowDown size={13} />
+                      </button>
+                    </div>
+                  )}
+
+                  <div
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '14px',
+                      background: 'var(--primary-light)',
+                      border: '1px solid var(--primary-border)',
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {product.image ? (
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: '1.65rem' }}>{product.emoji || '🍽️'}</span>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.96rem', fontWeight: 800 }}>
+                        {product.name}
+                      </strong>
+                      <span className="rpa-badge neutral">{product.category}</span>
+                      {product.available ? (
+                        <span className="rpa-badge success">Disponible</span>
+                      ) : (
+                        <span className="rpa-badge warning">Agotado</span>
+                      )}
+                      {product.preparationTimeMinutes && (
+                        <span className="rpa-badge primary">⏱️ {product.preparationTimeMinutes} min</span>
+                      )}
+                    </div>
+                    {product.desc && (
+                      <p
+                        style={{
+                          margin: '4px 0',
+                          fontSize: '0.8rem',
+                          color: 'var(--text-muted)',
+                          lineHeight: 1.4
+                        }}
+                      >
+                        {product.desc}
+                      </p>
+                    )}
+                    <div style={{ fontWeight: 900, fontSize: '0.95rem', color: 'var(--primary)' }}>
+                      ${product.price.toLocaleString('es-CO')} COP
+                    </div>
+                  </div>
                 </div>
-                
-                <div style={{ flex: 1 }}>
-                  <h4 style={{ color: 'white', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {product.name}
-                    {!product.available && <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>Agotado</span>}
-                  </h4>
-                  <p style={{ margin: '0 0 4px', fontSize: '0.85rem', color: 'var(--text-light)' }}>{product.category}</p>
-                  <p style={{ margin: 0, fontWeight: 700, color: 'var(--primary)' }}>${product.price.toLocaleString('es-CO')}</p>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '8px' }}>
+
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                   {activeSubTab === 'active' ? (
                     <>
-                      <button className="btn btn-secondary" style={{ padding: '8px' }} title={product.available ? 'Marcar Agotado' : 'Marcar Disponible'} onClick={() => toggleProductAvailability(product.id)}>
+                      <button
+                        type="button"
+                        className="rpa-icon-btn"
+                        title={product.available ? 'Marcar como Agotado' : 'Marcar como Disponible'}
+                        onClick={() => toggleProductAvailability(product.id)}
+                      >
                         {product.available ? <Eye size={16} /> : <EyeOff size={16} />}
                       </button>
-                      <button className="btn btn-secondary" style={{ padding: '8px' }} title="Editar" onClick={() => openEditForm(product)}><Edit2 size={16} /></button>
-                      <button className="btn btn-secondary" style={{ padding: '8px' }} title="Duplicar" onClick={() => duplicateProduct(product)}><Copy size={16} /></button>
-                      <button className="btn btn-secondary" style={{ padding: '8px', color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)' }} title="Archivar" onClick={() => archiveProduct(product)}><Archive size={16} /></button>
+                      <button
+                        type="button"
+                        className="rpa-icon-btn"
+                        title="Editar plato"
+                        onClick={() => openEditForm(product)}
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="rpa-icon-btn"
+                        title="Duplicar plato"
+                        onClick={() => duplicateProduct(product)}
+                      >
+                        <Copy size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="rpa-icon-btn danger"
+                        title="Archivar plato"
+                        onClick={() => archiveProduct(product)}
+                      >
+                        <Archive size={16} />
+                      </button>
                     </>
                   ) : (
                     <>
-                      <button className="btn btn-secondary" style={{ padding: '8px' }} title="Restaurar" onClick={() => restoreProduct(product)}><CheckCircle size={16} /></button>
-                      <button className="btn btn-secondary" style={{ padding: '8px', color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)' }} title="Eliminar Definitivo" onClick={() => { if(confirm('¿Eliminar definitivamente?')) deleteProduct(product.id); }}><Trash2 size={16} /></button>
+                      <button
+                        type="button"
+                        className="pam-chip"
+                        title="Restaurar al menú activo"
+                        onClick={() => restoreProduct(product)}
+                      >
+                        <CheckCircle size={14} /> Restaurar
+                      </button>
+                      <button
+                        type="button"
+                        className="rpa-icon-btn danger"
+                        title="Eliminar definitivamente"
+                        onClick={() => {
+                          if (window.confirm('¿Eliminar este plato definitivamente del menú?')) {
+                            deleteProduct(product.id);
+                          }
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </>
                   )}
                 </div>

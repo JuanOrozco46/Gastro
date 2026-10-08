@@ -1,27 +1,67 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/useApp';
 import type { Tenant, RestaurantHour, RestaurantDeliveryMode } from '../../types';
-import { Save, Image as ImageIcon, MapPin, Clock, DollarSign, Settings, Phone, Calendar } from 'lucide-react';
+import {
+  Save,
+  Image as ImageIcon,
+  MapPin,
+  Clock,
+  DollarSign,
+  Settings,
+  Phone,
+  Calendar,
+  Store,
+  FileText,
+  Sparkles,
+  Check,
+  AlertCircle,
+  CheckCircle2,
+  Bike,
+  ShoppingBag,
+  QrCode,
+  Copy,
+  Plus,
+  Trash2,
+  Upload
+} from 'lucide-react';
 import { uploadMediaFile } from '../../services/supabaseStorageService';
 
 const DAYS_OF_WEEK = [
-  'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado'
+];
+
+const CATEGORY_PRESETS = [
+  { label: '🍔 Hamburguesas', value: 'Hamburguesas' },
+  { label: '🍕 Pizzería', value: 'Pizzería' },
+  { label: '🥩 Parrilla & Carnes', value: 'Parrilla & Carnes' },
+  { label: '🍣 Sushi & Asiática', value: 'Sushi & Asiática' },
+  { label: '🌮 Mexicana', value: 'Comida Mexicana' },
+  { label: '🍗 Pollo & Alitas', value: 'Pollo & Alitas' },
+  { label: '🥗 Saludable & Bowls', value: 'Saludable & Bowls' },
+  { label: '☕ Café & Postres', value: 'Café & Postres' },
+  { label: '🍲 Típica Colombiana', value: 'Típica Colombiana' },
+  { label: '🥖 Panadería Artesanal', value: 'Artesanal' }
 ];
 
 export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
-  const { updateTenant } = useApp();
-  
-  const [activeSubTab, setActiveSubTab] = useState<'basic' | 'delivery' | 'hours'>('basic');
-  
-  // Basic info state
+  const { updateTenant, showToast } = useApp();
+
+  const [activeSubTab, setActiveSubTab] = useState<'all' | 'basic' | 'delivery' | 'hours'>('all');
+
   const [formData, setFormData] = useState({
     name: tenant.name || '',
     description: tenant.description || '',
-    category: tenant.category || '',
+    category: tenant.category || 'Hamburguesas',
     phone: tenant.phone || '',
     whatsapp: tenant.whatsapp || '',
     address: tenant.address || '',
-    logoEmoji: tenant.logoEmoji || '',
+    logoEmoji: tenant.logoEmoji || '🍽️',
     logoUrl: tenant.logoUrl || '',
     bannerUrl: tenant.bannerUrl || '',
     estimatedDeliveryMinutes: tenant.estimatedDeliveryMinutes?.toString() || '30',
@@ -31,21 +71,20 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     deliveryFee: tenant.deliveryFee?.toString() || '0',
     minOrder: tenant.minOrder?.toString() || '0',
     deliveryRadiusKm: tenant.deliveryRadiusKm?.toString() || '5',
-    specialties: tenant.specialties ? tenant.specialties.join(', ') : '',
+    specialties: tenant.specialties ? tenant.specialties.join(', ') : ''
   });
 
   const [deliveryModes, setDeliveryModes] = useState<RestaurantDeliveryMode[]>(
     tenant.deliveryModes || ['pickup', 'restaurant_delivery', 'table_service']
   );
 
-  // Initialize hours from tenant or default array
   const [hours, setHours] = useState<RestaurantHour[]>(() => {
     const defaultHours = DAYS_OF_WEEK.map((_, i) => ({
       restaurantId: tenant.id,
       dayOfWeek: i,
-      isOpen: i >= 1 && i <= 6, // Closed Sunday by default
+      isOpen: i >= 1 && i <= 6,
       openTime: '11:00',
-      closeTime: '22:00',
+      closeTime: '22:00'
     }));
 
     if (tenant.hours && tenant.hours.length > 0) {
@@ -66,17 +105,23 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleModeToggle = (mode: RestaurantDeliveryMode) => {
-    setDeliveryModes(prev => 
+    setDeliveryModes(prev =>
       prev.includes(mode) ? prev.filter(m => m !== mode) : [...prev, mode]
     );
   };
 
-  const handleHourChange = (dayIndex: number, field: keyof RestaurantHour, value: any) => {
+  const handleHourChange = (
+    dayIndex: number,
+    field: keyof RestaurantHour,
+    value: string | boolean
+  ) => {
     setHours(prev => {
       const updated = [...prev];
       updated[dayIndex] = { ...updated[dayIndex], [field]: value };
@@ -84,7 +129,46 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     });
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'banner') => {
+  const copyMondayToWeekdays = () => {
+    const monday = hours[1];
+    if (!monday) return;
+    setHours(prev =>
+      prev.map((h, idx) =>
+        idx >= 1 && idx <= 5
+          ? {
+              ...h,
+              isOpen: monday.isOpen,
+              openTime: monday.openTime,
+              closeTime: monday.closeTime,
+              openTime2: monday.openTime2,
+              closeTime2: monday.closeTime2
+            }
+          : h
+      )
+    );
+    showToast('Horario del lunes aplicado de lunes a viernes.');
+  };
+
+  const copyMondayToAllDays = () => {
+    const monday = hours[1];
+    if (!monday) return;
+    setHours(prev =>
+      prev.map(h => ({
+        ...h,
+        isOpen: monday.isOpen,
+        openTime: monday.openTime,
+        closeTime: monday.closeTime,
+        openTime2: monday.openTime2,
+        closeTime2: monday.closeTime2
+      }))
+    );
+    showToast('Horario del lunes aplicado a todos los días de la semana.');
+  };
+
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'profile' | 'banner'
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -93,7 +177,10 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     setUploading(true);
 
     try {
-      const res = await uploadMediaFile(file, type, tenant.id);
+      const { compressImage } = await import('../../utils/imageCompression');
+      const maxMB = type === 'profile' ? 5 : 12;
+      const compressed = await compressImage(file, maxMB);
+      const res = await uploadMediaFile(compressed.file, type, tenant.id);
       if (res.success && res.publicUrl) {
         if (type === 'profile') {
           setFormData(prev => ({ ...prev, logoUrl: res.publicUrl as string }));
@@ -101,10 +188,10 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
           setFormData(prev => ({ ...prev, bannerUrl: res.publicUrl as string }));
         }
       } else {
-        setErrorMsg(res.error || 'Error al subir el archivo.');
+        setErrorMsg(res.error || 'Error al subir la imagen.');
       }
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Error al subir el archivo.');
+      setErrorMsg(err instanceof Error ? err.message : 'Error al subir la imagen.');
     } finally {
       setUploading(false);
     }
@@ -114,21 +201,21 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     for (const h of hours) {
       if (h.isOpen) {
         if (!h.openTime || !h.closeTime) {
-          return `Faltan horas para el día ${DAYS_OF_WEEK[h.dayOfWeek]}.`;
+          return `Faltan horas de apertura o cierre para el día ${DAYS_OF_WEEK[h.dayOfWeek]}.`;
         }
         if (h.openTime >= h.closeTime) {
           if (h.closeTime > '00:00' && h.closeTime <= '05:00') {
-             // It's a valid overnight shift
+            // Turno nocturno válido
           } else {
-            return `El horario de cierre debe ser mayor al de apertura para el día ${DAYS_OF_WEEK[h.dayOfWeek]}.`;
+            return `El horario de cierre debe ser posterior al de apertura el día ${DAYS_OF_WEEK[h.dayOfWeek]}.`;
           }
         }
         if (h.openTime2 || h.closeTime2) {
           if (!h.openTime2 || !h.closeTime2) {
-            return `Falta completar el segundo turno para el día ${DAYS_OF_WEEK[h.dayOfWeek]}.`;
+            return `Completa ambos campos del segundo turno en ${DAYS_OF_WEEK[h.dayOfWeek]}.`;
           }
           if (h.openTime2 >= h.closeTime2) {
-             return `El horario de cierre del turno 2 debe ser mayor al de apertura para el día ${DAYS_OF_WEEK[h.dayOfWeek]}.`;
+            return `El horario de cierre del turno 2 debe ser posterior al de apertura en ${DAYS_OF_WEEK[h.dayOfWeek]}.`;
           }
         }
       }
@@ -140,7 +227,17 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
-    
+
+    if (!formData.name.trim()) {
+      setErrorMsg('El nombre comercial del restaurante es obligatorio.');
+      return;
+    }
+
+    if (deliveryModes.length === 0) {
+      setErrorMsg('Selecciona al menos una modalidad de atención.');
+      return;
+    }
+
     const hourError = validateHours();
     if (hourError) {
       setErrorMsg(hourError);
@@ -150,13 +247,13 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     setIsSaving(true);
     try {
       await updateTenant(tenant.id, {
-        name: formData.name,
-        description: formData.description,
-        category: formData.category,
-        phone: formData.phone,
-        whatsapp: formData.whatsapp,
-        address: formData.address,
-        logoEmoji: formData.logoEmoji,
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        category: formData.category.trim(),
+        phone: formData.phone.trim(),
+        whatsapp: formData.whatsapp.trim(),
+        address: formData.address.trim(),
+        logoEmoji: formData.logoEmoji || '🍽️',
         logoUrl: formData.logoUrl,
         bannerUrl: formData.bannerUrl,
         estimatedDeliveryMinutes: parseInt(formData.estimatedDeliveryMinutes) || 0,
@@ -166,323 +263,766 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
         deliveryFee: parseFloat(formData.deliveryFee) || 0,
         minOrder: parseFloat(formData.minOrder) || 0,
         deliveryRadiusKm: parseFloat(formData.deliveryRadiusKm) || 0,
-        specialties: formData.specialties.split(',').map(s => s.trim()).filter(s => s.length > 0),
+        specialties: formData.specialties
+          .split(',')
+          .map(s => s.trim())
+          .filter(s => s.length > 0),
         deliveryModes,
         hours
       });
-      setSuccessMsg('Perfil guardado exitosamente.');
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Error guardando perfil.');
+      setSuccessMsg('¡Perfil, configuración operativa y horarios actualizados exitosamente!');
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Error guardando el perfil.');
     } finally {
       setIsSaving(false);
     }
   };
 
+  const step1Done = Boolean(
+    formData.name.trim() && formData.category.trim() && (formData.phone.trim() || formData.whatsapp.trim())
+  );
+  const step2Done = Boolean(formData.address.trim() && deliveryModes.length > 0);
+  const openDaysCount = hours.filter(h => h.isOpen).length;
+  const step3Done = openDaysCount > 0 && !validateHours();
+
+  const completedSteps = [step1Done, step2Done, step3Done].filter(Boolean).length;
+  const progressPct = Math.round((completedSteps / 3) * 100);
+
   return (
-    <div className="card" style={{ maxWidth: '850px', margin: '0 auto', overflow: 'hidden' }}>
-      
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--neutral-border)' }}>
-        <button 
-          type="button" 
+    <div className="rpa-card">
+      {/* Header Editorial */}
+      <div className="rpa-card-header">
+        <div className="rpa-card-header-left">
+          <div className="rpa-card-icon">
+            <Store size={22} />
+          </div>
+          <div>
+            <span className="pam-eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>
+              <Sparkles size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Configuración Integral del Comercio
+            </span>
+            <h3 className="rpa-card-title">Perfil Comercial, Operación y Horarios</h3>
+            <p className="rpa-card-subtitle">
+              Personaliza la imagen de <strong>{tenant.name}</strong>, modalidades de entrega y turnos semanales.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ minWidth: '210px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '5px' }}>
+            <span>Ficha completada</span>
+            <strong style={{ color: 'var(--primary)' }}>{completedSteps}/3 secciones ({progressPct}%)</strong>
+          </div>
+          <div style={{ height: '7px', borderRadius: '999px', background: 'var(--neutral-border)', overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${progressPct}%`,
+                height: '100%',
+                borderRadius: '999px',
+                background: 'linear-gradient(90deg, var(--primary), #10B981)',
+                transition: 'width 0.3s ease'
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Sub-navigation bar */}
+      <div className="rpa-subtabs">
+        <button
+          type="button"
+          className={`rpa-subtab ${activeSubTab === 'all' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('all')}
+        >
+          <Sparkles size={15} /> Vista Completa (3 pasos)
+        </button>
+        <button
+          type="button"
+          className={`rpa-subtab ${activeSubTab === 'basic' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('basic')}
-          style={{ flex: 1, padding: '1rem', background: 'transparent', border: 'none', borderBottom: activeSubTab === 'basic' ? '3px solid var(--primary)' : '3px solid transparent', color: activeSubTab === 'basic' ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
-          <Settings size={18} /> Información Básica
+          <Settings size={15} /> 1. Identidad y Marca
+          {step1Done && (
+            <span className="rpa-subtab-check">
+              <Check size={11} strokeWidth={3} />
+            </span>
+          )}
         </button>
-        <button 
-          type="button" 
+        <button
+          type="button"
+          className={`rpa-subtab ${activeSubTab === 'delivery' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('delivery')}
-          style={{ flex: 1, padding: '1rem', background: 'transparent', border: 'none', borderBottom: activeSubTab === 'delivery' ? '3px solid var(--primary)' : '3px solid transparent', color: activeSubTab === 'delivery' ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
-          <MapPin size={18} /> Configuración Operativa
+          <MapPin size={15} /> 2. Operación y Domicilios
+          {step2Done && (
+            <span className="rpa-subtab-check">
+              <Check size={11} strokeWidth={3} />
+            </span>
+          )}
         </button>
-        <button 
-          type="button" 
+        <button
+          type="button"
+          className={`rpa-subtab ${activeSubTab === 'hours' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('hours')}
-          style={{ flex: 1, padding: '1rem', background: 'transparent', border: 'none', borderBottom: activeSubTab === 'hours' ? '3px solid var(--primary)' : '3px solid transparent', color: activeSubTab === 'hours' ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
-          <Calendar size={18} /> Horarios
+          <Calendar size={15} /> 3. Horarios ({openDaysCount} días)
+          {step3Done && (
+            <span className="rpa-subtab-check">
+              <Check size={11} strokeWidth={3} />
+            </span>
+          )}
         </button>
       </div>
 
-      {errorMsg && (
-        <div style={{ margin: '1.5rem 1.5rem 0', padding: '1rem', background: 'rgba(239,68,68,0.1)', color: '#ef4444', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)' }}>
-          {errorMsg}
-        </div>
-      )}
-      
-      {successMsg && (
-        <div style={{ margin: '1.5rem 1.5rem 0', padding: '1rem', background: 'var(--success-light)', color: 'var(--success-text)', borderRadius: '8px', border: '1px solid var(--success-border)' }}>
-          {successMsg}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        
-        {/* BASIC TAB */}
-        {activeSubTab === 'basic' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="rpa-card-body">
+          {errorMsg && (
+            <div className="pam-callout error" role="alert">
+              <AlertCircle size={18} />
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Nombre Comercial</label>
-                <input type="text" name="name" value={formData.name} onChange={handleChange} className="gf-input" required />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Categoría Principal</label>
-                <input type="text" name="category" value={formData.category} onChange={handleChange} className="gf-input" required />
+                <strong>Revisa la información antes de guardar</strong>
+                <div>{errorMsg}</div>
               </div>
             </div>
+          )}
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Descripción Corta (Bio)</label>
-              <textarea name="description" value={formData.description} onChange={handleChange} className="gf-input" style={{ minHeight: '80px' }} maxLength={200} />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+          {successMsg && (
+            <div className="pam-callout success" role="status">
+              <CheckCircle2 size={18} />
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Teléfono Fijo / Móvil</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Phone size={18} color="var(--text-muted)" />
-                  <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="gf-input" />
+                <strong>Cambios guardados</strong>
+                <div>{successMsg}</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── SECCIÓN 1: IDENTIDAD Y MARCA ── */}
+          {(activeSubTab === 'all' || activeSubTab === 'basic') && (
+            <section className="pam-section">
+              <div className="pam-section-head">
+                <div className={`pam-step ${step1Done ? 'done' : ''}`}>
+                  {step1Done ? <Check size={15} strokeWidth={3} /> : 1}
+                </div>
+                <div>
+                  <h4>Identidad Visual y Datos del Restaurante</h4>
+                  <p>Así verán tu marca los clientes en el feed gastronómico y en tu perfil público.</p>
                 </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>WhatsApp (Sin +)</label>
-                <input type="tel" name="whatsapp" value={formData.whatsapp} onChange={handleChange} className="gf-input" placeholder="573001234567" />
-              </div>
-            </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Imagen de Portada (Banner)</label>
-              <div 
-                style={{ 
-                  width: '100%', height: '200px', borderRadius: '12px', border: formData.bannerUrl ? 'none' : '2px dashed var(--neutral-border)',
-                  backgroundColor: 'var(--surface-color)', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-                }}
-                onClick={() => !uploadingBanner && bannerInputRef.current?.click()}
-              >
-                {formData.bannerUrl ? (
-                  <>
-                    <img src={formData.bannerUrl} alt="Banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: '8px' }}>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); bannerInputRef.current?.click(); }} style={{ background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>Cambiar</button>
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                    {uploadingBanner ? <div className="spinner" style={{ margin: '0 auto 8px' }} /> : <ImageIcon size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />}
-                    <p style={{ margin: 0 }}>{uploadingBanner ? 'Subiendo...' : 'Haz clic para subir banner'}</p>
+              {/* Uploads: Logo + Portada */}
+              <div className="pam-uploads">
+                <div className="pam-field">
+                  <label>
+                    Logo Comercial <span className="pam-opt">Cuadrado</span>
+                  </label>
+                  <div
+                    className={`pam-drop ${formData.logoUrl ? 'has-file' : ''}`}
+                    onClick={() => !uploadingLogo && logoInputRef.current?.click()}
+                  >
+                    {formData.logoUrl ? (
+                      <>
+                        <img src={formData.logoUrl} alt="Logo" />
+                        <span className="pam-drop-change">
+                          {uploadingLogo ? 'Subiendo...' : 'Cambiar'}
+                        </span>
+                      </>
+                    ) : (
+                      <div className="pam-drop-empty">
+                        <Upload size={22} />
+                        <strong>{uploadingLogo ? 'Optimizando...' : 'Subir Logo'}</strong>
+                        <span>JPG, PNG o WEBP</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      ref={logoInputRef}
+                      style={{ display: 'none' }}
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={e => handleFileUpload(e, 'profile')}
+                    />
                   </div>
-                )}
-                <input type="file" ref={bannerInputRef} style={{ display: 'none' }} accept="image/jpeg,image/png,image/webp" onChange={(e) => handleFileUpload(e, 'banner')} />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div 
-                style={{ 
-                  width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'var(--surface-color)', border: '2px dashed var(--neutral-border)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer', position: 'relative', flexShrink: 0
-                }}
-                onClick={() => !uploadingLogo && logoInputRef.current?.click()}
-              >
-                {formData.logoUrl ? (
-                  <img src={formData.logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  uploadingLogo ? <div className="spinner" /> : <ImageIcon size={24} style={{ opacity: 0.5 }} />
-                )}
-                <input type="file" ref={logoInputRef} style={{ display: 'none' }} accept="image/jpeg,image/png,image/webp" onChange={(e) => handleFileUpload(e, 'profile')} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', margin: '0 0 8px 0' }}>Logo del Restaurante</p>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="button" onClick={() => logoInputRef.current?.click()} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>Subir Logo</button>
                   {formData.logoUrl && (
-                    <button type="button" onClick={() => setFormData(p => ({...p, logoUrl: ''}))} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)' }}>Quitar</button>
+                    <button
+                      type="button"
+                      className="urm-avatar-remove"
+                      style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                      onClick={() => setFormData(prev => ({ ...prev, logoUrl: '' }))}
+                    >
+                      <Trash2 size={12} /> Quitar logo
+                    </button>
                   )}
                 </div>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Emoji Opcional</label>
-                <input type="text" name="logoEmoji" value={formData.logoEmoji} onChange={handleChange} className="gf-input" maxLength={2} placeholder="Ej. 🍔" style={{ width: '80px', textAlign: 'center' }} />
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* DELIVERY / OP TAB */}
-        {activeSubTab === 'delivery' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            
-            <div style={{ padding: '1rem', backgroundColor: formData.acceptingOrders ? 'var(--success-light)' : 'var(--warning-light)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${formData.acceptingOrders ? 'var(--success-border)' : 'var(--warning-border)'}` }}>
-              <div>
-                <h4 style={{ margin: 0, color: formData.acceptingOrders ? 'var(--success-text)' : 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {formData.acceptingOrders ? '🟢 Recibiendo Pedidos' : '⏸️ Pausado Temporalmente'}
-                </h4>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  {formData.acceptingOrders ? 'El restaurante está visible y permite checkout.' : 'La tienda sigue abierta pero los clientes no pueden completar compras.'}
-                </p>
-              </div>
-              <button type="button" onClick={() => setFormData(prev => ({ ...prev, acceptingOrders: !prev.acceptingOrders }))} className={`btn ${formData.acceptingOrders ? 'btn-secondary' : 'btn-primary'}`}>
-                {formData.acceptingOrders ? 'Pausar Recepción' : 'Reanudar'}
-              </button>
-            </div>
-
-            <div style={{ padding: '1rem', backgroundColor: formData.tableServiceEnabled ? 'var(--success-light)' : 'var(--warning-light)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${formData.tableServiceEnabled ? 'var(--success-border)' : 'var(--warning-border)'}` }}>
-              <div>
-                <h4 style={{ margin: 0, color: formData.tableServiceEnabled ? 'var(--success-text)' : 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {formData.tableServiceEnabled ? '✅ Servicio a la Mesa Habilitado' : '🚫 Servicio a la Mesa Deshabilitado'}
-                </h4>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  {formData.tableServiceEnabled ? 'Los clientes pueden escanear el QR y ordenar desde sus mesas.' : 'Al deshabilitarlo, los códigos QR mostrarán que el servicio no está disponible.'}
-                </p>
-              </div>
-              <button type="button" onClick={() => setFormData(prev => ({ ...prev, tableServiceEnabled: !prev.tableServiceEnabled }))} className={`btn ${formData.tableServiceEnabled ? 'btn-secondary' : 'btn-primary'}`}>
-                {formData.tableServiceEnabled ? 'Deshabilitar' : 'Habilitar'}
-              </button>
-            </div>
-
-            <div style={{ padding: '1rem', backgroundColor: formData.acceptsCash ? 'var(--success-light)' : 'var(--warning-light)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${formData.acceptsCash ? 'var(--success-border)' : 'var(--warning-border)'}` }}>
-              <div>
-                <h4 style={{ margin: 0, color: formData.acceptsCash ? 'var(--success-text)' : 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {formData.acceptsCash ? '💵 Pago en Efectivo Habilitado' : '💳 Solo Pagos Digitales'}
-                </h4>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  {formData.acceptsCash ? 'Los clientes verán la opción de pagar en efectivo al recibir o en mesa.' : 'Se ocultará la opción de pago en efectivo. Solo pasarelas de pago digitales.'}
-                </p>
-              </div>
-              <button type="button" onClick={() => setFormData(prev => ({ ...prev, acceptsCash: !prev.acceptsCash }))} className={`btn ${formData.acceptsCash ? 'btn-secondary' : 'btn-primary'}`}>
-                {formData.acceptsCash ? 'Deshabilitar' : 'Habilitar'}
-              </button>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Dirección Física</label>
-              <input type="text" name="address" value={formData.address} onChange={handleChange} className="gf-input" />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Especialidades (separadas por coma)</label>
-              <input type="text" name="specialties" value={formData.specialties} onChange={handleChange} className="gf-input" placeholder="Hamburguesas, Comida Rápida, Parrilla" />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Tarifa de Domicilio ($)</label>
-                <div style={{ position: 'relative' }}>
-                  <DollarSign size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: 12 }} />
-                  <input type="number" name="deliveryFee" value={formData.deliveryFee} onChange={handleChange} className="gf-input" style={{ paddingLeft: '36px' }} />
-                </div>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Pedido Mínimo ($)</label>
-                <div style={{ position: 'relative' }}>
-                  <DollarSign size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: 12 }} />
-                  <input type="number" name="minOrder" value={formData.minOrder} onChange={handleChange} className="gf-input" style={{ paddingLeft: '36px' }} />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Tiempo Estimado (Minutos)</label>
-                <div style={{ position: 'relative' }}>
-                  <Clock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: 12 }} />
-                  <input type="number" name="estimatedDeliveryMinutes" value={formData.estimatedDeliveryMinutes} onChange={handleChange} className="gf-input" style={{ paddingLeft: '36px' }} />
-                </div>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Radio de Cobertura (Km)</label>
-                <div style={{ position: 'relative' }}>
-                  <MapPin size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: 12 }} />
-                  <input type="number" step="0.1" name="deliveryRadiusKm" value={formData.deliveryRadiusKm} onChange={handleChange} className="gf-input" style={{ paddingLeft: '36px' }} />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>Modalidades de Entrega Habilitadas</label>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--surface-color)', padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--neutral-border)' }}>
-                  <input type="checkbox" checked={deliveryModes.includes('restaurant_delivery')} onChange={() => handleModeToggle('restaurant_delivery')} />
-                  <span>Domicilio (Delivery)</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--surface-color)', padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--neutral-border)' }}>
-                  <input type="checkbox" checked={deliveryModes.includes('pickup')} onChange={() => handleModeToggle('pickup')} />
-                  <span>Para Recoger (Pickup)</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--surface-color)', padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--neutral-border)' }}>
-                  <input type="checkbox" checked={deliveryModes.includes('table_service')} onChange={() => handleModeToggle('table_service')} />
-                  <span>A la Mesa (Table Service)</span>
-                </label>
-              </div>
-            </div>
-            
-          </div>
-        )}
-
-        {/* HOURS TAB */}
-        {activeSubTab === 'hours' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Configura los horarios en los que el restaurante aparecerá como "Abierto". Zona horaria: Bogotá/Colombia.</p>
-            
-            {hours.map((hour, index) => (
-              <div key={hour.dayOfWeek} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: 'var(--surface-color)', borderRadius: '12px', border: '1px solid var(--neutral-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '1rem', cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={hour.isOpen} 
-                      onChange={(e) => handleHourChange(index, 'isOpen', e.target.checked)} 
-                      style={{ transform: 'scale(1.2)' }}
-                    />
-                    {DAYS_OF_WEEK[hour.dayOfWeek]}
+                <div className="pam-field">
+                  <label>
+                    Portada / Banner del Restaurante <span className="pam-opt">Horizontal 16:9</span>
                   </label>
-                  {!hour.isOpen && <span style={{ fontSize: '0.8rem', color: 'var(--text-light)', background: 'var(--neutral-light)', padding: '2px 8px', borderRadius: '12px' }}>Cerrado</span>}
+                  <div
+                    className={`pam-drop ${formData.bannerUrl ? 'has-file' : ''}`}
+                    onClick={() => !uploadingBanner && bannerInputRef.current?.click()}
+                  >
+                    {formData.bannerUrl ? (
+                      <>
+                        <img src={formData.bannerUrl} alt="Portada" />
+                        <span className="pam-drop-change">
+                          {uploadingBanner ? 'Subiendo...' : 'Cambiar portada'}
+                        </span>
+                      </>
+                    ) : (
+                      <div className="pam-drop-empty">
+                        <ImageIcon size={24} />
+                        <strong>{uploadingBanner ? 'Optimizando...' : 'Subir Imagen de Portada'}</strong>
+                        <span>Destaca tu plato estrella o ambiente del local (JPG, PNG, WEBP)</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      ref={bannerInputRef}
+                      style={{ display: 'none' }}
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={e => handleFileUpload(e, 'banner')}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Nombre, Emoji y Teléfonos */}
+              <div className="pam-grid">
+                <div className="pam-field">
+                  <label>
+                    Nombre Comercial <em>*</em>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <Store size={16} className="pam-icon" />
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className="pam-input"
+                      placeholder="Ej. La Burguesía Artesanal"
+                      required
+                    />
+                  </div>
                 </div>
 
-                {hour.isOpen && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', marginLeft: '28px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Abre:</span>
-                      <input type="time" className="gf-input" style={{ width: 'auto', padding: '8px' }} value={hour.openTime || ''} onChange={e => handleHourChange(index, 'openTime', e.target.value)} required />
+                <div className="pam-field">
+                  <label>
+                    Emoji Distintivo <span className="pam-opt">Avatar rápido</span>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <input
+                      type="text"
+                      name="logoEmoji"
+                      value={formData.logoEmoji}
+                      onChange={handleChange}
+                      className="pam-input no-icon"
+                      maxLength={2}
+                      placeholder="🍔"
+                      style={{ textAlign: 'center', fontSize: '1.15rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="pam-field">
+                  <label>
+                    Teléfono de Contacto <em>*</em>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <Phone size={16} className="pam-icon" />
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      className="pam-input"
+                      placeholder="Ej. 300 123 4567"
+                    />
+                  </div>
+                </div>
+
+                <div className="pam-field">
+                  <label>
+                    WhatsApp de Pedidos <span className="pam-opt">Con código de país</span>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <Phone size={16} className="pam-icon" />
+                    <input
+                      type="tel"
+                      name="whatsapp"
+                      value={formData.whatsapp}
+                      onChange={handleChange}
+                      className="pam-input"
+                      placeholder="Ej. 573001234567"
+                    />
+                  </div>
+                </div>
+
+                {/* Categoría con chips */}
+                <div className="pam-field pam-span-2">
+                  <label>
+                    Categoría Gastronómica Principal <em>*</em>
+                  </label>
+                  <div className="pam-chips">
+                    {CATEGORY_PRESETS.map(preset => (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        className={`pam-chip ${formData.category === preset.value ? 'active' : ''}`}
+                        onClick={() => setFormData(prev => ({ ...prev, category: preset.value }))}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="pam-input-wrap" style={{ marginTop: '6px' }}>
+                    <Store size={16} className="pam-icon" />
+                    <input
+                      type="text"
+                      name="category"
+                      value={formData.category}
+                      onChange={handleChange}
+                      className="pam-input"
+                      placeholder="O escribe otra categoría personalizada..."
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Descripción / Bio */}
+                <div className="pam-field pam-span-2">
+                  <label>
+                    Historia / Descripción Corta (Bio) <span className="pam-opt">Máx. 200 caracteres</span>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <FileText size={16} className="pam-icon top" />
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      className="pam-input"
+                      rows={3}
+                      maxLength={200}
+                      placeholder="Cuéntale a tus clientes qué hace única tu cocina, tus ingredientes o tu especialidad..."
+                    />
+                  </div>
+                  <span className="pam-hint">{formData.description.length}/200 caracteres</span>
+                </div>
+
+                {/* Especialidades */}
+                <div className="pam-field pam-span-2">
+                  <label>
+                    Especialidades de la Casa <span className="pam-opt">Separadas por coma</span>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <Sparkles size={16} className="pam-icon" />
+                    <input
+                      type="text"
+                      name="specialties"
+                      value={formData.specialties}
+                      onChange={handleChange}
+                      className="pam-input"
+                      placeholder="Ej. Hamburguesas maduradas, Papas rústicas, Malteadas artesanales"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ── SECCIÓN 2: OPERACIÓN, DOMICILIOS Y PAGOS ── */}
+          {(activeSubTab === 'all' || activeSubTab === 'delivery') && (
+            <section className="pam-section">
+              <div className="pam-section-head">
+                <div className={`pam-step ${step2Done ? 'done' : ''}`}>
+                  {step2Done ? <Check size={15} strokeWidth={3} /> : 2}
+                </div>
+                <div>
+                  <h4>Configuración Operativa, Modalidades y Tarifas</h4>
+                  <p>Controla en tiempo real los canales de atención, costos de envío y métodos de pago.</p>
+                </div>
+              </div>
+
+              {/* Interruptores operativos */}
+              <div className="rpa-switch-grid">
+                <div className={`rpa-switch-card ${formData.acceptingOrders ? 'on' : 'off'}`}>
+                  <div className="rpa-switch-info">
+                    <h5>
+                      {formData.acceptingOrders ? '🟢 Recepción de Pedidos Activa' : '⏸️ Pedidos Pausados'}
+                    </h5>
+                    <p>
+                      {formData.acceptingOrders
+                        ? 'Los clientes pueden finalizar pedidos desde el feed y tu menú.'
+                        : 'Tu perfil sigue visible pero el checkout está pausado temporalmente.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={`rpa-toggle-pill ${formData.acceptingOrders ? 'on' : ''}`}
+                    onClick={() =>
+                      setFormData(prev => ({ ...prev, acceptingOrders: !prev.acceptingOrders }))
+                    }
+                    aria-label="Alternar recepción de pedidos"
+                  >
+                    <div className="rpa-toggle-knob" />
+                  </button>
+                </div>
+
+                <div className={`rpa-switch-card ${formData.tableServiceEnabled ? 'on' : 'off'}`}>
+                  <div className="rpa-switch-info">
+                    <h5>
+                      {formData.tableServiceEnabled ? '🍽️ Servicio en Mesa QR Activo' : '🚫 Servicio en Mesa Inactivo'}
+                    </h5>
+                    <p>
+                      {formData.tableServiceEnabled
+                        ? 'Los códigos QR en tus mesas permiten ordenar directo a cocina.'
+                        : 'Al escanear el QR se indicará que el pedido en mesa está deshabilitado.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={`rpa-toggle-pill ${formData.tableServiceEnabled ? 'on' : ''}`}
+                    onClick={() =>
+                      setFormData(prev => ({
+                        ...prev,
+                        tableServiceEnabled: !prev.tableServiceEnabled
+                      }))
+                    }
+                    aria-label="Alternar servicio a la mesa"
+                  >
+                    <div className="rpa-toggle-knob" />
+                  </button>
+                </div>
+
+                <div className={`rpa-switch-card ${formData.acceptsCash ? 'on' : 'off'}`}>
+                  <div className="rpa-switch-info">
+                    <h5>
+                      {formData.acceptsCash ? '💵 Pago en Efectivo Habilitado' : '💳 Solo Pagos Digitales'}
+                    </h5>
+                    <p>
+                      {formData.acceptsCash
+                        ? 'Los clientes pueden elegir pagar en efectivo contra entrega o en mesa.'
+                        : 'Solo se aceptarán pagos electrónicos en línea (Wompi / Tarjeta / PSE).'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={`rpa-toggle-pill ${formData.acceptsCash ? 'on' : ''}`}
+                    onClick={() =>
+                      setFormData(prev => ({ ...prev, acceptsCash: !prev.acceptsCash }))
+                    }
+                    aria-label="Alternar pago en efectivo"
+                  >
+                    <div className="rpa-toggle-knob" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modalidades de Entrega */}
+              <div className="pam-field">
+                <label>
+                  Modalidades de Atención Habilitadas <em>*</em>
+                </label>
+                <div className="pam-modes">
+                  <button
+                    type="button"
+                    className={`pam-mode ${deliveryModes.includes('restaurant_delivery') ? 'active' : ''}`}
+                    onClick={() => handleModeToggle('restaurant_delivery')}
+                  >
+                    <div className="pam-mode-icon">
+                      <Bike size={20} />
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Cierra:</span>
-                      <input type="time" className="gf-input" style={{ width: 'auto', padding: '8px' }} value={hour.closeTime || ''} onChange={e => handleHourChange(index, 'closeTime', e.target.value)} required />
+                    <div className="pam-mode-check">
+                      {deliveryModes.includes('restaurant_delivery') && <Check size={12} strokeWidth={3} />}
                     </div>
-                    
-                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      {hour.openTime2 ? (
-                        <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Abre 2:</span>
-                            <input type="time" className="gf-input" style={{ width: 'auto', padding: '8px' }} value={hour.openTime2} onChange={e => handleHourChange(index, 'openTime2', e.target.value)} />
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Cierra 2:</span>
-                            <input type="time" className="gf-input" style={{ width: 'auto', padding: '8px' }} value={hour.closeTime2 || ''} onChange={e => handleHourChange(index, 'closeTime2', e.target.value)} />
-                          </div>
-                          <button type="button" onClick={() => { handleHourChange(index, 'openTime2', ''); handleHourChange(index, 'closeTime2', ''); }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem' }}>Quitar</button>
-                        </>
-                      ) : (
-                        <button type="button" onClick={() => { handleHourChange(index, 'openTime2', '18:00'); handleHourChange(index, 'closeTime2', '23:00'); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>+ Agregar segundo turno</button>
+                    <strong>Domicilio Propio</strong>
+                    <span>Envías con tus propios domiciliarios</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`pam-mode ${deliveryModes.includes('pickup') ? 'active' : ''}`}
+                    onClick={() => handleModeToggle('pickup')}
+                  >
+                    <div className="pam-mode-icon">
+                      <ShoppingBag size={20} />
+                    </div>
+                    <div className="pam-mode-check">
+                      {deliveryModes.includes('pickup') && <Check size={12} strokeWidth={3} />}
+                    </div>
+                    <strong>Recoger en Local</strong>
+                    <span>El cliente pasa por su pedido</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`pam-mode ${deliveryModes.includes('table_service') ? 'active' : ''}`}
+                    onClick={() => handleModeToggle('table_service')}
+                  >
+                    <div className="pam-mode-icon">
+                      <QrCode size={20} />
+                    </div>
+                    <div className="pam-mode-check">
+                      {deliveryModes.includes('table_service') && <Check size={12} strokeWidth={3} />}
+                    </div>
+                    <strong>Servicio en Mesa QR</strong>
+                    <span>Pedidos desde las mesas del local</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Dirección y Parámetros de Envío */}
+              <div className="pam-grid">
+                <div className="pam-field pam-span-2">
+                  <label>
+                    Dirección Física del Local <em>*</em>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <MapPin size={16} className="pam-icon" />
+                    <input
+                      type="text"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleChange}
+                      className="pam-input"
+                      placeholder="Ej. Cra 14 # 19-20, Barrio Norte, Armenia"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="pam-field">
+                  <label>
+                    Tarifa de Domicilio <span className="pam-opt">COP</span>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <DollarSign size={16} className="pam-icon" />
+                    <input
+                      type="number"
+                      name="deliveryFee"
+                      value={formData.deliveryFee}
+                      onChange={handleChange}
+                      className="pam-input with-suffix"
+                      min="0"
+                      step="500"
+                    />
+                    <span className="pam-suffix">COP</span>
+                  </div>
+                </div>
+
+                <div className="pam-field">
+                  <label>
+                    Pedido Mínimo <span className="pam-opt">COP</span>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <DollarSign size={16} className="pam-icon" />
+                    <input
+                      type="number"
+                      name="minOrder"
+                      value={formData.minOrder}
+                      onChange={handleChange}
+                      className="pam-input with-suffix"
+                      min="0"
+                      step="1000"
+                    />
+                    <span className="pam-suffix">COP</span>
+                  </div>
+                </div>
+
+                <div className="pam-field">
+                  <label>
+                    Tiempo Estimado de Entrega <span className="pam-opt">Minutos</span>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <Clock size={16} className="pam-icon" />
+                    <input
+                      type="number"
+                      name="estimatedDeliveryMinutes"
+                      value={formData.estimatedDeliveryMinutes}
+                      onChange={handleChange}
+                      className="pam-input with-suffix"
+                      min="5"
+                    />
+                    <span className="pam-suffix">min</span>
+                  </div>
+                </div>
+
+                <div className="pam-field">
+                  <label>
+                    Radio de Cobertura <span className="pam-opt">Kilómetros</span>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <MapPin size={16} className="pam-icon" />
+                    <input
+                      type="number"
+                      step="0.5"
+                      name="deliveryRadiusKm"
+                      value={formData.deliveryRadiusKm}
+                      onChange={handleChange}
+                      className="pam-input with-suffix"
+                      min="0.5"
+                    />
+                    <span className="pam-suffix">km</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ── SECCIÓN 3: HORARIOS DE ATENCIÓN ── */}
+          {(activeSubTab === 'all' || activeSubTab === 'hours') && (
+            <section className="pam-section">
+              <div className="pam-section-head" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <div className={`pam-step ${step3Done ? 'done' : ''}`}>
+                    {step3Done ? <Check size={15} strokeWidth={3} /> : 3}
+                  </div>
+                  <div>
+                    <h4>Horarios de Atención por Día</h4>
+                    <p>Configura apertura, cierre y doble turno (ej. almuerzo y cena). Zona horaria: Colombia.</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="pam-chip"
+                    onClick={copyMondayToWeekdays}
+                    title="Copia el horario configurado en Lunes a Martes, Miércoles, Jueves y Viernes"
+                  >
+                    <Copy size={13} /> Copiar Lunes a Lun–Vie
+                  </button>
+                  <button
+                    type="button"
+                    className="pam-chip"
+                    onClick={copyMondayToAllDays}
+                    title="Copia el horario configurado en Lunes a los 7 días"
+                  >
+                    <Copy size={13} /> Copiar Lunes a toda la semana
+                  </button>
+                </div>
+              </div>
+
+              <div className="rpa-hours-list">
+                {hours.map((hour, index) => (
+                  <div
+                    key={hour.dayOfWeek}
+                    className={`rpa-hour-row ${hour.isOpen ? 'open' : 'closed'}`}
+                  >
+                    <div className="rpa-hour-top">
+                      <div
+                        className="rpa-day-label"
+                        onClick={() => handleHourChange(index, 'isOpen', !hour.isOpen)}
+                      >
+                        <button
+                          type="button"
+                          className={`rpa-toggle-pill ${hour.isOpen ? 'on' : ''}`}
+                          aria-label={`Alternar ${DAYS_OF_WEEK[hour.dayOfWeek]}`}
+                        >
+                          <div className="rpa-toggle-knob" />
+                        </button>
+                        <span>{DAYS_OF_WEEK[hour.dayOfWeek]}</span>
+                        <span className={`rpa-badge ${hour.isOpen ? 'success' : 'neutral'}`}>
+                          {hour.isOpen ? 'Abierto' : 'Cerrado'}
+                        </span>
+                      </div>
+
+                      {hour.isOpen && !hour.openTime2 && (
+                        <button
+                          type="button"
+                          className="pam-chip"
+                          style={{ padding: '5px 11px', fontSize: '0.74rem' }}
+                          onClick={() => {
+                            handleHourChange(index, 'openTime2', '18:00');
+                            handleHourChange(index, 'closeTime2', '23:00');
+                          }}
+                        >
+                          <Plus size={13} /> Agregar 2° turno (Cena)
+                        </button>
                       )}
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
 
-        <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="submit" className="gf-btn-primary" style={{ padding: '0.75rem 2rem', opacity: isSaving ? 0.7 : 1 }} disabled={isSaving}>
-            <Save size={18} /> {isSaving ? 'Guardando...' : 'Guardar Cambios'}
-          </button>
+                    {hour.isOpen && (
+                      <div className="rpa-hour-slots">
+                        <div className="rpa-time-box">
+                          <Clock size={14} style={{ color: 'var(--primary)' }} />
+                          <span>Abre:</span>
+                          <input
+                            type="time"
+                            value={hour.openTime || ''}
+                            onChange={e => handleHourChange(index, 'openTime', e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="rpa-time-box">
+                          <span>Cierra:</span>
+                          <input
+                            type="time"
+                            value={hour.closeTime || ''}
+                            onChange={e => handleHourChange(index, 'closeTime', e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        {hour.openTime2 && (
+                          <>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', marginLeft: '6px' }}>
+                              2° Turno:
+                            </span>
+                            <div className="rpa-time-box">
+                              <span>Abre:</span>
+                              <input
+                                type="time"
+                                value={hour.openTime2}
+                                onChange={e => handleHourChange(index, 'openTime2', e.target.value)}
+                              />
+                            </div>
+                            <div className="rpa-time-box">
+                              <span>Cierra:</span>
+                              <input
+                                type="time"
+                                value={hour.closeTime2 || ''}
+                                onChange={e => handleHourChange(index, 'closeTime2', e.target.value)}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              className="urm-avatar-remove"
+                              onClick={() => {
+                                handleHourChange(index, 'openTime2', '');
+                                handleHourChange(index, 'closeTime2', '');
+                              }}
+                            >
+                              <Trash2 size={12} /> Quitar 2° turno
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
+        {/* Footer de Guardado */}
+        <div className="pam-footer">
+          <div className="pam-footer-hint">
+            Editando perfil oficial de <strong>{tenant.name}</strong> · Los cambios se reflejan al instante en el feed.
+          </div>
+          <div className="pam-footer-actions">
+            <button
+              type="submit"
+              className="pam-btn-primary"
+              disabled={isSaving || uploadingLogo || uploadingBanner}
+            >
+              <Save size={17} />
+              <span>{isSaving ? 'Guardando cambios...' : 'Guardar Perfil y Horarios'}</span>
+            </button>
+          </div>
+        </div>
       </form>
     </div>
   );

@@ -1,29 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/useApp';
 import type { Tenant, RestaurantMember } from '../../types';
-import { Users, Mail, RefreshCw, XCircle, PlayCircle, ShieldBan } from 'lucide-react';
+import {
+  Users,
+  Mail,
+  RefreshCw,
+  XCircle,
+  PlayCircle,
+  ShieldBan,
+  Sparkles,
+  Check,
+  UserPlus,
+  ShieldCheck,
+  AlertCircle,
+  X
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { validateEmail } from '../../utils/formValidation';
 
 export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
-  const { 
-    currentUser, 
-    fetchRestaurantMembers, 
-    inviteRestaurantStaff, 
-    resendStaffInvitation, 
-    suspendRestaurantMember, 
-    reactivateRestaurantMember, 
+  const {
+    currentUser,
+    fetchRestaurantMembers,
+    inviteRestaurantStaff,
+    resendStaffInvitation,
+    suspendRestaurantMember,
+    reactivateRestaurantMember,
     revokeRestaurantMember,
-    showToast 
+    showToast
   } = useApp();
 
   const [members, setMembers] = useState<RestaurantMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const isOwner = members.find(m => m.userId === currentUser?.id)?.role === 'owner' || currentUser?.role === 'admin';
+  const isOwner =
+    members.find(m => m.userId === currentUser?.id)?.role === 'owner' ||
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'platform_admin' ||
+    currentUser?.tenantId === tenant.id;
 
   const loadMembers = async () => {
     setLoading(true);
@@ -39,26 +58,35 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail) return;
-    
+    const err = validateEmail(inviteEmail);
+    if (err) {
+      setEmailError(err);
+      return;
+    }
+
+    setEmailError(null);
     setInviting(true);
-    const res = await inviteRestaurantStaff(tenant.id, inviteEmail);
+    const res = await inviteRestaurantStaff(tenant.id, inviteEmail.trim());
     if (res.success) {
-      showToast('Invitación enviada correctamente.');
+      showToast('✨ Invitación enviada correctamente al empleado.');
       setInviteEmail('');
       setShowInviteForm(false);
       await loadMembers();
     } else {
+      setEmailError(res.error || 'No se pudo enviar la invitación.');
       showToast(`⚠️ Error al invitar: ${res.error}`);
     }
     setInviting(false);
   };
 
-  const handleAction = async (action: 'resend' | 'suspend' | 'reactivate' | 'revoke', member: RestaurantMember) => {
+  const handleAction = async (
+    action: 'resend' | 'suspend' | 'reactivate' | 'revoke',
+    member: RestaurantMember
+  ) => {
     let confirmMsg = '';
-    if (action === 'revoke') confirmMsg = '¿Deseas revocar el acceso de forma permanente?';
-    if (action === 'suspend') confirmMsg = '¿Deseas suspender a este miembro temporalmente?';
-    if (action === 'resend') confirmMsg = '¿Deseas reenviar la invitación?';
+    if (action === 'revoke') confirmMsg = '¿Deseas revocar el acceso de este empleado de forma permanente?';
+    if (action === 'suspend') confirmMsg = '¿Deseas suspender temporalmente el acceso de este empleado?';
+    if (action === 'resend') confirmMsg = '¿Deseas reenviar la invitación a su correo?';
 
     if (confirmMsg && !window.confirm(confirmMsg)) return;
 
@@ -71,7 +99,7 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     if (action === 'revoke') res = await revokeRestaurantMember(member.id);
 
     if (res.success) {
-      showToast(`Acción completada.`);
+      showToast('Estado del miembro actualizado.');
       await loadMembers();
     } else {
       showToast(`⚠️ Error: ${res.error}`);
@@ -83,97 +111,221 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const invitedMembers = members.filter(m => m.status === 'invited');
   const otherMembers = members.filter(m => m.status === 'suspended' || m.status === 'revoked');
 
+  const emailValid = Boolean(inviteEmail.trim() && !validateEmail(inviteEmail));
+
   return (
-    <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-      <div className="card-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <div className="card-title" style={{ color: 'white', fontWeight: 900, fontSize: '1.2rem' }}>
-          <Users size={22} style={{ color: 'var(--primary)' }} /> Equipo de {tenant.name}
+    <div className="rpa-card">
+      {/* Header Editorial */}
+      <div className="rpa-card-header">
+        <div className="rpa-card-header-left">
+          <div className="rpa-card-icon">
+            <Users size={22} />
+          </div>
+          <div>
+            <span className="pam-eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>
+              <Sparkles size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Gestión de Personal y Accesos
+            </span>
+            <h3 className="rpa-card-title">Equipo y Empleados de {tenant.name}</h3>
+            <p className="rpa-card-subtitle">
+              Administra quién tiene acceso operativo a pedidos, cocina (KDS) y atención en mesas.
+            </p>
+          </div>
         </div>
+
         {isOwner && (
-          <motion.button 
-            whileHover={{ scale: 1.05 }} 
-            whileTap={{ scale: 0.95 }} 
-            className="btn btn-primary" 
-            onClick={() => setShowInviteForm(!showInviteForm)}
+          <button
+            type="button"
+            className={showInviteForm ? 'pam-btn-ghost' : 'pam-btn-primary'}
+            onClick={() => {
+              setShowInviteForm(!showInviteForm);
+              setEmailError(null);
+            }}
           >
-            <Mail size={16} /> {showInviteForm ? 'Cancelar' : 'Invitar Staff'}
-          </motion.button>
+            {showInviteForm ? (
+              <>
+                <X size={16} /> Cancelar
+              </>
+            ) : (
+              <>
+                <UserPlus size={16} /> Vincular Empleado
+              </>
+            )}
+          </button>
         )}
       </div>
 
-      <AnimatePresence>
-        {showInviteForm && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
-            <form onSubmit={handleInvite} style={{ padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <h4 style={{ color: 'white', margin: '0 0 14px', fontWeight: 900 }}>Invitar nuevo miembro</h4>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '14px' }}>
-                El usuario recibirá una invitación a su correo. Una vez acepte, tendrá acceso al panel operativo (KDS, Pedidos, etc.) sin ver información financiera ni configuración crítica.
-              </p>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <input 
-                  type="email" 
-                  className="gf-input" 
-                  placeholder="Correo electrónico" 
-                  value={inviteEmail} 
-                  onChange={e => setInviteEmail(e.target.value)} 
-                  required 
-                  style={{ flex: 1 }}
-                />
-                <button type="submit" className="btn btn-primary" disabled={inviting}>
-                  {inviting ? 'Enviando...' : 'Enviar Invitación'}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="rpa-card-body">
+        {/* Formulario de Invitación con formato .pam-* */}
+        <AnimatePresence>
+          {showInviteForm && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+            >
+              <form onSubmit={handleInvite} noValidate>
+                <section className="pam-section">
+                  <div className="pam-section-head">
+                    <div className={`pam-step ${emailValid ? 'done' : ''}`}>
+                      {emailValid ? <Check size={15} strokeWidth={3} /> : 1}
+                    </div>
+                    <div>
+                      <h4>Invitar Empleado / Staff Operativo</h4>
+                      <p>
+                        El colaborador recibirá acceso inmediato al panel operativo de <strong>{tenant.name}</strong> sin ver métricas financieras sensibles.
+                      </p>
+                    </div>
+                  </div>
 
-      <div style={{ padding: '1.5rem' }}>
+                  {/* Permisos del rol Staff */}
+                  <div className="pam-chips">
+                    <span className="rpa-badge success">
+                      <Check size={11} /> Gestión de Pedidos en Vivo
+                    </span>
+                    <span className="rpa-badge success">
+                      <Check size={11} /> Monitor de Cocina (KDS)
+                    </span>
+                    <span className="rpa-badge success">
+                      <Check size={11} /> Mesas QR y Repartidores
+                    </span>
+                    <span className="rpa-badge neutral">
+                      <ShieldCheck size={11} /> Sin acceso a Finanzas Críticas
+                    </span>
+                  </div>
+
+                  {emailError && (
+                    <div className="pam-callout error">
+                      <AlertCircle size={17} />
+                      <span>{emailError}</span>
+                    </div>
+                  )}
+
+                  <div className="pam-grid">
+                    <div className="pam-field pam-span-2">
+                      <label>
+                        Correo Electrónico del Empleado <em>*</em>
+                      </label>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <div className="pam-input-wrap" style={{ flex: 1, minWidth: '240px' }}>
+                          <Mail size={16} className="pam-icon" />
+                          <input
+                            type="email"
+                            className={`pam-input ${emailError ? 'has-error' : ''}`}
+                            placeholder="empleado@correo.com"
+                            value={inviteEmail}
+                            onChange={e => {
+                              setInviteEmail(e.target.value);
+                              setEmailError(null);
+                            }}
+                            required
+                          />
+                        </div>
+                        <button type="submit" className="pam-btn-primary" disabled={inviting}>
+                          <UserPlus size={16} />
+                          <span>{inviting ? 'Enviando invitación...' : 'Enviar Invitación'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Listado de Miembros */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Cargando equipo...</div>
+          <div className="pam-section" style={{ alignItems: 'center', padding: '2.5rem', textAlign: 'center' }}>
+            <RefreshCw size={24} className="spin" style={{ color: 'var(--primary)' }} />
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', margin: 0 }}>
+              Cargando equipo de {tenant.name}...
+            </p>
+          </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            
-            {/* ACTIVE MEMBERS */}
-            <div>
-              <h4 style={{ color: 'white', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                Miembros Activos <span className="badge badge-primary">{activeMembers.length}</span>
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {activeMembers.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No hay miembros activos.</p> : activeMembers.map(m => (
-                  <MemberRow key={m.id} member={m} isOwner={isOwner} onAction={handleAction} processingId={processingId} />
-                ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* Miembros Activos */}
+            <section className="pam-section">
+              <div className="pam-section-head" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div className="pam-step done">
+                    <Check size={14} strokeWidth={3} />
+                  </div>
+                  <div>
+                    <h4>Colaboradores Activos ({activeMembers.length})</h4>
+                    <p>Miembros con acceso habilitado al restaurante</p>
+                  </div>
+                </div>
+                <span className="rpa-badge success">{activeMembers.length} activos</span>
               </div>
-            </div>
 
-            {/* PENDING INVITES */}
+              {activeMembers.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+                  Aún no hay miembros activos registrados.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {activeMembers.map(m => (
+                    <MemberRow
+                      key={m.id}
+                      member={m}
+                      isOwner={isOwner}
+                      onAction={handleAction}
+                      processingId={processingId}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Invitaciones Pendientes */}
             {invitedMembers.length > 0 && (
-              <div>
-                <h4 style={{ color: 'white', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  Invitaciones Pendientes <span className="badge badge-warning">{invitedMembers.length}</span>
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <section className="pam-section">
+                <div className="pam-section-head" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h4>Invitaciones Pendientes ({invitedMembers.length})</h4>
+                    <p>Colaboradores que aún no han aceptado su invitación</p>
+                  </div>
+                  <span className="rpa-badge warning">{invitedMembers.length} pendientes</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {invitedMembers.map(m => (
-                    <MemberRow key={m.id} member={m} isOwner={isOwner} onAction={handleAction} processingId={processingId} />
+                    <MemberRow
+                      key={m.id}
+                      member={m}
+                      isOwner={isOwner}
+                      onAction={handleAction}
+                      processingId={processingId}
+                    />
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
-            {/* SUSPENDED & REVOKED */}
+            {/* Suspendidos o Revocados */}
             {otherMembers.length > 0 && (
-              <div>
-                <h4 style={{ color: 'white', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  Historial e Inactivos <span className="badge badge-secondary">{otherMembers.length}</span>
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <section className="pam-section">
+                <div className="pam-section-head" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h4>Historial de Accesos Inactivos ({otherMembers.length})</h4>
+                    <p>Miembros suspendidos temporalmente o con acceso revocado</p>
+                  </div>
+                  <span className="rpa-badge neutral">{otherMembers.length} inactivos</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {otherMembers.map(m => (
-                    <MemberRow key={m.id} member={m} isOwner={isOwner} onAction={handleAction} processingId={processingId} />
+                    <MemberRow
+                      key={m.id}
+                      member={m}
+                      isOwner={isOwner}
+                      onAction={handleAction}
+                      processingId={processingId}
+                    />
                   ))}
                 </div>
-              </div>
+              </section>
             )}
-
           </div>
         )}
       </div>
@@ -181,51 +333,119 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   );
 };
 
-const MemberRow: React.FC<{ 
-  member: RestaurantMember, 
-  isOwner: boolean, 
-  onAction: (action: 'resend' | 'suspend' | 'reactivate' | 'revoke', member: RestaurantMember) => void,
-  processingId: string | null 
+const MemberRow: React.FC<{
+  member: RestaurantMember;
+  isOwner: boolean;
+  onAction: (
+    action: 'resend' | 'suspend' | 'reactivate' | 'revoke',
+    member: RestaurantMember
+  ) => void;
+  processingId: string | null;
 }> = ({ member, isOwner, onAction, processingId }) => {
   const isProcessing = processingId === member.id;
+  const initials = (member.email || 'EM').slice(0, 2).toUpperCase();
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <strong style={{ color: 'white' }}>{member.email}</strong>
-          {member.role === 'owner' && <span className="badge badge-primary" style={{ fontSize: '0.65rem' }}>Dueño</span>}
-          {member.role === 'staff' && <span className="badge badge-secondary" style={{ fontSize: '0.65rem' }}>Staff</span>}
-          
-          {member.status === 'invited' && <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>Pendiente</span>}
-          {member.status === 'suspended' && <span className="badge badge-danger" style={{ fontSize: '0.65rem', background: 'var(--danger)', color: 'white' }}>Suspendido</span>}
-          {member.status === 'revoked' && <span className="badge badge-danger" style={{ fontSize: '0.65rem', background: 'var(--text-muted)', color: 'white' }}>Revocado</span>}
+    <div className="rpa-item-card">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div
+          className="urm-avatar-preview"
+          style={{ width: '44px', height: '44px', fontSize: '0.9rem' }}
+        >
+          <span>{initials}</span>
         </div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          {member.status === 'invited' ? `Invitado el ${new Date(member.invitedAt || member.createdAt).toLocaleDateString()}` : 
-           member.status === 'active' ? `Activo desde ${new Date(member.acceptedAt || member.createdAt).toLocaleDateString()}` : 
-           `Actualizado el ${new Date(member.updatedAt || member.createdAt).toLocaleDateString()}`}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem' }}>
+              {member.email}
+            </strong>
+            {member.role === 'owner' ? (
+              <span className="rpa-badge primary">Propietario</span>
+            ) : (
+              <span className="rpa-badge neutral">Staff Operativo</span>
+            )}
+
+            {member.status === 'active' && <span className="rpa-badge success">Activo</span>}
+            {member.status === 'invited' && <span className="rpa-badge warning">Invitado</span>}
+            {member.status === 'suspended' && <span className="rpa-badge danger">Suspendido</span>}
+            {member.status === 'revoked' && <span className="rpa-badge neutral">Revocado</span>}
+          </div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+            {member.status === 'invited'
+              ? `Invitado el ${new Date(member.invitedAt || member.createdAt).toLocaleDateString('es-CO')}`
+              : member.status === 'active'
+                ? `Activo desde ${new Date(member.acceptedAt || member.createdAt).toLocaleDateString('es-CO')}`
+                : `Actualizado el ${new Date(member.updatedAt || member.createdAt).toLocaleDateString('es-CO')}`}
+          </div>
         </div>
       </div>
 
       {isOwner && member.role !== 'owner' && (
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {member.status === 'invited' && (
             <>
-              <button disabled={isProcessing} className="btn btn-secondary" style={{ padding: '6px' }} title="Reenviar Invitación" onClick={() => onAction('resend', member)}><RefreshCw size={16} /></button>
-              <button disabled={isProcessing} className="btn btn-secondary" style={{ padding: '6px', color: '#ef4444' }} title="Revocar Invitación" onClick={() => onAction('revoke', member)}><XCircle size={16} /></button>
+              <button
+                type="button"
+                disabled={isProcessing}
+                className="pam-chip"
+                onClick={() => onAction('resend', member)}
+                title="Reenviar invitación por correo"
+              >
+                <RefreshCw size={13} /> Reenviar
+              </button>
+              <button
+                type="button"
+                disabled={isProcessing}
+                className="rpa-icon-btn danger"
+                onClick={() => onAction('revoke', member)}
+                title="Revocar invitación"
+              >
+                <XCircle size={16} />
+              </button>
             </>
           )}
           {member.status === 'active' && (
             <>
-              <button disabled={isProcessing} className="btn btn-secondary" style={{ padding: '6px', color: '#f59e0b' }} title="Suspender Temporalmente" onClick={() => onAction('suspend', member)}><ShieldBan size={16} /></button>
-              <button disabled={isProcessing} className="btn btn-secondary" style={{ padding: '6px', color: '#ef4444' }} title="Revocar Acceso" onClick={() => onAction('revoke', member)}><XCircle size={16} /></button>
+              <button
+                type="button"
+                disabled={isProcessing}
+                className="pam-chip"
+                onClick={() => onAction('suspend', member)}
+                title="Suspender acceso temporalmente"
+              >
+                <ShieldBan size={13} /> Suspender
+              </button>
+              <button
+                type="button"
+                disabled={isProcessing}
+                className="rpa-icon-btn danger"
+                onClick={() => onAction('revoke', member)}
+                title="Revocar acceso permanente"
+              >
+                <XCircle size={16} />
+              </button>
             </>
           )}
           {member.status === 'suspended' && (
             <>
-              <button disabled={isProcessing} className="btn btn-secondary" style={{ padding: '6px', color: '#10b981' }} title="Reactivar" onClick={() => onAction('reactivate', member)}><PlayCircle size={16} /></button>
-              <button disabled={isProcessing} className="btn btn-secondary" style={{ padding: '6px', color: '#ef4444' }} title="Revocar Acceso" onClick={() => onAction('revoke', member)}><XCircle size={16} /></button>
+              <button
+                type="button"
+                disabled={isProcessing}
+                className="pam-chip"
+                onClick={() => onAction('reactivate', member)}
+                title="Reactivar acceso"
+              >
+                <PlayCircle size={13} /> Reactivar
+              </button>
+              <button
+                type="button"
+                disabled={isProcessing}
+                className="rpa-icon-btn danger"
+                onClick={() => onAction('revoke', member)}
+                title="Revocar acceso permanente"
+              >
+                <XCircle size={16} />
+              </button>
             </>
           )}
         </div>

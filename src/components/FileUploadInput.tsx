@@ -133,151 +133,154 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
   };
 
   return (
-    <div style={{ marginBottom: '1.25rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <label style={{ fontSize: '0.88rem', fontWeight: 600, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {accept === 'video' ? <Film size={16} style={{ color: '#F59E0B' }} /> : <ImageIcon size={16} style={{ color: '#10B981' }} />}
-          {label}
-        </label>
-      </div>
+    <div className="pam-field">
+      <label>
+        {accept === 'video' ? (
+          <Film size={15} style={{ color: 'var(--primary)' }} />
+        ) : (
+          <ImageIcon size={15} style={{ color: 'var(--primary)' }} />
+        )}
+        {label} <em>*</em>
+      </label>
 
-      <div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={acceptMime}
-            onChange={handleFileChange}
-            style={{ display: 'none' }}
-          />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={acceptMime}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
 
-          {!value ? (
-            <div
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                border: `2px dashed ${dragActive ? 'var(--primary, #E11D48)' : 'rgba(255, 255, 255, 0.15)'}`,
-                borderRadius: '16px',
-                padding: '1.5rem 1rem',
-                textAlign: 'center',
-                background: dragActive ? 'rgba(225, 29, 72, 0.08)' : 'var(--glass-overlay)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {isProcessing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <Loader2 size={32} className="animate-spin" style={{ color: 'var(--primary, #E11D48)' }} />
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f1f5f9', margin: 0 }}>
-                    {isSupabaseConfigured ? 'Subiendo a Supabase Storage (CDN)...' : 'Procesando archivo...'}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <Upload size={32} style={{ color: dragActive ? 'var(--primary, #E11D48)' : '#94a3b8', marginBottom: '8px' }} />
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f1f5f9', margin: '0 0 4px 0' }}>
-                    Haz clic o arrastra tu archivo aquí
-                  </p>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
-                    {accept === 'image' && 'Soporta PNG, JPG, WEBP (Máx. 50MB)'}
-                    {accept === 'video' && 'Soporta MP4, WEBM, MOV (Máx. 50MB)'}
-                    {accept === 'both' && 'Fotos (PNG, JPG, WEBP) o Videos (MP4, WEBM)'}
-                  </p>
-                </>
-              )}
+      {!value ? (
+        <div
+          className={`pam-drop ${error ? 'has-error' : ''}`}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+          onClick={() => !isProcessing && fileInputRef.current?.click()}
+          style={{
+            height: '165px',
+            borderColor: dragActive ? 'var(--primary)' : undefined,
+            background: dragActive ? 'var(--primary-light)' : undefined
+          }}
+        >
+          {isProcessing ? (
+            <div className="pam-drop-empty">
+              <Loader2 size={28} className="spin" />
+              <strong>
+                {isSupabaseConfigured ? 'Subiendo archivo al servidor...' : 'Procesando archivo...'}
+              </strong>
+              <span>Optimizando calidad y peso automáticamente</span>
             </div>
           ) : (
-            <div style={{ position: 'relative', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#000' }}>
-              {isVideo ? (
-                <video
-                  src={value}
-                  controls
-                  style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', display: 'block' }}
-                />
-              ) : (
-                <img
-                  src={value}
-                  alt="Vista previa"
-                  style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', display: 'block' }}
-                />
-              )}
-
-              <div style={{
-                position: 'absolute',
-                top: '10px',
-                right: '10px',
-                display: 'flex',
-                gap: '8px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: 'var(--glass-medium)',
-                    backdropFilter: 'blur(8px)',
-                    color: '#ffffff',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cambiar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChange('', 'photo')}
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    border: 'none',
-                    background: 'rgba(239, 68, 68, 0.9)',
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div style={{
-                position: 'absolute',
-                bottom: '10px',
-                left: '10px',
-                background: 'rgba(16, 185, 129, 0.9)',
-                color: '#fff',
-                padding: '4px 10px',
-                borderRadius: '20px',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                <CheckCircle size={13} />
-                {isVideo ? 'Video cargado' : 'Imagen cargada'}
-              </div>
+            <div className="pam-drop-empty">
+              <Upload size={26} />
+              <strong>Haz clic o arrastra tu archivo aquí</strong>
+              <span>
+                {accept === 'image' && `Formatos JPG, PNG o WEBP · Máx. ${maxSizeMB}MB`}
+                {accept === 'video' && `Formatos MP4, WEBM o MOV · Máx. ${maxSizeMB}MB`}
+                {accept === 'both' && `Fotos (JPG, PNG, WEBP) o Videos (MP4, WEBM) · Máx. ${maxSizeMB}MB`}
+              </span>
             </div>
           )}
         </div>
+      ) : (
+        <div
+          className="pam-drop has-file"
+          style={{ height: isVideo ? '220px' : '185px', background: '#141210' }}
+        >
+          {isVideo ? (
+            <video
+              src={value}
+              controls
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            />
+          ) : (
+            <img
+              src={value}
+              alt="Vista previa"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          )}
+
+          <div
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              display: 'flex',
+              gap: '8px'
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '999px',
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(20, 18, 16, 0.78)',
+                color: '#ffffff',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Cambiar
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange('', 'photo')}
+              style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '50%',
+                border: 'none',
+                background: 'rgba(220, 38, 38, 0.92)',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+              title="Quitar archivo"
+            >
+              <X size={15} />
+            </button>
+          </div>
+
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '10px',
+              left: '10px',
+              background: 'rgba(5, 150, 105, 0.92)',
+              color: '#fff',
+              padding: '4px 10px',
+              borderRadius: '999px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            <CheckCircle size={13} />
+            {isVideo ? 'Video listo' : 'Imagen lista'}
+          </div>
+        </div>
+      )}
 
       {compressionInfo && !error && value && (
-        <p style={{ color: '#10B981', fontSize: '0.75rem', marginTop: '6px', fontWeight: 600 }}>
-          ⚡ Comprimido: {(compressionInfo.original / 1024 / 1024).toFixed(1)}MB → {(compressionInfo.final / 1024 / 1024).toFixed(1)}MB (WEBP)
-        </p>
+        <span className="pam-hint ok">
+          ⚡ Optimizado: {(compressionInfo.original / 1024 / 1024).toFixed(1)}MB → {(compressionInfo.final / 1024 / 1024).toFixed(1)}MB (WEBP)
+        </span>
       )}
       {error && (
-        <p style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '6px', fontWeight: 600 }}>
+        <span className="pam-error">
           ⚠️ {error}
-        </p>
+        </span>
       )}
     </div>
   );

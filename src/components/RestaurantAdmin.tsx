@@ -1,58 +1,106 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { useApp } from '../context/useApp';
-import { getOperationalTenant, getFulfillmentBadgeText, getValidOrderTransitions } from '../utils/tenantHelpers';
-import { motion } from 'framer-motion';
+import {
+  getOperationalTenant,
+  getFulfillmentBadgeText,
+  getValidOrderTransitions
+} from '../utils/tenantHelpers';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FileUploadInput } from './FileUploadInput';
 import { ProfileTab } from './RestaurantAdmin/ProfileTab';
 import { NotificationBell } from './NotificationBell';
+import { RestaurantTablesAdmin } from './RestaurantTablesAdmin';
+import {
+  QrCode,
+  Utensils,
+  Truck,
+  Plus,
+  Share2,
+  Play,
+  Eye,
+  Heart,
+  Sparkles,
+  Trash2,
+  Power,
+  MapPin,
+  BarChart3,
+  MessageSquare,
+  Users,
+  AlertCircle,
+  Package,
+  Clock,
+  CheckCircle,
+  Loader2,
+  Check,
+  DollarSign,
+  FileText,
+  Hash,
+  Film,
+  Image as ImageIcon,
+  User,
+  Phone,
+  X,
+  Save,
+  Store
+} from 'lucide-react';
 
-const FinancialAnalytics = lazy(() => import('./FinancialAnalytics').then(m => ({ default: m.FinancialAnalytics })));
-const SupportTab = lazy(() => import('./RestaurantAdmin/SupportTab').then(m => ({ default: m.SupportTab })));
-const MenuTab = lazy(() => import('./RestaurantAdmin/MenuTab').then(m => ({ default: m.MenuTab })));
-const TeamTab = lazy(() => import('./RestaurantAdmin/TeamTab').then(m => ({ default: m.TeamTab })));
+const FinancialAnalytics = lazy(() =>
+  import('./FinancialAnalytics').then(m => ({ default: m.FinancialAnalytics }))
+);
+const SupportTab = lazy(() =>
+  import('./RestaurantAdmin/SupportTab').then(m => ({ default: m.SupportTab }))
+);
+const MenuTab = lazy(() =>
+  import('./RestaurantAdmin/MenuTab').then(m => ({ default: m.MenuTab }))
+);
+const TeamTab = lazy(() =>
+  import('./RestaurantAdmin/TeamTab').then(m => ({ default: m.TeamTab }))
+);
 
 const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
-  <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-    <div style={{ width: '24px', height: '24px', border: '2px solid', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
-    {message}
+  <div className="rpa-card">
+    <div className="rpa-card-body" style={{ alignItems: 'center', textAlign: 'center', padding: '3rem' }}>
+      <Loader2 size={28} className="spin" style={{ color: 'var(--primary)' }} />
+      <p style={{ color: 'var(--text-muted)', margin: 0, fontWeight: 600 }}>{message}</p>
+    </div>
   </div>
 );
 
-import {
-  QrCode, Utensils, Truck, Plus, Share2, Play,
-  Eye, Heart, Sparkles, Trash2, Power,
-  MapPin, BarChart3, MessageSquare, ShieldBan,
-  AlertCircle, Package, Clock, CheckCircle, Loader2
-} from 'lucide-react';
-
-import { RestaurantTablesAdmin } from './RestaurantTablesAdmin';
+const VEHICLE_PRESETS = [
+  '🏍️ Moto 125cc / 150cc',
+  '🚲 Bicicleta / E-Bike',
+  '🚗 Automóvil'
+];
 
 export const RestaurantAdmin: React.FC = () => {
   const {
-    tenants, currentUser, toggleTenantOpenStatus,
+    tenants,
+    currentUser,
+    toggleTenantOpenStatus,
     products,
-    drivers, addDriver,
-    posts, createPost, deletePost,
-    orders, updateOrderStatus
+    drivers,
+    addDriver,
+    posts,
+    createPost,
+    deletePost,
+    orders,
+    updateOrderStatus
   } = useApp();
 
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
-  const [activeTab, setActiveTab] = useState<'orders' | 'profile' | 'content' | 'menu' | 'analytics' | 'qr' | 'support' | 'team'>('orders');
+  const [activeTab, setActiveTab] = useState<
+    'orders' | 'profile' | 'content' | 'menu' | 'analytics' | 'qr' | 'support' | 'team'
+  >('orders');
   const [supportInitialTicketId, setSupportInitialTicketId] = useState<string | null>(null);
-  
-  // Modals state
-  // Modals state
+
+  // Driver form state
   const [showAddDriverForm, setShowAddDriverForm] = useState(false);
-
-
-
-  // Form State for Drivers
   const [driverName, setDriverName] = useState('');
-  const [driverVehicle, setDriverVehicle] = useState('Moto Yamaha FZ');
-  const [driverPhone, setDriverPhone] = useState('(300) 123-4567');
+  const [driverVehicle, setDriverVehicle] = useState('🏍️ Moto 125cc / 150cc');
+  const [driverPhone, setDriverPhone] = useState('');
 
-  // Form State for Content Creation (Post)
+  // Content creation (Post) form state
   const [postDishName, setPostDishName] = useState('');
   const [postDishEmoji, setPostDishEmoji] = useState('🍕');
   const [postPrice, setPostPrice] = useState('25000');
@@ -70,51 +118,42 @@ export const RestaurantAdmin: React.FC = () => {
 
   if (!operatingTenant) {
     return (
-      <div 
-        style={{
-          textAlign: 'center',
-          padding: '4rem 2rem',
-          background: 'var(--glass-medium)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(239, 68, 68, 0.3)',
-          borderRadius: '28px',
-          maxWidth: '600px',
-          margin: '2rem auto',
-          color: 'var(--text-muted)'
-        }}
-      >
-        <AlertCircle size={52} style={{ color: '#EF4444', marginBottom: '1rem' }} />
-        <h3 style={{ fontSize: '1.4rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
-          No tienes un restaurante asignado
-        </h3>
-        <p style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>
-          Esta cuenta no está autorizada para administrar comercios. Inicia sesión con la cuenta oficial del restaurante.
-        </p>
+      <div className="rpa-card" style={{ maxWidth: '600px', margin: '2rem auto' }}>
+        <div className="rpa-card-body" style={{ alignItems: 'center', textAlign: 'center', padding: '3.5rem 2rem' }}>
+          <AlertCircle size={48} style={{ color: '#DC2626' }} />
+          <h3 style={{ fontSize: '1.35rem', color: 'var(--text-main)', fontWeight: 900, margin: '8px 0 4px' }}>
+            No tienes un restaurante asignado
+          </h3>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+            Esta cuenta no está vinculada a ningún comercio activo. Inicia sesión con la cuenta oficial del restaurante.
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Filtered data for active operating tenant ONLY
-  const tenantProducts = products.filter(p => p.tenantId === operatingTenant.id);
+  const tenantProducts = products.filter(p => p.tenantId === operatingTenant.id && !p.isArchived);
   const tenantPosts = posts.filter(p => p.tenantId === operatingTenant.id);
   const tenantDrivers = drivers.filter(d => d.tenantId === operatingTenant.id);
-  const tenantOrders = orders.filter(o => o.tenantId === operatingTenant.id).sort((a, b) => b.createdAt - a.createdAt);
+  const tenantOrders = orders
+    .filter(o => o.tenantId === operatingTenant.id)
+    .sort((a, b) => b.createdAt - a.createdAt);
 
   const activeOrders = tenantOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
   const pastOrders = tenantOrders.filter(o => o.status === 'delivered' || o.status === 'cancelled');
 
-
   const handleAddDriverSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!driverName || !driverPhone) return;
+    if (!driverName.trim() || !driverPhone.trim()) return;
 
     addDriver({
-      name: driverName,
-      vehicle: driverVehicle,
-      phone: driverPhone
+      name: driverName.trim(),
+      vehicle: driverVehicle.trim(),
+      phone: driverPhone.trim()
     });
 
     setDriverName('');
+    setDriverPhone('');
     setShowAddDriverForm(false);
   };
 
@@ -122,7 +161,6 @@ export const RestaurantAdmin: React.FC = () => {
     e.preventDefault();
     setPostFormError(null);
 
-    // Validación antes de tocar el servidor: precio entero positivo y medio cargado.
     const parsedPrice = parseFloat(postPrice);
     if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
       setPostFormError('El precio debe ser un número mayor a $0 COP.');
@@ -133,9 +171,11 @@ export const RestaurantAdmin: React.FC = () => {
       return;
     }
     if (!postMediaUrl) {
-      setPostFormError(postMediaType === 'video'
-        ? 'Debes subir el archivo de video antes de publicar.'
-        : 'Debes subir la foto del plato antes de publicar.');
+      setPostFormError(
+        postMediaType === 'video'
+          ? 'Debes subir el archivo de video antes de publicar.'
+          : 'Debes subir la foto del plato antes de publicar.'
+      );
       return;
     }
     if (!postDishName.trim() || !postDesc.trim()) {
@@ -146,14 +186,15 @@ export const RestaurantAdmin: React.FC = () => {
     const hashtagsArr = postHashtags
       .split(' ')
       .filter(h => h.trim().length > 0)
-      .map(h => h.startsWith('#') ? h : `#${h}`);
+      .map(h => (h.startsWith('#') ? h : `#${h}`));
 
-    const existingProduct = postProductId ? tenantProducts.find(p => p.id === postProductId) : tenantProducts.find(p => p.name.toLowerCase().includes(postDishName.toLowerCase()));
+    const existingProduct = postProductId
+      ? tenantProducts.find(p => p.id === postProductId)
+      : tenantProducts.find(p => p.name.toLowerCase().includes(postDishName.toLowerCase()));
     const productId = existingProduct ? existingProduct.id : undefined;
 
-    const finalImage = postMediaType === 'photo'
-      ? postMediaUrl
-      : (postImage || operatingTenant.bannerUrl || '');
+    const finalImage =
+      postMediaType === 'photo' ? postMediaUrl : postImage || operatingTenant.bannerUrl || '';
 
     setIsSubmittingPost(true);
     const ok = await createPost({
@@ -177,7 +218,6 @@ export const RestaurantAdmin: React.FC = () => {
     });
     setIsSubmittingPost(false);
 
-    // Solo se limpia el formulario si la publicación se creó; en error los datos quedan intactos.
     if (ok) {
       setPostDishName('');
       setPostProductId('');
@@ -191,704 +231,1056 @@ export const RestaurantAdmin: React.FC = () => {
 
   const applyStoryPreset = (type: string) => {
     if (type === 'artesanal') {
-      setPostDesc(`Preparado desde cero en la cocina de ${operatingTenant.name}. Receta artesanal horneada con dedicación para hoy.`);
+      setPostDesc(
+        `Preparado desde cero en la cocina de ${operatingTenant.name}. Receta artesanal horneada con dedicación para hoy.`
+      );
       setPostHashtags('#ProcesoArtesanal #IngredientesLocales #GastroSync');
     } else if (type === 'promocion') {
-      setPostDesc(`¡Especial del día en ${operatingTenant.name}! Haz tu pedido directo sin pagar tarifas extras y recíbelo bien caliente.`);
+      setPostDesc(
+        `¡Especial del día en ${operatingTenant.name}! Haz tu pedido directo sin pagar tarifas extras y recíbelo bien caliente.`
+      );
       setPostHashtags('#EspecialDelDía #SaborÚnico #DomicilioSinComisión');
     } else if (type === 'secreto') {
-      setPostDesc(`El secreto que hace inolvidable a ${operatingTenant.name}. Selección fresca de esta mañana directo a tu plato.`);
+      setPostDesc(
+        `El secreto que hace inolvidable a ${operatingTenant.name}. Selección fresca de esta mañana directo a tu plato.`
+      );
       setPostHashtags('#RecetaDeLaCasa #CalidadGarantizada #Foodies');
     }
   };
 
+  const postStep1Done = Boolean(postDishName.trim() && Number(postPrice) > 0);
+  const postStep2Done = Boolean(postMediaUrl && postDesc.trim());
+  const driverStepDone = Boolean(driverName.trim() && driverPhone.trim());
+
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 15 }}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="tab-content active"
+      transition={{ duration: 0.35 }}
+      className="rpa-shell"
     >
-      {/* ── Operating Tenant Header ── */}
-      <div 
-        className="card" 
-        style={{ 
-          padding: '1.75rem 2rem', 
-          marginBottom: '1.75rem',
-          background: 'var(--glass-medium)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '28px'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ fontSize: '2.8rem', background: 'rgba(255, 255, 255, 0.06)', padding: '12px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-              {operatingTenant.logoEmoji}
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, color: 'white', margin: 0, letterSpacing: '-0.5px' }}>
-                  {operatingTenant.name}
-                </h2>
-                <span className="badge badge-secondary">{operatingTenant.category}</span>
+      {/* ── HERO HEADER DEL RESTAURANTE ── */}
+      <div className="rpa-hero">
+        {operatingTenant.bannerUrl && (
+          <div
+            className="rpa-hero-banner-bg"
+            style={{ backgroundImage: `url(${operatingTenant.bannerUrl})` }}
+          />
+        )}
+
+        <div className="rpa-hero-content">
+          <div className="rpa-hero-top">
+            <div className="rpa-brand">
+              <div className="rpa-brand-avatar">
+                {operatingTenant.logoUrl ? (
+                  <img src={operatingTenant.logoUrl} alt={operatingTenant.name} />
+                ) : (
+                  <span>{operatingTenant.logoEmoji || '🍽️'}</span>
+                )}
               </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', margin: '4px 0 0' }}>
-                <MapPin size={14} style={{ color: 'var(--primary)', verticalAlign: 'middle' }} /> {operatingTenant.address} · Comisión Ética (3%)
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <NotificationBell onOpenTicket={(ticketId) => {
-              setSupportInitialTicketId(ticketId);
-              setActiveTab('support');
-            }} />
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className={`btn ${operatingTenant.isOpen ? 'btn-secondary' : 'btn-outline'}`}
-              onClick={() => toggleTenantOpenStatus(operatingTenant.id)}
-              style={{ padding: '12px 20px', fontWeight: 800, borderRadius: '14px', fontSize: '0.9rem' }}
-            >
-              <Power size={18} />
-              {operatingTenant.isOpen ? '🟢 ABIERTO' : '🔴 CERRADO'}
-            </motion.button>
-          </div>
-        </div>
-
-        {/* Financial KPI Cards */}
-        <div 
-          style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
-            gap: '14px', 
-            marginTop: '1.5rem', 
-            paddingTop: '1.25rem', 
-            borderTop: '1px dashed rgba(255, 255, 255, 0.12)' 
-          }}
-        >
-
-          <div style={{ background: 'rgba(56, 189, 248, 0.12)', padding: '14px 18px', borderRadius: '16px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
-            <span style={{ fontSize: '0.75rem', color: '#38BDF8', fontWeight: 800, textTransform: 'uppercase' }}>
-              Pedidos Activos
-            </span>
-            <strong style={{ display: 'block', fontSize: '1.3rem', color: '#38BDF8', fontWeight: 900, marginTop: '4px' }}>
-              {activeOrders.length} en proceso
-            </strong>
-          </div>
-
-          <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '14px 18px', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
-              Publicaciones
-            </span>
-            <strong style={{ display: 'block', fontSize: '1.3rem', color: 'white', fontWeight: 900, marginTop: '4px' }}>
-              {tenantPosts.length} posts
-            </strong>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation Pills */}
-      <div className="nav-tabs" style={{ marginBottom: '1.75rem' }}>
-        <button
-          className={`nav-tab ${activeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setActiveTab('profile')}
-        >
-          <MapPin size={16} /> 👤 Perfil y Horarios
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'orders' ? 'active' : ''}`}
-          onClick={() => setActiveTab('orders')}
-        >
-          <Package size={16} /> 📦 Pedidos ({activeOrders.length})
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'content' ? 'active' : ''}`}
-          onClick={() => setActiveTab('content')}
-        >
-          <Share2 size={16} /> 📢 Publicar Contenido
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'analytics' ? 'active' : ''}`}
-          onClick={() => setActiveTab('analytics')}
-        >
-          <BarChart3 size={16} /> 📈 Analítica Financiera
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'menu' ? 'active' : ''}`}
-          onClick={() => setActiveTab('menu')}
-        >
-          <Utensils size={16} /> 🍕 Menú ({tenantProducts.length})
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'qr' ? 'active' : ''}`}
-          onClick={() => setActiveTab('qr')}
-        >
-          <QrCode size={16} /> 📱 QR & Repartidores
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'team' ? 'active' : ''}`}
-          onClick={() => setActiveTab('team')}
-        >
-          <ShieldBan size={16} /> 👥 Miembros
-        </button>
-        <button
-          className={`nav-tab ${activeTab === 'support' ? 'active' : ''}`}
-          onClick={() => setActiveTab('support')}
-        >
-          <MessageSquare size={16} /> 💬 Soporte
-        </button>
-      </div>
-
-      {/* ── TAB: PROFILE ── */}
-      {activeTab === 'profile' && (
-        <ProfileTab tenant={operatingTenant} />
-      )}
-
-      {/* ── TAB 0: ORDER MANAGEMENT ── */}
-      {activeTab === 'orders' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-          
-          {/* Active Orders */}
-          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '24px', padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'white', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Package size={22} style={{ color: 'var(--primary)' }} /> Operación de Pedidos Activos
-                </h3>
-                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  Gestión exclusiva para {operatingTenant.name}
-                </span>
-              </div>
-              <span className="badge badge-primary">{activeOrders.length} activos</span>
-            </div>
-
-            {activeOrders.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem 1rem', fontSize: '0.9rem' }}>
-                <CheckCircle size={40} style={{ color: '#10B981', marginBottom: '12px' }} />
-                <h4 style={{ color: 'white', fontWeight: 800, margin: '0 0 4px' }}>¡Todo al día en cocina y despacho!</h4>
-                <p>No tienes pedidos activos pendientes en este momento.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {activeOrders.map(order => {
-                  const badgeText = getFulfillmentBadgeText(order.fulfillment, order.type);
-                  const transitions = getValidOrderTransitions(order.status, order.fulfillment, order.type, false);
-
-                  return (
-                    <div 
-                      key={order.id}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        borderRadius: '20px',
-                        padding: '1.25rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white' }}>#{order.id}</span>
-                          <span className="badge badge-secondary" style={{ fontSize: '0.78rem', fontWeight: 800 }}>
-                            {badgeText}
-                          </span>
-                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            <Clock size={13} style={{ verticalAlign: 'middle', marginRight: '3px' }} />
-                            {new Date(order.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-glow)', padding: '4px 10px', borderRadius: '12px' }}>
-                            Estado: {order.status.toUpperCase()}
-                          </span>
-                          <strong style={{ fontSize: '1.05rem', color: 'white', fontWeight: 900 }}>
-                            ${order.total.toLocaleString('es-CO')} COP
-                          </strong>
-                        </div>
-                      </div>
-
-                      {/* Customer / Fulfillment details */}
-                      <div style={{ background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '12px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                        {order.customerName && (
-                          <div>Cliente: <strong style={{ color: 'white' }}>{order.customerName}</strong> {order.customerPhone && `· Tel: ${order.customerPhone}`}</div>
-                        )}
-                        {order.deliveryAddress && (
-                          <div style={{ marginTop: '2px', color: '#38BDF8' }}>
-                            📍 Dirección: <strong>{typeof order.deliveryAddress === 'string' ? order.deliveryAddress : order.deliveryAddress.addressLine}</strong>
-                          </div>
-                        )}
-                        {order.tableNumber && (
-                          <div style={{ marginTop: '2px', color: '#F59E0B' }}>
-                            🍽️ Servicio en Mesa: <strong>Mesa #{order.tableNumber}</strong>
-                          </div>
-                        )}
-                        {order.restaurantNotes && (
-                          <div style={{ marginTop: '4px', fontStyle: 'italic', color: '#FCA5A5' }}>
-                            📝 Nota: "{order.restaurantNotes}"
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Items */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {order.items.map((item, idx) => (
-                          <span key={idx} style={{ background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '8px', fontSize: '0.82rem', color: 'white' }}>
-                            <strong style={{ color: 'var(--primary)' }}>{item.qty}x</strong> {item.name}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* Action buttons */}
-                      {transitions.length > 0 && (
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
-                          {transitions.map(t => (
-                            <button
-                              key={t.status}
-                              type="button"
-                              className={`btn ${t.variant === 'primary' ? 'btn-primary' : t.variant === 'secondary' ? 'btn-secondary' : 'btn-outline'}`}
-                              style={{ 
-                                padding: '8px 16px', 
-                                fontSize: '0.82rem', 
-                                fontWeight: 800, 
-                                borderRadius: '10px',
-                                color: t.variant === 'danger' ? '#EF4444' : undefined,
-                                borderColor: t.variant === 'danger' ? 'rgba(239,68,68,0.4)' : undefined
-                              }}
-                              onClick={() => updateOrderStatus(order.id, t.status)}
-                            >
-                              {t.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Past Orders */}
-          {pastOrders.length > 0 && (
-            <div className="card" style={{ background: 'var(--glass-light)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.08)', borderRadius: '24px', padding: '1.5rem' }}>
-              <h4 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white', marginBottom: '1rem' }}>
-                Historial de Pedidos Completados / Cancelados ({pastOrders.length})
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {pastOrders.map(order => (
-                  <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', fontSize: '0.82rem' }}>
-                    <span>
-                      <strong style={{ color: 'white' }}>#{order.id}</strong> · {getFulfillmentBadgeText(order.fulfillment, order.type)}
-                    </span>
-                    <span style={{ color: order.status === 'delivered' ? '#10B981' : '#EF4444', fontWeight: 800 }}>
-                      {order.status === 'delivered' ? '✓ ENTREGADO' : '✗ CANCELADO'} (${order.total.toLocaleString('es-CO')} COP)
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-        </div>
-      )}
-
-      {/* ── TAB 1: CONTENT CREATOR & ZONE PUBLISHING ── */}
-      {activeTab === 'content' && (
-        <div className="grid-2" style={{ gridTemplateColumns: '1.4fr 1fr', gap: '1.75rem' }}>
-          
-          {/* Creator Form */}
-          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-            <div className="card-header">
-              <div className="card-title" style={{ fontSize: '1.2rem', fontWeight: 900, color: 'white' }}>
-                <Sparkles size={20} style={{ color: 'var(--primary)' }} /> Publicar Foto o Reel para {operatingTenant.name}
-              </div>
-            </div>
-            
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              Cada publicación que hagas aparecerá en el feed de los clientes cercanos en la zona de <strong>{operatingTenant.address}</strong>.
-            </p>
-
-            {/* Storytelling Assistant Pills */}
-            <div style={{ marginBottom: '1.25rem', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px', fontWeight: 800 }}>
-                💡 Asistente de Copywriting (Haz clic para aplicar texto automático):
-              </span>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: '10px' }} onClick={() => applyStoryPreset('artesanal')}>
-                  🌾 Preparación Artesanal
-                </button>
-                <button type="button" className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: '10px' }} onClick={() => applyStoryPreset('promocion')}>
-                  🔥 Especial del Día
-                </button>
-                <button type="button" className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: '10px' }} onClick={() => applyStoryPreset('secreto')}>
-                  ❤️ Receta Secreta
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleCreatePostSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Vincular / Nombre del Plato:
-                  </label>
-                  {tenantProducts.length > 0 ? (
-                    <select
-                      value={postProductId}
-                      onChange={e => {
-                        const selected = tenantProducts.find(p => p.id === e.target.value);
-                        setPostProductId(e.target.value);
-                        if (selected) {
-                          setPostDishName(selected.name);
-                          setPostPrice(selected.price.toString());
-                          setPostDishEmoji(selected.emoji);
-                        } else {
-                          setPostDishName('');
-                        }
-                      }}
-                      required
-                      style={{ width: '100%' }}
-                    >
-                      <option value="">-- Selecciona del Menú --</option>
-                      {tenantProducts.map(p => (
-                        <option key={p.id} value={p.id} style={{ color: '#000' }}>
-                          {p.emoji} {p.name} - ${p.price.toLocaleString('es-CO')}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      placeholder="Ej: Pizza Napolitana Trufada"
-                      value={postDishName}
-                      onChange={e => setPostDishName(e.target.value)}
-                      required
-                      style={{ width: '100%' }}
-                    />
-                  )}
+                <div className="rpa-eyebrow">
+                  <Sparkles size={11} /> Panel de Administración · GastroSync
                 </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Emoji:
-                  </label>
-                  <input
-                    type="text"
-                    value={postDishEmoji}
-                    onChange={e => setPostDishEmoji(e.target.value)}
-                    style={{ width: '100%', textAlign: 'center' }}
-                  />
+                <div className="rpa-title-row">
+                  <h2 className="rpa-title">{operatingTenant.name}</h2>
+                  <span className="rpa-category-pill">{operatingTenant.category}</span>
                 </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Precio en Menú (COP):
-                  </label>
-                  <input
-                    type="number"
-                    value={postPrice}
-                    onChange={e => setPostPrice(e.target.value)}
-                    required
-                    style={{ width: '100%' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Formato Visual:
-                  </label>
-                  <select
-                    value={postMediaType}
-                    onChange={e => setPostMediaType(e.target.value as 'photo' | 'video')}
-                    style={{ width: '100%' }}
-                  >
-                    <option value="video">▶ Video Corto (Reel)</option>
-                    <option value="photo">🖼️ Foto de Alta Calidad</option>
-                  </select>
-                </div>
-              </div>
-
-              <FileUploadInput
-                label={postMediaType === 'video' ? "Archivo de Video" : "Foto del Plato"}
-                accept={postMediaType === 'video' ? 'video' : 'image'}
-                value={postMediaUrl}
-                onChange={(val, type, w, h) => {
-                  setPostMediaUrl(val);
-                  setPostMediaType(type);
-                  setPostMediaWidth(w);
-                  setPostMediaHeight(h);
-                }}
-                folder="posts"
-                tenantId={operatingTenant.id}
-                maxSizeMB={8}
-              />
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                  Descripción / Storytelling del Plato:
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Describe los ingredientes, aroma y por qué deben probarlo hoy..."
-                  value={postDesc}
-                  onChange={e => setPostDesc(e.target.value)}
-                  required
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                  Hashtags (separados por espacio):
-                </label>
-                <input
-                  type="text"
-                  value={postHashtags}
-                  onChange={e => setPostHashtags(e.target.value)}
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              {postFormError && (
-                <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '10px', color: '#FCA5A5', fontSize: '0.85rem', fontWeight: 600 }}>
-                  ⚠️ {postFormError}
-                </div>
-              )}
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                className="btn btn-primary"
-                disabled={isSubmittingPost}
-                style={isSubmittingPost ? { width: '100%', padding: '14px', marginTop: '8px', fontSize: '0.95rem', fontWeight: 900, borderRadius: '14px', opacity: 0.6, cursor: 'not-allowed' } : { width: '100%', padding: '14px', marginTop: '8px', fontSize: '0.95rem', fontWeight: 900, borderRadius: '14px' }}
-              >
-                <Sparkles size={18} /> {isSubmittingPost ? 'Publicando...' : 'Publicar Contenido en el Feed de la Zona'}
-              </motion.button>
-
-            </form>
-          </div>
-
-          {/* Live Preview & Active Content */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            
-            {/* Live Card Preview */}
-            <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-              <div className="card-header">
-                <div className="card-title" style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white' }}>
-                  <Eye size={18} /> Vista Previa en Vivo ({operatingTenant.name})
-                </div>
-                <span className="badge badge-secondary">En Vivo</span>
-              </div>
-
-              <div style={{ background: 'rgba(0,0,0,0.4)', padding: '16px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                  <div style={{ fontSize: '1.3rem' }}>{operatingTenant.logoEmoji}</div>
-                  <div>
-                    <strong style={{ color: 'white', display: 'block', fontSize: '0.9rem' }}>{operatingTenant.name}</strong>
-                    <span style={{ fontSize: '0.75rem', color: '#38BDF8' }}>{operatingTenant.category} · {operatingTenant.address}</span>
-                  </div>
-                </div>
-                <h4 style={{ margin: '8px 0', color: 'white', fontSize: '0.95rem', fontWeight: 800 }}>{postDishEmoji} {postDishName || 'Nombre de tu plato'}</h4>
-                
-                <div style={{ height: '180px', borderRadius: '14px', overflow: 'hidden', position: 'relative', background: 'rgba(255,255,255,0.04)' }}>
-                  {postMediaUrl ? (
-                    postMediaType === 'video' ? (
-                      <video src={postMediaUrl} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <img src={postMediaUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    )
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      Sube una foto o video para ver la vista previa
-                    </div>
-                  )}
-                  {postMediaType === 'video' && (
-                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(255,85,51,0.5)' }}>
-                        <Play size={20} fill="white" />
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.85)', padding: '5px 12px', borderRadius: '10px', color: 'white', fontWeight: 900, fontSize: '0.9rem' }}>
-                    ${parseFloat(postPrice || '0').toLocaleString('es-CO')} COP
-                  </div>
-                </div>
-
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '10px', lineHeight: 1.45 }}>
-                  {postDesc || 'Aquí aparecerá la descripción del plato...'}
+                <p className="rpa-subtitle">
+                  <span>
+                    <MapPin size={13} style={{ color: '#F0A483', verticalAlign: 'middle' }} />{' '}
+                    {operatingTenant.address}
+                  </span>
+                  <span>· Comisión Ética (3%)</span>
                 </p>
               </div>
             </div>
 
-            {/* Published Posts Analytics */}
-            <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-              <div className="card-header">
-                <div className="card-title" style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white' }}>
-                  📊 Publicaciones Activas ({tenantPosts.length})
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {tenantPosts.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1.5rem' }}>
-                    {operatingTenant.name} aún no ha publicado contenido visual en la zona. ¡Crea el primero a la izquierda!
-                  </p>
-                ) : (
-                  tenantPosts.map(p => (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <img src={p.image} alt={p.dishName} style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover' }} />
-                        <div>
-                          <strong style={{ color: 'white', fontSize: '0.88rem' }}>{p.dishEmoji} {p.dishName}</strong>
-                          <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            <span><Eye size={12} /> {p.viewCount || 0} vistas</span>
-                            <span><Heart size={12} fill="#EF4444" /> {p.likes} likes</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          className="btn btn-outline"
-                          style={{ padding: '6px 10px', color: 'var(--text-muted)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '10px' }}
-                          disabled={true}
-                          title="Edición de publicaciones en desarrollo por seguridad de los assets"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                        </button>
-                        <button
-                          className="btn btn-outline"
-                          style={{ padding: '6px 10px', color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '10px' }}
-                          disabled={isDeletingPost === p.id}
-                        onClick={async () => {
-                          const confirmMessage = "La publicación se archivará y dejará de aparecer públicamente (si tiene interacciones) o se eliminará de forma permanente. ¿Deseas eliminar esta publicación?";
-                          if (!window.confirm(confirmMessage)) return;
-                          
-                          setIsDeletingPost(p.id);
-                          await deletePost(p.id);
-                          setIsDeletingPost(null);
-                        }}
-                        title="Eliminar publicación"
-                      >
-                        {isDeletingPost === p.id ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
-                      </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <NotificationBell
+                onOpenTicket={ticketId => {
+                  setSupportInitialTicketId(ticketId);
+                  setActiveTab('support');
+                }}
+              />
+              <button
+                type="button"
+                className="pam-btn-ghost"
+                style={{
+                  color: '#FFFFFF',
+                  borderColor: 'rgba(255,255,255,0.22)',
+                  background: 'rgba(255,255,255,0.08)',
+                  padding: '10px 16px'
+                }}
+                onClick={() => setActiveTab('profile')}
+              >
+                <Store size={16} /> Editar Perfil
+              </button>
+              <button
+                type="button"
+                className="pam-btn-primary"
+                style={{
+                  background: operatingTenant.isOpen
+                    ? 'linear-gradient(135deg, #059669 0%, #10B981 100%)'
+                    : 'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)',
+                  boxShadow: operatingTenant.isOpen
+                    ? '0 6px 16px rgba(16, 185, 129, 0.35)'
+                    : '0 6px 16px rgba(239, 68, 68, 0.35)',
+                  minWidth: '145px',
+                  padding: '10px 18px'
+                }}
+                onClick={() => toggleTenantOpenStatus(operatingTenant.id)}
+              >
+                <Power size={16} />
+                <span>{operatingTenant.isOpen ? '🟢 ABIERTO' : '🔴 CERRADO'}</span>
+              </button>
             </div>
-
           </div>
 
+          {/* KPI Quick-Navigation Cards */}
+          <div className="rpa-kpis">
+            <div className="rpa-kpi" onClick={() => setActiveTab('orders')}>
+              <span className="rpa-kpi-label">Pedidos Activos</span>
+              <strong className="rpa-kpi-val" style={{ color: '#F0A483' }}>
+                {activeOrders.length} en proceso
+              </strong>
+            </div>
+
+            <div className="rpa-kpi" onClick={() => setActiveTab('menu')}>
+              <span className="rpa-kpi-label">Carta Digital</span>
+              <strong className="rpa-kpi-val">{tenantProducts.length} platos</strong>
+            </div>
+
+            <div className="rpa-kpi" onClick={() => setActiveTab('content')}>
+              <span className="rpa-kpi-label">Publicaciones</span>
+              <strong className="rpa-kpi-val">{tenantPosts.length} en feed</strong>
+            </div>
+
+            <div className="rpa-kpi" onClick={() => setActiveTab('qr')}>
+              <span className="rpa-kpi-label">Repartidores</span>
+              <strong className="rpa-kpi-val">{tenantDrivers.length} propios</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── NAVIGATION TABS ── */}
+      <div className="nav-tabs" style={{ marginBottom: '0.25rem' }}>
+        <button
+          type="button"
+          className={`nav-tab ${activeTab === 'orders' ? 'active' : ''}`}
+          onClick={() => setActiveTab('orders')}
+        >
+          <Package size={16} /> Pedidos ({activeOrders.length})
+        </button>
+        <button
+          type="button"
+          className={`nav-tab ${activeTab === 'profile' ? 'active' : ''}`}
+          onClick={() => setActiveTab('profile')}
+        >
+          <Store size={16} /> Perfil y Horarios
+        </button>
+        <button
+          type="button"
+          className={`nav-tab ${activeTab === 'menu' ? 'active' : ''}`}
+          onClick={() => setActiveTab('menu')}
+        >
+          <Utensils size={16} /> Menú ({tenantProducts.length})
+        </button>
+        <button
+          type="button"
+          className={`nav-tab ${activeTab === 'content' ? 'active' : ''}`}
+          onClick={() => setActiveTab('content')}
+        >
+          <Share2 size={16} /> Publicar Contenido
+        </button>
+        <button
+          type="button"
+          className={`nav-tab ${activeTab === 'qr' ? 'active' : ''}`}
+          onClick={() => setActiveTab('qr')}
+        >
+          <QrCode size={16} /> QR y Repartidores
+        </button>
+        <button
+          type="button"
+          className={`nav-tab ${activeTab === 'team' ? 'active' : ''}`}
+          onClick={() => setActiveTab('team')}
+        >
+          <Users size={16} /> Empleados
+        </button>
+        <button
+          type="button"
+          className={`nav-tab ${activeTab === 'analytics' ? 'active' : ''}`}
+          onClick={() => setActiveTab('analytics')}
+        >
+          <BarChart3 size={16} /> Finanzas
+        </button>
+        <button
+          type="button"
+          className={`nav-tab ${activeTab === 'support' ? 'active' : ''}`}
+          onClick={() => setActiveTab('support')}
+        >
+          <MessageSquare size={16} /> Soporte
+        </button>
+      </div>
+
+      {/* ── TAB: PERFIL Y HORARIOS ── */}
+      {activeTab === 'profile' && <ProfileTab tenant={operatingTenant} />}
+
+      {/* ── TAB: PEDIDOS ACTIVOS E HISTORIAL ── */}
+      {activeTab === 'orders' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="rpa-card">
+            <div className="rpa-card-header">
+              <div className="rpa-card-header-left">
+                <div className="rpa-card-icon">
+                  <Package size={22} />
+                </div>
+                <div>
+                  <span className="pam-eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>
+                    <Sparkles size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Despacho y Cocina en Tiempo Real
+                  </span>
+                  <h3 className="rpa-card-title">Operación de Pedidos Activos</h3>
+                  <p className="rpa-card-subtitle">
+                    Gestiona el estado de las órdenes de <strong>{operatingTenant.name}</strong>.
+                  </p>
+                </div>
+              </div>
+              <span className="rpa-badge primary">{activeOrders.length} activos</span>
+            </div>
+
+            <div className="rpa-card-body">
+              {activeOrders.length === 0 ? (
+                <div className="pam-section" style={{ alignItems: 'center', textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+                  <CheckCircle size={40} style={{ color: '#059669' }} />
+                  <h4 style={{ color: 'var(--text-main)', fontWeight: 800, margin: '6px 0 2px' }}>
+                    ¡Todo al día en cocina y despacho!
+                  </h4>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+                    No tienes pedidos pendientes en este momento.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {activeOrders.map(order => {
+                    const badgeText = getFulfillmentBadgeText(order.fulfillment, order.type);
+                    const transitions = getValidOrderTransitions(
+                      order.status,
+                      order.fulfillment,
+                      order.type,
+                      false
+                    );
+
+                    return (
+                      <section key={order.id} className="pam-section">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <strong style={{ fontSize: '1.08rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                              #{order.id}
+                            </strong>
+                            <span className="rpa-badge primary">{badgeText}</span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                              <Clock size={13} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                              {new Date(order.createdAt).toLocaleTimeString('es-CO', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span className="rpa-badge warning">
+                              Estado: {order.status.toUpperCase()}
+                            </span>
+                            <strong style={{ fontSize: '1.08rem', color: 'var(--primary)', fontWeight: 900 }}>
+                              ${order.total.toLocaleString('es-CO')} COP
+                            </strong>
+                          </div>
+                        </div>
+
+                        {/* Datos del cliente y entrega */}
+                        <div
+                          style={{
+                            background: 'var(--neutral-surface-alt)',
+                            border: '1px solid var(--neutral-border)',
+                            padding: '10px 14px',
+                            borderRadius: '12px',
+                            fontSize: '0.83rem',
+                            color: 'var(--text-main)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '3px'
+                          }}
+                        >
+                          {order.customerName && (
+                            <div>
+                              👤 Cliente: <strong>{order.customerName}</strong>
+                              {order.customerPhone && ` · 📞 ${order.customerPhone}`}
+                            </div>
+                          )}
+                          {order.deliveryAddress && (
+                            <div style={{ color: '#0369A1' }}>
+                              📍 Dirección:{' '}
+                              <strong>
+                                {typeof order.deliveryAddress === 'string'
+                                  ? order.deliveryAddress
+                                  : order.deliveryAddress.addressLine}
+                              </strong>
+                            </div>
+                          )}
+                          {order.tableNumber && (
+                            <div style={{ color: '#B45309' }}>
+                              🍽️ Servicio en Mesa: <strong>Mesa #{order.tableNumber}</strong>
+                            </div>
+                          )}
+                          {order.restaurantNotes && (
+                            <div style={{ fontStyle: 'italic', color: 'var(--primary)' }}>
+                              📝 Nota: "{order.restaurantNotes}"
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Platos del pedido */}
+                        <div className="pam-chips">
+                          {order.items.map((item, idx) => (
+                            <span key={idx} className="rpa-badge neutral" style={{ fontSize: '0.8rem', padding: '5px 11px' }}>
+                              <strong style={{ color: 'var(--primary)' }}>{item.qty}x</strong> {item.name}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Acciones de transición */}
+                        {transitions.length > 0 && (
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '8px',
+                              justifyContent: 'flex-end',
+                              flexWrap: 'wrap',
+                              paddingTop: '10px',
+                              borderTop: '1px solid var(--neutral-border)'
+                            }}
+                          >
+                            {transitions.map(t => (
+                              <button
+                                key={t.status}
+                                type="button"
+                                className={t.variant === 'primary' ? 'pam-btn-primary' : 'pam-btn-ghost'}
+                                style={{
+                                  minWidth: 'auto',
+                                  padding: '8px 16px',
+                                  fontSize: '0.82rem',
+                                  color: t.variant === 'danger' ? '#DC2626' : undefined,
+                                  borderColor: t.variant === 'danger' ? '#FCA5A5' : undefined
+                                }}
+                                onClick={() => updateOrderStatus(order.id, t.status)}
+                              >
+                                {t.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Historial de Pedidos */}
+              {pastOrders.length > 0 && (
+                <section className="pam-section" style={{ marginTop: '0.5rem' }}>
+                  <div className="pam-section-head">
+                    <div>
+                      <h4>Historial de Pedidos Completados / Cancelados ({pastOrders.length})</h4>
+                      <p>Registro reciente de órdenes cerradas</p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {pastOrders.map(order => (
+                      <div key={order.id} className="rpa-item-card" style={{ padding: '10px 14px' }}>
+                        <span style={{ fontSize: '0.84rem', color: 'var(--text-main)' }}>
+                          <strong>#{order.id}</strong> · {getFulfillmentBadgeText(order.fulfillment, order.type)}
+                          {order.customerName ? ` · ${order.customerName}` : ''}
+                        </span>
+                        <span className={`rpa-badge ${order.status === 'delivered' ? 'success' : 'danger'}`}>
+                          {order.status === 'delivered' ? '✓ ENTREGADO' : '✗ CANCELADO'} (${order.total.toLocaleString('es-CO')} COP)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* ── TAB 2: FINANCIAL ANALYTICS ── */}
-      {activeTab === 'analytics' && (
-      <Suspense fallback={<FallbackLoader message="Cargando analítica..." />}>
-        <FinancialAnalytics tenantId={operatingTenant.id} />
-      </Suspense>
+      {/* ── TAB: PUBLICADOR DE CONTENIDO (FOTOS Y REELS) ── */}
+      {activeTab === 'content' && (
+        <div className="grid-2" style={{ gridTemplateColumns: '1.35fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+          <div className="rpa-card">
+            <div className="rpa-card-header">
+              <div className="rpa-card-header-left">
+                <div className="rpa-card-icon">
+                  <Sparkles size={22} />
+                </div>
+                <div>
+                  <span className="pam-eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>
+                    <Sparkles size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Estudio Creativo del Restaurante
+                  </span>
+                  <h3 className="rpa-card-title">Publicar Foto o Reel en el Feed</h3>
+                  <p className="rpa-card-subtitle">
+                    Tus publicaciones aparecen ante los clientes cercanos a <strong>{operatingTenant.address}</strong>.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreatePostSubmit} noValidate>
+              <div className="rpa-card-body">
+                {postFormError && (
+                  <div className="pam-callout error">
+                    <AlertCircle size={18} />
+                    <span>{postFormError}</span>
+                  </div>
+                )}
+
+                {/* Paso 1: Plato, Precio y Formato */}
+                <section className="pam-section">
+                  <div className="pam-section-head">
+                    <div className={`pam-step ${postStep1Done ? 'done' : ''}`}>
+                      {postStep1Done ? <Check size={15} strokeWidth={3} /> : 1}
+                    </div>
+                    <div>
+                      <h4>1. Plato Destacado y Formato Visual</h4>
+                      <p>Vincula un plato de tu menú para que los clientes puedan pedirlo con 1 clic.</p>
+                    </div>
+                  </div>
+
+                  <div className="pam-grid">
+                    <div className="pam-field">
+                      <label>
+                        Vincular / Nombre del Plato <em>*</em>
+                      </label>
+                      <div className="pam-input-wrap">
+                        <Utensils size={16} className="pam-icon" />
+                        {tenantProducts.length > 0 ? (
+                          <select
+                            className="pam-input"
+                            value={postProductId}
+                            onChange={e => {
+                              const selected = tenantProducts.find(p => p.id === e.target.value);
+                              setPostProductId(e.target.value);
+                              if (selected) {
+                                setPostDishName(selected.name);
+                                setPostPrice(selected.price.toString());
+                                setPostDishEmoji(selected.emoji);
+                              } else {
+                                setPostDishName('');
+                              }
+                            }}
+                            required
+                          >
+                            <option value="">-- Selecciona un plato del menú --</option>
+                            {tenantProducts.map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.emoji} {p.name} - ${p.price.toLocaleString('es-CO')}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            className="pam-input"
+                            placeholder="Ej. Pizza Napolitana Trufada"
+                            value={postDishName}
+                            onChange={e => setPostDishName(e.target.value)}
+                            required
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pam-field">
+                      <label>
+                        Emoji y Precio en Menú <em>*</em>
+                      </label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="text"
+                          className="pam-input no-icon"
+                          value={postDishEmoji}
+                          onChange={e => setPostDishEmoji(e.target.value)}
+                          maxLength={2}
+                          style={{ width: '58px', textAlign: 'center', fontSize: '1.1rem' }}
+                        />
+                        <div className="pam-input-wrap" style={{ flex: 1 }}>
+                          <DollarSign size={16} className="pam-icon" />
+                          <input
+                            type="number"
+                            className="pam-input with-suffix"
+                            value={postPrice}
+                            onChange={e => setPostPrice(e.target.value)}
+                            required
+                          />
+                          <span className="pam-suffix">COP</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pam-field pam-span-2">
+                      <label>
+                        Formato de la Publicación <em>*</em>
+                      </label>
+                      <div className="pam-modes" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                        <button
+                          type="button"
+                          className={`pam-mode ${postMediaType === 'video' ? 'active' : ''}`}
+                          onClick={() => setPostMediaType('video')}
+                        >
+                          <div className="pam-mode-icon">
+                            <Film size={20} />
+                          </div>
+                          <div className="pam-mode-check">
+                            {postMediaType === 'video' && <Check size={12} strokeWidth={3} />}
+                          </div>
+                          <strong>Video Corto (Reel)</strong>
+                          <span>Ideal para mostrar preparación y textura</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`pam-mode ${postMediaType === 'photo' ? 'active' : ''}`}
+                          onClick={() => setPostMediaType('photo')}
+                        >
+                          <div className="pam-mode-icon">
+                            <ImageIcon size={20} />
+                          </div>
+                          <div className="pam-mode-check">
+                            {postMediaType === 'photo' && <Check size={12} strokeWidth={3} />}
+                          </div>
+                          <strong>Fotografía de Alta Calidad</strong>
+                          <span>Compresión inteligente en formato WebP</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Paso 2: Archivo Multimedia y Storytelling */}
+                <section className="pam-section">
+                  <div className="pam-section-head">
+                    <div className={`pam-step ${postStep2Done ? 'done' : ''}`}>
+                      {postStep2Done ? <Check size={15} strokeWidth={3} /> : 2}
+                    </div>
+                    <div>
+                      <h4>2. Archivo Visual, Copywriting y Hashtags</h4>
+                      <p>Sube el contenido y usa las plantillas rápidas para redactar una descripción irresistible.</p>
+                    </div>
+                  </div>
+
+                  <FileUploadInput
+                    label={postMediaType === 'video' ? 'Archivo de Video (Reel)' : 'Fotografía del Plato'}
+                    accept={postMediaType === 'video' ? 'video' : 'image'}
+                    value={postMediaUrl}
+                    onChange={(val, type, w, h) => {
+                      setPostMediaUrl(val);
+                      setPostMediaType(type);
+                      setPostMediaWidth(w);
+                      setPostMediaHeight(h);
+                    }}
+                    folder="posts"
+                    tenantId={operatingTenant.id}
+                    maxSizeMB={8}
+                  />
+
+                  <div className="pam-field">
+                    <label>
+                      💡 Plantillas Rápidas de Copywriting <span className="pam-opt">1 clic</span>
+                    </label>
+                    <div className="pam-chips">
+                      <button
+                        type="button"
+                        className="pam-chip"
+                        onClick={() => applyStoryPreset('artesanal')}
+                      >
+                        🌾 Preparación Artesanal
+                      </button>
+                      <button
+                        type="button"
+                        className="pam-chip"
+                        onClick={() => applyStoryPreset('promocion')}
+                      >
+                        🔥 Especial del Día
+                      </button>
+                      <button
+                        type="button"
+                        className="pam-chip"
+                        onClick={() => applyStoryPreset('secreto')}
+                      >
+                        ❤️ Receta de la Casa
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pam-field">
+                    <label>
+                      Descripción / Storytelling del Plato <em>*</em>
+                    </label>
+                    <div className="pam-input-wrap">
+                      <FileText size={16} className="pam-icon top" />
+                      <textarea
+                        rows={3}
+                        className="pam-input"
+                        placeholder="Describe los ingredientes, aroma y por qué deben probarlo hoy..."
+                        value={postDesc}
+                        onChange={e => setPostDesc(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pam-field">
+                    <label>
+                      Hashtags <span className="pam-opt">Separados por espacio</span>
+                    </label>
+                    <div className="pam-input-wrap">
+                      <Hash size={16} className="pam-icon" />
+                      <input
+                        type="text"
+                        className="pam-input"
+                        value={postHashtags}
+                        onChange={e => setPostHashtags(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <div className="pam-footer">
+                <div className="pam-footer-hint">
+                  Se publicará en el feed de <strong>{operatingTenant.name}</strong>
+                </div>
+                <div className="pam-footer-actions">
+                  <button
+                    type="submit"
+                    className="pam-btn-primary"
+                    disabled={isSubmittingPost}
+                  >
+                    <Sparkles size={16} />
+                    <span>{isSubmittingPost ? 'Publicando...' : 'Publicar en el Feed'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Columna Derecha: Vista Previa & Publicaciones Activas */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="rpa-card">
+              <div className="rpa-card-header">
+                <div className="rpa-card-header-left">
+                  <div className="rpa-card-icon">
+                    <Eye size={20} />
+                  </div>
+                  <div>
+                    <h3 className="rpa-card-title" style={{ fontSize: '1.08rem' }}>
+                      Vista Previa en Vivo
+                    </h3>
+                    <p className="rpa-card-subtitle">Así lucirá tu publicación en el feed</p>
+                  </div>
+                </div>
+                <span className="rpa-badge success">En Vivo</span>
+              </div>
+
+              <div className="rpa-card-body">
+                <div className="pam-section">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ fontSize: '1.5rem' }}>{operatingTenant.logoEmoji || '🍽️'}</div>
+                    <div>
+                      <strong style={{ color: 'var(--text-main)', display: 'block', fontSize: '0.9rem' }}>
+                        {operatingTenant.name}
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>
+                        {operatingTenant.category} · {operatingTenant.address}
+                      </span>
+                    </div>
+                  </div>
+
+                  <h4 style={{ margin: '4px 0 0', color: 'var(--text-main)', fontSize: '0.96rem', fontWeight: 800 }}>
+                    {postDishEmoji} {postDishName || 'Nombre de tu plato'}
+                  </h4>
+
+                  <div
+                    style={{
+                      height: '185px',
+                      borderRadius: '14px',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      background: '#181411',
+                      border: '1px solid var(--neutral-border)'
+                    }}
+                  >
+                    {postMediaUrl ? (
+                      postMediaType === 'video' ? (
+                        <video
+                          src={postMediaUrl}
+                          muted
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <img
+                          src={postMediaUrl}
+                          alt="Preview"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      )
+                    ) : (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          height: '100%',
+                          color: 'rgba(255,255,255,0.65)',
+                          fontSize: '0.82rem',
+                          padding: '1rem',
+                          textAlign: 'center'
+                        }}
+                      >
+                        Sube una foto o video a la izquierda para previsualizar
+                      </div>
+                    )}
+                    {postMediaType === 'video' && postMediaUrl && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: 'rgba(0,0,0,0.25)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            background: 'var(--primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <Play size={18} fill="white" color="white" />
+                        </div>
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '10px',
+                        right: '10px',
+                        background: 'rgba(20, 18, 16, 0.88)',
+                        padding: '5px 12px',
+                        borderRadius: '10px',
+                        color: '#FFFFFF',
+                        fontWeight: 900,
+                        fontSize: '0.86rem'
+                      }}
+                    >
+                      ${parseFloat(postPrice || '0').toLocaleString('es-CO')} COP
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.45 }}>
+                    {postDesc || 'Aquí aparecerá la descripción tentadora de tu plato...'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Publicaciones Activas */}
+            <div className="rpa-card">
+              <div className="rpa-card-header">
+                <div>
+                  <h3 className="rpa-card-title" style={{ fontSize: '1.08rem' }}>
+                    📊 Publicaciones Activas ({tenantPosts.length})
+                  </h3>
+                  <p className="rpa-card-subtitle">Interacción de tus publicaciones en el feed</p>
+                </div>
+              </div>
+
+              <div className="rpa-card-body">
+                {tenantPosts.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', margin: 0, padding: '1rem' }}>
+                    Aún no has publicado contenido en el feed. ¡Crea tu primera publicación a la izquierda!
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {tenantPosts.map(p => (
+                      <div key={p.id} className="rpa-item-card" style={{ padding: '10px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                          <img
+                            src={p.image}
+                            alt={p.dishName}
+                            style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <strong style={{ color: 'var(--text-main)', fontSize: '0.88rem', display: 'block' }}>
+                              {p.dishEmoji} {p.dishName}
+                            </strong>
+                            <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                              <span>
+                                <Eye size={12} style={{ verticalAlign: 'middle' }} /> {p.viewCount || 0} vistas
+                              </span>
+                              <span>
+                                <Heart size={12} fill="#EF4444" color="#EF4444" style={{ verticalAlign: 'middle' }} /> {p.likes} likes
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="rpa-icon-btn danger"
+                          disabled={isDeletingPost === p.id}
+                          onClick={async () => {
+                            const confirmMessage =
+                              '¿Deseas eliminar o archivar esta publicación del feed público?';
+                            if (!window.confirm(confirmMessage)) return;
+
+                            setIsDeletingPost(p.id);
+                            await deletePost(p.id);
+                            setIsDeletingPost(null);
+                          }}
+                          title="Eliminar publicación"
+                        >
+                          {isDeletingPost === p.id ? (
+                            <Loader2 size={14} className="spin" />
+                          ) : (
+                            <Trash2 size={15} />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
+      {/* ── TAB: ANALÍTICA FINANCIERA ── */}
+      {activeTab === 'analytics' && (
+        <Suspense fallback={<FallbackLoader message="Cargando analítica financiera..." />}>
+          <FinancialAnalytics tenantId={operatingTenant.id} />
+        </Suspense>
+      )}
+
+      {/* ── TAB: MENÚ ── */}
       {activeTab === 'menu' && (
-        <Suspense fallback={<FallbackLoader message="Cargando menú..." />}>
+        <Suspense fallback={<FallbackLoader message="Cargando carta digital..." />}>
           <MenuTab tenant={operatingTenant} />
         </Suspense>
       )}
 
-      {/* ── TAB 4: QR & DRIVERS ── */}
+      {/* ── TAB: QR DE MESAS & REPARTIDORES PROPIOS ── */}
       {activeTab === 'qr' && (
-        <div className="grid-2" style={{ gap: '1.75rem' }}>
-          
-          {/* QR & Table Management */}
+        <div className="grid-2" style={{ gap: '1.5rem', alignItems: 'start' }}>
           <RestaurantTablesAdmin tenant={operatingTenant} />
 
-          {/* Delivery Drivers */}
-          <div className="card" style={{ background: 'var(--glass-medium)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-            <div className="card-header">
-              <div className="card-title" style={{ color: 'white', fontWeight: 900 }}><Truck size={22} style={{ color: 'var(--secondary)' }} /> Repartidores Propios ({tenantDrivers.length})</div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="btn btn-primary"
-                style={{ padding: '6px 14px', fontSize: '0.82rem', fontWeight: 800, borderRadius: '10px' }}
+          {/* Repartidores Propios con el mismo formato .pam-* */}
+          <div className="rpa-card">
+            <div className="rpa-card-header">
+              <div className="rpa-card-header-left">
+                <div className="rpa-card-icon">
+                  <Truck size={22} />
+                </div>
+                <div>
+                  <span className="pam-eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>
+                    <Sparkles size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Flota de Domiciliarios
+                  </span>
+                  <h3 className="rpa-card-title">Repartidores Propios ({tenantDrivers.length})</h3>
+                  <p className="rpa-card-subtitle">
+                    Enrola y gestiona los domiciliarios directos de tu restaurante.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className={showAddDriverForm ? 'pam-btn-ghost' : 'pam-btn-primary'}
                 onClick={() => setShowAddDriverForm(!showAddDriverForm)}
               >
-                <Plus size={14} /> {showAddDriverForm ? 'Cancelar' : 'Enrolar Repartidor'}
-              </motion.button>
+                {showAddDriverForm ? (
+                  <>
+                    <X size={16} /> Cancelar
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} /> Enrolar Repartidor
+                  </>
+                )}
+              </button>
             </div>
 
-            {showAddDriverForm && (
-              <form onSubmit={handleAddDriverSubmit} style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '16px', marginBottom: '1.25rem', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                  <input
-                    placeholder="Nombre repartidor"
-                    value={driverName}
-                    onChange={e => setDriverName(e.target.value)}
-                    required
-                  />
-                  <input
-                    placeholder="Teléfono"
-                    value={driverPhone}
-                    onChange={e => setDriverPhone(e.target.value)}
-                    required
-                  />
-                </div>
-                <input
-                  placeholder="Vehículo (e.g. Moto Honda Biz / Bicicleta)"
-                  value={driverVehicle}
-                  onChange={e => setDriverVehicle(e.target.value)}
-                  style={{ width: '100%', marginBottom: '10px' }}
-                />
-                <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '10px', fontWeight: 800, borderRadius: '10px' }}>
-                  Guardar Repartidor
-                </button>
-              </form>
-            )}
+            <div className="rpa-card-body">
+              <AnimatePresence>
+                {showAddDriverForm && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                  >
+                    <form onSubmit={handleAddDriverSubmit} noValidate>
+                      <section className="pam-section">
+                        <div className="pam-section-head">
+                          <div className={`pam-step ${driverStepDone ? 'done' : ''}`}>
+                            {driverStepDone ? <Check size={15} strokeWidth={3} /> : 1}
+                          </div>
+                          <div>
+                            <h4>Datos del Repartidor</h4>
+                            <p>Registra el nombre, teléfono de contacto y medio de transporte.</p>
+                          </div>
+                        </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {tenantDrivers.map(driver => (
-                <div key={driver.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px' }}>
-                  <div>
-                    <strong style={{ color: 'white', fontSize: '0.92rem' }}>{driver.name}</strong>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                      {driver.vehicle} • {driver.phone}
-                    </p>
-                  </div>
-                  <span className={`badge ${driver.status === 'available' ? 'badge-secondary' : 'badge-tertiary'}`}>
-                    {driver.status === 'available' ? 'Disponible' : `En entrega (#${driver.assignedOrderId})`}
-                  </span>
+                        <div className="pam-grid">
+                          <div className="pam-field">
+                            <label>
+                              Nombre Completo <em>*</em>
+                            </label>
+                            <div className="pam-input-wrap">
+                              <User size={16} className="pam-icon" />
+                              <input
+                                type="text"
+                                className="pam-input"
+                                placeholder="Ej. Carlos Andrés Gómez"
+                                value={driverName}
+                                onChange={e => setDriverName(e.target.value)}
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div className="pam-field">
+                            <label>
+                              Teléfono / WhatsApp <em>*</em>
+                            </label>
+                            <div className="pam-input-wrap">
+                              <Phone size={16} className="pam-icon" />
+                              <input
+                                type="tel"
+                                className="pam-input"
+                                placeholder="Ej. 300 123 4567"
+                                value={driverPhone}
+                                onChange={e => setDriverPhone(e.target.value)}
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div className="pam-field pam-span-2">
+                            <label>
+                              Vehículo / Medio de Transporte <em>*</em>
+                            </label>
+                            <div className="pam-chips">
+                              {VEHICLE_PRESETS.map(v => (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  className={`pam-chip ${driverVehicle === v ? 'active' : ''}`}
+                                  onClick={() => setDriverVehicle(v)}
+                                >
+                                  {v}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="pam-input-wrap" style={{ marginTop: '6px' }}>
+                              <Truck size={16} className="pam-icon" />
+                              <input
+                                type="text"
+                                className="pam-input"
+                                placeholder="O especifica marca/placa (ej. Moto Yamaha FZ - ABC12D)"
+                                value={driverVehicle}
+                                onChange={e => setDriverVehicle(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                          <button
+                            type="button"
+                            className="pam-btn-ghost"
+                            onClick={() => setShowAddDriverForm(false)}
+                          >
+                            Cancelar
+                          </button>
+                          <button type="submit" className="pam-btn-primary">
+                            <Save size={16} /> Guardar Repartidor
+                          </button>
+                        </div>
+                      </section>
+                    </form>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {tenantDrivers.length === 0 ? (
+                <div className="pam-section" style={{ alignItems: 'center', textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+                  <Truck size={40} style={{ color: 'var(--primary)', opacity: 0.6 }} />
+                  <h4 style={{ margin: '6px 0 2px', color: 'var(--text-main)', fontWeight: 800 }}>
+                    No tienes repartidores registrados
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+                    Haz clic en "Enrolar Repartidor" para registrar a tu equipo de entregas a domicilio.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {tenantDrivers.map(driver => (
+                    <div key={driver.id} className="rpa-item-card">
+                      <div>
+                        <strong style={{ color: 'var(--text-main)', fontSize: '0.94rem', fontWeight: 800 }}>
+                          {driver.name}
+                        </strong>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '3px 0 0' }}>
+                          {driver.vehicle} · 📞 {driver.phone}
+                        </p>
+                      </div>
+                      <span className={`rpa-badge ${driver.status === 'available' ? 'success' : 'warning'}`}>
+                        {driver.status === 'available'
+                          ? '🟢 Disponible'
+                          : `🛵 En entrega (#${driver.assignedOrderId})`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-
         </div>
       )}
 
-      {/* ── TAB: TEAM & MEMBERS ── */}
+      {/* ── TAB: EMPLEADOS / EQUIPO ── */}
       {activeTab === 'team' && (
-        <Suspense fallback={<FallbackLoader message="Cargando equipo..." />}>
+        <Suspense fallback={<FallbackLoader message="Cargando equipo del restaurante..." />}>
           <TeamTab tenant={operatingTenant} />
         </Suspense>
       )}
 
       {/* ── TAB: SOPORTE ── */}
       {activeTab === 'support' && operatingTenant && (
-      <Suspense fallback={<FallbackLoader message="Cargando soporte..." />}>
-        <SupportTab restaurantId={operatingTenant.id} initialTicketId={supportInitialTicketId} />
-      </Suspense>
+        <Suspense fallback={<FallbackLoader message="Cargando centro de soporte..." />}>
+          <SupportTab
+            restaurantId={operatingTenant.id}
+            initialTicketId={supportInitialTicketId}
+          />
+        </Suspense>
       )}
-
     </motion.div>
   );
 };
