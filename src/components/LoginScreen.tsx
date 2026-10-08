@@ -7,6 +7,13 @@ import {
   AlertCircle, Building2, CheckCircle2, X, KeyRound
 } from 'lucide-react';
 import { PartnerApplicationModal } from './PartnerApplicationModal';
+import {
+  validateEmail,
+  validateName,
+  validateRegisterPassword,
+  validatePasswordConfirm,
+  evaluatePasswordStrength
+} from '../utils/formValidation';
 
 /* ── Animated feature cards shown on the left panel ────────── */
 const FEATURES = [
@@ -15,42 +22,25 @@ const FEATURES = [
   { icon: '🍽️', title: 'Restaurantes de Armenia', desc: 'Apoya el comercio local del Quindío con cada pedido' },
 ];
 
-/* ── Password strength validation ────────────────────────── */
-interface PasswordStrength {
-  score: number; // 0-4
-  label: string;
-  color: string;
-  checks: { passed: boolean; text: string }[];
+type AuthTab = 'login' | 'register';
+
+interface TabFieldErrors {
+  email: string | null;
+  password: string | null;
+  name: string | null;
+  confirmPassword: string | null;
 }
 
-function evaluatePasswordStrength(password: string): PasswordStrength {
-  const checks = [
-    { passed: password.length >= 8, text: 'Mínimo 8 caracteres' },
-    { passed: /[A-Z]/.test(password), text: 'Al menos una mayúscula' },
-    { passed: /[a-z]/.test(password), text: 'Al menos una minúscula' },
-    { passed: /[0-9]/.test(password), text: 'Al menos un número' },
-    { passed: /[^A-Za-z0-9]/.test(password), text: 'Al menos un carácter especial' },
-  ];
-
-  const score = checks.filter(c => c.passed).length;
-
-  const configs: Record<number, { label: string; color: string }> = {
-    0: { label: 'Muy débil', color: '#EF4444' },
-    1: { label: 'Débil', color: '#EF4444' },
-    2: { label: 'Regular', color: '#F59E0B' },
-    3: { label: 'Buena', color: '#F59E0B' },
-    4: { label: 'Fuerte', color: '#10B981' },
-    5: { label: 'Excelente', color: '#10B981' },
-  };
-
-  const config = configs[score] || configs[0];
-
-  return { score, label: config.label, color: config.color, checks };
-}
+const EMPTY_FIELD_ERRORS: TabFieldErrors = {
+  email: null,
+  password: null,
+  name: null,
+  confirmPassword: null,
+};
 
 export const LoginScreen: React.FC = () => {
   const { authMode, loginWithCredentials, loginWithGoogle, registerAccount, sendPasswordReset } = useApp();
-  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [tab, setTab] = useState<AuthTab>('login');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -68,9 +58,77 @@ export const LoginScreen: React.FC = () => {
   // Modal para restablecer contraseña
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
+  const [resetEmailError, setResetEmailError] = useState<string | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
   const [resetErrorMessage, setResetErrorMessage] = useState<string | null>(null);
+
+  // Estado de errores por campo separado por tab
+  const [errorsByTab, setErrorsByTab] = useState<Record<AuthTab, TabFieldErrors>>({
+    login: { ...EMPTY_FIELD_ERRORS },
+    register: { ...EMPTY_FIELD_ERRORS },
+  });
+
+  const fieldErrors = errorsByTab[tab];
+
+  const setTabFieldError = (field: keyof TabFieldErrors, value: string | null) => {
+    setErrorsByTab(prev => ({
+      ...prev,
+      [tab]: {
+        ...prev[tab],
+        [field]: value,
+      },
+    }));
+  };
+
+  // Field validation handlers (onBlur)
+  const handleEmailBlur = () => {
+    setTabFieldError('email', validateEmail(email));
+  };
+
+  const handlePasswordBlur = () => {
+    if (tab === 'login') {
+      setTabFieldError('password', password ? null : 'Ingresa tu contraseña.');
+    } else {
+      setTabFieldError('password', validateRegisterPassword(password));
+      if (confirmPassword) {
+        setTabFieldError('confirmPassword', validatePasswordConfirm(password, confirmPassword));
+      }
+    }
+  };
+
+  const handleNameBlur = () => {
+    setTabFieldError('name', validateName(name));
+  };
+
+  const handleConfirmPasswordBlur = () => {
+    setTabFieldError('confirmPassword', validatePasswordConfirm(password, confirmPassword));
+  };
+
+  // Clear field error on change
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    setTabFieldError('email', null);
+    setLoginError(null);
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    setTabFieldError('password', null);
+    setLoginError(null);
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
+    setTabFieldError('name', null);
+    setLoginError(null);
+  };
+
+  const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setConfirmPassword(e.target.value);
+    setTabFieldError('confirmPassword', null);
+    setLoginError(null);
+  };
 
   // Cycle features every 3.5s
   React.useEffect(() => {
@@ -81,19 +139,32 @@ export const LoginScreen: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    if (!email || !password) return;
 
-    if (tab === 'register') {
-      if (!name.trim()) {
-        setLoginError('Por favor ingresa tu nombre completo.');
+    if (tab === 'login') {
+      const emailErr = validateEmail(email);
+      const passErr = password ? null : 'Ingresa tu contraseña.';
+      if (emailErr || passErr) {
+        setErrorsByTab(prev => ({
+          ...prev,
+          login: { ...EMPTY_FIELD_ERRORS, email: emailErr, password: passErr },
+        }));
         return;
       }
-      if (passwordStrength.score < 3) {
-        setLoginError('La contraseña es demasiado débil. Debe tener al menos 8 caracteres con mayúsculas, minúsculas y números.');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setLoginError('Las contraseñas no coinciden. Por favor verifícalas.');
+    } else {
+      const nameErr = validateName(name);
+      const emailErr = validateEmail(email);
+      const passErr = validateRegisterPassword(password);
+      const confirmErr = validatePasswordConfirm(password, confirmPassword);
+      if (nameErr || emailErr || passErr || confirmErr) {
+        setErrorsByTab(prev => ({
+          ...prev,
+          register: {
+            name: nameErr,
+            email: emailErr,
+            password: passErr,
+            confirmPassword: confirmErr,
+          },
+        }));
         return;
       }
     }
@@ -123,10 +194,16 @@ export const LoginScreen: React.FC = () => {
 
   const handleResetPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail) return;
-    setResetLoading(true);
     setResetErrorMessage(null);
     setResetSuccessMessage(null);
+
+    const emailErr = validateEmail(resetEmail);
+    if (emailErr) {
+      setResetEmailError(emailErr);
+      return;
+    }
+
+    setResetLoading(true);
 
     try {
       const res = await sendPasswordReset(resetEmail);
@@ -350,48 +427,23 @@ export const LoginScreen: React.FC = () => {
         )}
 
         {/* Tab Switcher */}
-        <div style={{
-          display: 'flex',
-          background: 'var(--neutral-surface-alt)',
-          padding: '4px',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--neutral-border)',
-          marginBottom: '1.25rem',
-          gap: '4px'
-        }}>
+        {/* Tab Switcher */}
+        <div className="auth-tabs" role="tablist" aria-label="Opciones de acceso">
           <button
             type="button"
+            role="tab"
+            aria-selected={tab === 'login'}
             onClick={() => { setTab('login'); setLoginError(null); }}
-            style={{
-              flex: 1,
-              padding: '10px',
-              borderRadius: '8px',
-              border: 'none',
-              background: tab === 'login' ? 'var(--neutral-dark)' : 'transparent',
-              color: tab === 'login' ? 'white' : 'var(--text-muted)',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
+            className={`auth-tab ${tab === 'login' ? 'active' : ''}`}
           >
             Iniciar Sesión
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={tab === 'register'}
             onClick={() => { setTab('register'); setLoginError(null); }}
-            style={{
-              flex: 1,
-              padding: '10px',
-              borderRadius: '8px',
-              border: 'none',
-              background: tab === 'register' ? 'var(--neutral-dark)' : 'transparent',
-              color: tab === 'register' ? 'white' : 'var(--text-muted)',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
+            className={`auth-tab ${tab === 'register' ? 'active' : ''}`}
           >
             Crear Cuenta
           </button>
@@ -402,19 +454,8 @@ export const LoginScreen: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            style={{
-              padding: '12px 14px',
-              borderRadius: 'var(--radius-sm)',
-              background: '#FEF2F2',
-              border: '1px solid #FCA5A5',
-              color: '#991B1B',
-              fontSize: '0.82rem',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              marginBottom: '1.1rem'
-            }}
+            className="auth-alert error"
+            role="alert"
           >
             <AlertCircle size={18} style={{ color: '#DC2626', flexShrink: 0 }} />
             <span>{loginError}</span>
@@ -422,124 +463,112 @@ export const LoginScreen: React.FC = () => {
         )}
 
         {/* Credentials Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+        <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
           {tab === 'register' && (
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
-                Nombre completo
-              </label>
-              <div style={{ position: 'relative' }}>
-                <User size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
+            <div className="auth-field">
+              <label htmlFor="auth-name" className="auth-label">Nombre completo</label>
+              <div className="auth-input-wrap">
+                <div className="auth-field-icon">
+                  <User size={18} />
+                </div>
                 <input
+                  id="auth-name"
                   type="text"
                   placeholder="Ej. María Fernanda López"
                   value={name}
-                  onChange={e => setName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    paddingLeft: '44px',
-                    paddingRight: '14px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1.5px solid var(--neutral-border)',
-                    background: 'var(--neutral-surface-alt)',
-                    color: 'var(--text-main)',
-                    fontSize: '0.9rem',
-                    outline: 'none'
-                  }}
+                  onChange={handleNameChange}
+                  onBlur={handleNameBlur}
+                  aria-invalid={!!fieldErrors.name}
+                  aria-describedby={fieldErrors.name ? 'auth-name-error' : undefined}
+                  className={`auth-input ${fieldErrors.name ? 'auth-input-error' : ''}`}
                   required
                 />
               </div>
+              {fieldErrors.name && (
+                <div id="auth-name-error" role="alert" className="auth-field-error">
+                  {fieldErrors.name}
+                </div>
+              )}
             </div>
           )}
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
-              Correo electrónico
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Mail size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
+          <div className="auth-field">
+            <label htmlFor="auth-email" className="auth-label">Correo electrónico</label>
+            <div className="auth-input-wrap">
+              <div className="auth-field-icon">
+                <Mail size={18} />
+              </div>
               <input
+                id="auth-email"
                 type="email"
                 placeholder="tu.correo@ejemplo.com"
                 value={email}
-                onChange={e => { setEmail(e.target.value); setLoginError(null); }}
-                style={{
-                  width: '100%',
-                  paddingLeft: '44px',
-                  paddingRight: '14px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1.5px solid var(--neutral-border)',
-                  background: 'var(--neutral-surface-alt)',
-                  color: 'var(--text-main)',
-                  fontSize: '0.9rem',
-                  outline: 'none'
-                }}
+                onChange={handleEmailChange}
+                onBlur={handleEmailBlur}
+                aria-invalid={!!fieldErrors.email}
+                aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
+                className={`auth-input ${fieldErrors.email ? 'auth-input-error' : ''}`}
                 required
               />
             </div>
+            {fieldErrors.email && (
+              <div id="auth-email-error" role="alert" className="auth-field-error">
+                {fieldErrors.email}
+              </div>
+            )}
           </div>
 
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                Contraseña
-              </label>
+          <div className="auth-field">
+            <div className="auth-label-row">
+              <label htmlFor="auth-password" className="auth-label">Contraseña</label>
               {tab === 'login' && (
                 <button
                   type="button"
                   onClick={() => {
                     setResetEmail(email);
+                    setResetEmailError(null);
                     setResetSuccessMessage(null);
                     setResetErrorMessage(null);
                     setShowResetModal(true);
                   }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--primary)',
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
+                  className="forgot-link"
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
               )}
             </div>
-            <div style={{ position: 'relative' }}>
-              <Lock size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
+            <div className="auth-input-wrap">
+              <div className="auth-field-icon">
+                <Lock size={18} />
+              </div>
               <input
+                id="auth-password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••••••"
                 value={password}
-                onChange={e => { setPassword(e.target.value); setLoginError(null); }}
-                style={{
-                  width: '100%',
-                  paddingLeft: '44px',
-                  paddingRight: '44px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1.5px solid var(--neutral-border)',
-                  background: 'var(--neutral-surface-alt)',
-                  color: 'var(--text-main)',
-                  fontSize: '0.9rem',
-                  outline: 'none'
-                }}
+                onChange={handlePasswordChange}
+                onBlur={handlePasswordBlur}
+                aria-invalid={!!fieldErrors.password}
+                aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
+                className={`auth-input has-icon-right ${fieldErrors.password ? 'auth-input-error' : ''}`}
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(v => !v)}
-                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                className="field-toggle-pw"
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+
+            {/* Field error for password */}
+            {fieldErrors.password && (
+              <div id="auth-password-error" role="alert" className="auth-field-error">
+                {fieldErrors.password}
+              </div>
+            )}
 
             {/* Password Strength Indicator (only on register) */}
             {tab === 'register' && password.length > 0 && (
@@ -585,64 +614,46 @@ export const LoginScreen: React.FC = () => {
           </div>
 
           {tab === 'register' && (
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
-                Confirmar contraseña
-              </label>
-              <div style={{ position: 'relative' }}>
-                <Lock size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
+            <div className="auth-field">
+              <label htmlFor="auth-confirm-password" className="auth-label">Confirmar contraseña</label>
+              <div className="auth-input-wrap">
+                <div className="auth-field-icon">
+                  <Lock size={18} />
+                </div>
                 <input
+                  id="auth-confirm-password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••••••"
                   value={confirmPassword}
-                  onChange={e => { setConfirmPassword(e.target.value); setLoginError(null); }}
-                  style={{
-                    width: '100%',
-                    paddingLeft: '44px',
-                    paddingRight: '14px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1.5px solid var(--neutral-border)',
-                    background: 'var(--neutral-surface-alt)',
-                    color: 'var(--text-main)',
-                    fontSize: '0.9rem',
-                    outline: 'none'
-                  }}
+                  onChange={handleConfirmPasswordChange}
+                  onBlur={handleConfirmPasswordBlur}
+                  aria-invalid={!!fieldErrors.confirmPassword}
+                  aria-describedby={fieldErrors.confirmPassword ? 'auth-confirm-password-error' : undefined}
+                  className={`auth-input has-icon-right ${fieldErrors.confirmPassword ? 'auth-input-error' : ''}`}
                   required
                 />
               </div>
-              {confirmPassword.length > 0 && password !== confirmPassword && (
-                <span style={{ fontSize: '0.72rem', color: '#DC2626', fontWeight: 600, marginTop: '4px', display: 'block' }}>
-                  Las contraseñas no coinciden
-                </span>
+              {fieldErrors.confirmPassword && (
+                <div id="auth-confirm-password-error" role="alert" className="auth-field-error">
+                  {fieldErrors.confirmPassword}
+                </div>
               )}
             </div>
           )}
 
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
+          <button
             type="submit"
-            style={{
-              padding: '13px',
-              fontSize: '0.92rem',
-              fontWeight: 700,
-              borderRadius: 'var(--radius-sm)',
-              marginTop: '4px',
-              background: 'var(--neutral-dark)',
-              color: '#FFFFFF',
-              border: 'none',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1
-            }}
+            className="auth-submit"
             disabled={loading}
           >
-            {loading
-              ? 'Validando...'
-              : (tab === 'login' ? 'Iniciar Sesión' : 'Crear Mi Cuenta')
-            }
-          </motion.button>
+            {loading && <span className="auth-spinner" aria-hidden="true" />}
+            <span>
+              {loading
+                ? (tab === 'login' ? 'Validando...' : 'Creando cuenta...')
+                : (tab === 'login' ? 'Iniciar Sesión' : 'Crear Mi Cuenta')
+              }
+            </span>
+          </button>
 
           <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
             <div style={{ flex: 1, height: '1px', background: 'var(--neutral-border)' }} />
@@ -766,6 +777,7 @@ export const LoginScreen: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowResetModal(false)}
+                  aria-label="Cerrar recuperación de contraseña"
                   style={{
                     position: 'absolute',
                     top: '18px',
@@ -822,69 +834,58 @@ export const LoginScreen: React.FC = () => {
                     {resetSuccessMessage}
                   </motion.div>
                 ) : (
-                  <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <form onSubmit={handleResetPasswordSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
                       Ingresa tu correo electrónico registrado y te enviaremos un enlace seguro para crear una nueva contraseña.
                     </p>
 
                     {resetErrorMessage && (
-                      <div style={{
-                        padding: '10px 12px',
-                        borderRadius: 'var(--radius-sm)',
-                        background: '#FEF2F2',
-                        border: '1px solid #FCA5A5',
-                        color: '#991B1B',
-                        fontSize: '0.8rem'
-                      }}>
-                        {resetErrorMessage}
+                      <div className="auth-alert error" role="alert" style={{ marginBottom: 0 }}>
+                        <AlertCircle size={18} style={{ color: '#DC2626', flexShrink: 0 }} />
+                        <span>{resetErrorMessage}</span>
                       </div>
                     )}
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
+                    <div className="auth-field">
+                      <label htmlFor="reset-email" className="auth-label">
                         Correo electrónico
                       </label>
-                      <div style={{ position: 'relative' }}>
-                        <Mail size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
+                      <div className="auth-input-wrap">
+                        <div className="auth-field-icon">
+                          <Mail size={18} />
+                        </div>
                         <input
+                          id="reset-email"
                           type="email"
                           placeholder="tu.correo@ejemplo.com"
                           value={resetEmail}
-                          onChange={e => setResetEmail(e.target.value)}
-                          style={{
-                            width: '100%',
-                            paddingLeft: '44px',
-                            paddingRight: '14px',
-                            paddingTop: '12px',
-                            paddingBottom: '12px',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1.5px solid var(--neutral-border)',
-                            background: 'var(--neutral-surface-alt)',
-                            color: 'var(--text-main)',
-                            fontSize: '0.9rem',
-                            outline: 'none'
+                          onChange={e => {
+                            setResetEmail(e.target.value);
+                            setResetEmailError(null);
+                            setResetErrorMessage(null);
                           }}
+                          onBlur={() => setResetEmailError(validateEmail(resetEmail))}
+                          aria-invalid={!!resetEmailError}
+                          aria-describedby={resetEmailError ? 'reset-email-error' : undefined}
+                          className={`auth-input ${resetEmailError ? 'auth-input-error' : ''}`}
                           required
                         />
                       </div>
+                      {resetEmailError && (
+                        <div id="reset-email-error" role="alert" className="auth-field-error">
+                          {resetEmailError}
+                        </div>
+                      )}
                     </div>
 
                     <button
                       type="submit"
                       disabled={resetLoading}
-                      style={{
-                        padding: '12px',
-                        borderRadius: 'var(--radius-sm)',
-                        fontWeight: 700,
-                        fontSize: '0.9rem',
-                        marginTop: '4px',
-                        background: 'var(--neutral-dark)',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        cursor: resetLoading ? 'not-allowed' : 'pointer'
-                      }}
+                      className="auth-submit"
+                      style={{ marginTop: '4px' }}
                     >
-                      {resetLoading ? 'Enviando enlace...' : 'Enviar correo de recuperación'}
+                      {resetLoading && <span className="auth-spinner" aria-hidden="true" />}
+                      <span>{resetLoading ? 'Enviando enlace...' : 'Enviar correo de recuperación'}</span>
                     </button>
                   </form>
                 )}

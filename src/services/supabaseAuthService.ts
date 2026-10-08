@@ -23,22 +23,37 @@ export interface AuthActionResult {
 /**
  * Traduce mensajes de error estándar de Supabase al español para una mejor UX.
  */
-function translateAuthError(errMessage: string): string {
+export function translateAuthError(errMessage: string): string {
   const msg = errMessage.toLowerCase();
   if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
-    return 'Correo electrónico o contraseña incorrectos.';
+    return 'Correo o contraseña incorrectos.';
   }
-  if (msg.includes('user already registered') || msg.includes('already exists')) {
-    return 'Este correo electrónico ya se encuentra registrado.';
+  if (msg.includes('user already registered') || msg.includes('already exists') || msg.includes('already been registered')) {
+    return 'Ya existe una cuenta con este correo. Inicia sesión.';
   }
-  if (msg.includes('password should be at least')) {
-    return 'La contraseña debe tener al menos 6 caracteres.';
+  if (msg.includes('email not confirmed')) {
+    return 'Confirma tu correo antes de entrar.';
+  }
+  if (msg.includes('password should be at least') || msg.includes('weak password') || msg.includes('password is known to be weak')) {
+    return 'La contraseña es demasiado débil. Usa al menos 8 caracteres combinando letras y números.';
   }
   if (msg.includes('unable to validate email address') || msg.includes('invalid email')) {
     return 'El formato de correo electrónico no es válido.';
   }
-  if (msg.includes('email rate limit exceeded')) {
-    return 'Se ha superado el límite de intentos de correo. Intenta de nuevo en unos minutos.';
+  if (msg.includes('email rate limit exceeded') || msg.includes('over_email_send_rate_limit') || msg.includes('for security purposes, you can only request this')) {
+    return 'Se ha superado el límite de envíos de correo. Intenta de nuevo en unos minutos.';
+  }
+  if (msg.includes('too many requests') || msg.includes('rate limit')) {
+    return 'Demasiados intentos seguidos. Espera un momento antes de volver a intentar.';
+  }
+  if (msg.includes('user not found')) {
+    return 'No encontramos una cuenta asociada a este correo.';
+  }
+  if (msg.includes(' signup is disabled') || msg.includes('signups not allowed')) {
+    return 'El registro de nuevas cuentas está deshabilitado temporalmente.';
+  }
+  if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('network request failed')) {
+    return 'Error de conexión. Verifica tu internet e inténtalo de nuevo.';
   }
   return errMessage || 'Ocurrió un error inesperado al procesar la autenticación.';
 }

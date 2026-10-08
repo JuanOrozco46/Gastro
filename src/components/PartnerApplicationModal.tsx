@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/useApp';
 import { motion } from 'framer-motion';
-import { X, Building2, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck, Upload, Image, Clock, FileText, AlertCircle } from 'lucide-react';
+import { X, Building2, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck, Upload, Image, Clock, FileText, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react';
 import type { OrderFulfillment } from '../types';
 import { PLATFORM_COMMISSION_RATE } from '../services/supabaseDataService';
+import {
+  validateEmail,
+  validateName,
+  validatePhone,
+  validateRequired,
+  validateRegisterPassword,
+  validatePasswordConfirm,
+  evaluatePasswordStrength
+} from '../utils/formValidation';
 
 interface PartnerApplicationModalProps {
   isOpen: boolean;
@@ -11,7 +20,7 @@ interface PartnerApplicationModalProps {
 }
 
 export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = ({ isOpen, onClose }) => {
-  const { cities, zones, selectedCityId, submitRestaurantApplication } = useApp();
+  const { cities, zones, selectedCityId, authMode, registerAccount, submitRestaurantApplication } = useApp();
 
   const activeCities = cities.filter(c => c.isActive);
 
@@ -29,11 +38,17 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     setCityId(newCityId);
     const nextCityZones = zones.filter(z => z.cityId === newCityId && z.isActive);
     setZoneId(nextCityZones.length > 0 ? nextCityZones[0].id : '');
+    clearFieldError('cityId');
+    clearFieldError('zoneId');
   };
 
   const [ownerName, setOwnerName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
+  const [ownerPasswordConfirm, setOwnerPasswordConfirm] = useState('');
+  const [showOwnerPassword, setShowOwnerPassword] = useState(false);
+
   const [restaurantName, setRestaurantName] = useState('');
   const [category, setCategory] = useState('Hamburguesas');
   const [address, setAddress] = useState('');
@@ -63,8 +78,78 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
   // UI state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
+  const [accountCreated, setAccountCreated] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const passwordStrength = evaluatePasswordStrength(ownerPassword);
+
+  const clearFieldError = (field: string) => {
+    setErrors(prev => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const computeFieldError = (field: string): string | null => {
+    switch (field) {
+      case 'ownerName':
+        return validateName(ownerName);
+      case 'ownerEmail':
+        return validateEmail(ownerEmail);
+      case 'ownerPhone':
+        return validatePhone(ownerPhone);
+      case 'ownerPassword':
+        return authMode === 'remote' ? validateRegisterPassword(ownerPassword) : null;
+      case 'ownerPasswordConfirm':
+        return authMode === 'remote' ? validatePasswordConfirm(ownerPassword, ownerPasswordConfirm) : null;
+      case 'restaurantName':
+        return validateRequired(restaurantName, 'El nombre del restaurante');
+      case 'category':
+        return validateRequired(category, 'La categoría gastronómica');
+      case 'cityId':
+        return validateRequired(cityId, 'La ciudad de operación');
+      case 'zoneId':
+        return validateRequired(zoneId, 'La zona urbana');
+      case 'address':
+        return validateRequired(address, 'La dirección o referencia comercial');
+      case 'estimatedDeliveryMinutes':
+        if (estimatedDeliveryMinutes !== '' && (isNaN(Number(estimatedDeliveryMinutes)) || Number(estimatedDeliveryMinutes) <= 0)) {
+          return 'El tiempo estimado debe ser en minutos (ej: 30).';
+        }
+        return null;
+      case 'deliveryFee':
+        if (deliveryModes.includes('restaurant_delivery') && deliveryFee !== '' && (isNaN(Number(deliveryFee)) || Number(deliveryFee) < 0)) {
+          return 'La tarifa debe ser un número positivo.';
+        }
+        return null;
+      case 'deliveryRadiusKm':
+        if (deliveryModes.includes('restaurant_delivery') && deliveryRadiusKm !== '' && (isNaN(Number(deliveryRadiusKm)) || Number(deliveryRadiusKm) < 0)) {
+          return 'El radio debe ser un número positivo.';
+        }
+        return null;
+      case 'minOrder':
+        if (minOrder !== '' && (isNaN(Number(minOrder)) || Number(minOrder) < 0)) {
+          return 'El valor debe ser un número positivo.';
+        }
+        return null;
+      default:
+        return null;
+    }
+  };
+
+  const handleFieldBlur = (field: string) => {
+    const err = computeFieldError(field);
+    setErrors(prev => {
+      const next = { ...prev };
+      if (err) next[field] = err;
+      else delete next[field];
+      return next;
+    });
+  };
 
   // Keyboard shortcut ESC to close modal
   useEffect(() => {
@@ -81,11 +166,9 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
 
   const handleModeToggle = (mode: OrderFulfillment) => {
     setDeliveryModes(prev => {
-      if (prev.includes(mode)) {
-        return prev.filter(m => m !== mode);
-      } else {
-        return [...prev, mode];
-      }
+      const next = prev.includes(mode) ? prev.filter(m => m !== mode) : [...prev, mode];
+      if (next.length > 0) clearFieldError('deliveryModes');
+      return next;
     });
   };
 
@@ -114,11 +197,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
       return;
     }
 
-    setErrors(prev => {
-      const next = { ...prev };
-      delete next[type];
-      return next;
-    });
+    clearFieldError(type);
 
     if (type === 'logo') {
       setLogoFile(finalFile);
@@ -136,33 +215,30 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!ownerName.trim()) newErrors.ownerName = 'El nombre del responsable es obligatorio.';
-    if (!ownerEmail.trim() || !ownerEmail.includes('@')) newErrors.ownerEmail = 'Ingresa un correo electrónico de contacto válido.';
-    if (!ownerPhone.trim()) newErrors.ownerPhone = 'El teléfono de contacto es obligatorio.';
-    if (!restaurantName.trim()) newErrors.restaurantName = 'El nombre del restaurante es obligatorio.';
-    if (!category.trim()) newErrors.category = 'Selecciona una categoría gastronómica.';
-    if (!cityId) newErrors.cityId = 'Selecciona una ciudad válida.';
-    if (!zoneId) newErrors.zoneId = 'Selecciona una zona válida.';
-    if (!address.trim()) newErrors.address = 'La dirección o referencia comercial es obligatoria.';
+    const fieldsToCheck = [
+      'ownerName',
+      'ownerEmail',
+      'ownerPhone',
+      'ownerPassword',
+      'ownerPasswordConfirm',
+      'restaurantName',
+      'category',
+      'cityId',
+      'zoneId',
+      'address',
+      'estimatedDeliveryMinutes',
+      'deliveryFee',
+      'deliveryRadiusKm',
+      'minOrder',
+    ];
+
+    for (const f of fieldsToCheck) {
+      const err = computeFieldError(f);
+      if (err) newErrors[f] = err;
+    }
+
     if (deliveryModes.length === 0) newErrors.deliveryModes = 'Selecciona al menos una modalidad de atención.';
     if (!termsAccepted) newErrors.terms = 'Debes aceptar los Términos del Servicio para continuar.';
-
-    if (minOrder !== '' && (isNaN(Number(minOrder)) || Number(minOrder) < 0)) {
-      newErrors.minOrder = 'El valor debe ser un número positivo.';
-    }
-
-    if (estimatedDeliveryMinutes !== '' && (isNaN(Number(estimatedDeliveryMinutes)) || Number(estimatedDeliveryMinutes) <= 0)) {
-      newErrors.estimatedDeliveryMinutes = 'El tiempo estimado debe ser en minutos (ej: 30).';
-    }
-
-    if (deliveryModes.includes('restaurant_delivery')) {
-      if (deliveryFee !== '' && (isNaN(Number(deliveryFee)) || Number(deliveryFee) < 0)) {
-        newErrors.deliveryFee = 'La tarifa debe ser un número positivo.';
-      }
-      if (deliveryRadiusKm !== '' && (isNaN(Number(deliveryRadiusKm)) || Number(deliveryRadiusKm) < 0)) {
-        newErrors.deliveryRadiusKm = 'El radio debe ser un número positivo.';
-      }
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -171,12 +247,29 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
+    setAccountNotice(null);
     if (!validate()) return;
 
     setIsSubmitting(true);
     try {
-      // La solicitud se crea primero; las imágenes (opcionales) se suben después con URLs firmadas.
-      // La unicidad de solicitudes pendientes la garantiza la base de datos.
+      // 1) Si estamos en modo remoto, crear la cuenta de acceso del propietario
+      if (authMode === 'remote') {
+        const regRes = await registerAccount(ownerName.trim(), ownerEmail.trim(), ownerPassword, 'client_delivery');
+        if (typeof regRes === 'object' && regRes !== null && !regRes.success) {
+          const isAlreadyRegistered = /ya existe|ya se encuentra registrado|already registered|already exists/i.test(regRes.error || '');
+          if (isAlreadyRegistered) {
+            setAccountNotice('Ya tienes una cuenta; la solicitud se vinculará a tu correo.');
+            setAccountCreated(false);
+          } else {
+            setSubmitError(regRes.error || 'No se pudo crear tu cuenta de acceso.');
+            return;
+          }
+        } else {
+          setAccountCreated(true);
+        }
+      }
+
+      // 2) Enviar solicitud del restaurante; las imágenes (opcionales) se suben después con URLs firmadas.
       const ok = await submitRestaurantApplication({
         ownerName: ownerName.trim(),
         ownerEmail: ownerEmail.trim(),
@@ -214,6 +307,9 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     setOwnerName('');
     setOwnerEmail('');
     setOwnerPhone('');
+    setOwnerPassword('');
+    setOwnerPasswordConfirm('');
+    setShowOwnerPassword(false);
     setRestaurantName('');
     setCategory('Hamburguesas');
     setAddress('');
@@ -235,6 +331,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     setBannerCompression(null);
     setErrors({});
     setSubmitError(null);
+    setAccountNotice(null);
+    setAccountCreated(false);
     setSubmittedSuccess(false);
     onClose();
   };
@@ -310,12 +408,26 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
               🎉 ¡Solicitud Registrada con Éxito!
             </h3>
 
-            <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
               Tu solicitud para vincular el restaurante <strong>{restaurantName}</strong> a la red local de GastroSync en <strong>{selectedCityName}</strong> ha sido recibida correctamente (Estado: <span style={{ color: '#F59E0B', fontWeight: 800 }}>Pendiente de Revisión</span>).
             </p>
 
+            {accountNotice && (
+              <div style={{ background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.35)', borderRadius: '14px', padding: '12px 14px', fontSize: '0.84rem', color: '#BFDBFE', marginBottom: '1rem', textAlign: 'left', lineHeight: 1.5 }}>
+                🔐 <strong>Cuenta existente detectada:</strong> {accountNotice}
+              </div>
+            )}
+
+            {accountCreated && (
+              <div style={{ background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '14px', padding: '12px 14px', fontSize: '0.84rem', color: '#A7F3D0', marginBottom: '1rem', textAlign: 'left', lineHeight: 1.5 }}>
+                ✅ <strong>Cuenta de acceso creada ({ownerEmail}):</strong> Revisa tu bandeja de entrada para confirmar tu correo electrónico (si aplica).
+              </div>
+            )}
+
             <div style={{ background: 'rgba(255,255,255,0.04)', padding: '1rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.75rem', lineHeight: 1.5 }}>
-              ℹ️ <strong>Siguientes pasos:</strong> El equipo administrativo revisará tu propuesta comercial. Una vez aprobada, recibirás las credenciales de acceso para gestionar tu menú, zonas de despacho y pedidos en tiempo real.
+              ℹ️ <strong>Siguientes pasos:</strong> El equipo administrativo revisará tu propuesta comercial. {authMode === 'remote'
+                ? 'Una vez aprobada la solicitud, tu cuenta quedará vinculada automáticamente como propietario del restaurante para gestionar tu menú, zonas de despacho y pedidos en tiempo real.'
+                : 'Una vez aprobada, recibirás las credenciales de acceso para gestionar tu menú, zonas de despacho y pedidos en tiempo real.'}
             </div>
 
             <button
@@ -346,18 +458,26 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
             <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '14px', padding: '10px 14px', fontSize: '0.8rem', color: '#FCD34D', marginBottom: '1.25rem', lineHeight: 1.45, display: 'flex', gap: '10px' }}>
               <ShieldCheck size={18} style={{ flexShrink: 0, marginTop: '2px', color: '#F59E0B' }} />
               <div>
-                <strong>Aviso de Revisión Previa:</strong> Registro formal sin contraseña inicial. Tu solicitud será evaluada por el equipo administrativo antes de activar tu perfil de restaurante.
+                {authMode === 'remote' ? (
+                  <>
+                    <strong>Registro y Revisión Previa:</strong> Crea tu cuenta de acceso y envía los datos de tu restaurante. Cuando el equipo administrativo apruebe tu solicitud, tu cuenta quedará vinculada como propietario.
+                  </>
+                ) : (
+                  <>
+                    <strong>Aviso de Revisión Previa:</strong> Registro formal sin contraseña inicial. Tu solicitud será evaluada por el equipo administrativo antes de activar tu perfil de restaurante.
+                  </>
+                )}
               </div>
             </div>
 
             {submitError && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '14px', padding: '10px 14px', fontSize: '0.82rem', color: '#FCA5A5', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div role="alert" style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '14px', padding: '10px 14px', fontSize: '0.82rem', color: '#FCA5A5', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <AlertCircle size={18} style={{ flexShrink: 0, color: '#EF4444' }} />
                 <span>{submitError}</span>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
               {/* Owner Info Section */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -366,17 +486,19 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     Nombre del Responsable *
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                     <input
                       id="ownerName"
                       type="text"
                       placeholder="Ej: Carlos Gómez"
                       value={ownerName}
-                      onChange={e => setOwnerName(e.target.value)}
+                      onChange={e => { setOwnerName(e.target.value); clearFieldError('ownerName'); }}
+                      onBlur={() => handleFieldBlur('ownerName')}
+                      aria-invalid={!!errors.ownerName}
                       style={{ width: '100%', paddingLeft: '38px', borderColor: errors.ownerName ? '#EF4444' : undefined }}
                     />
                   </div>
-                  {errors.ownerName && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.ownerName}</span>}
+                  {errors.ownerName && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.ownerName}</span>}
                 </div>
 
                 <div>
@@ -384,17 +506,19 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     Teléfono de Contacto *
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <Phone size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <Phone size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                     <input
                       id="ownerPhone"
                       type="tel"
                       placeholder="Ej: (300) 123-4567"
                       value={ownerPhone}
-                      onChange={e => setOwnerPhone(e.target.value)}
+                      onChange={e => { setOwnerPhone(e.target.value); clearFieldError('ownerPhone'); }}
+                      onBlur={() => handleFieldBlur('ownerPhone')}
+                      aria-invalid={!!errors.ownerPhone}
                       style={{ width: '100%', paddingLeft: '38px', borderColor: errors.ownerPhone ? '#EF4444' : undefined }}
                     />
                   </div>
-                  {errors.ownerPhone && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.ownerPhone}</span>}
+                  {errors.ownerPhone && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.ownerPhone}</span>}
                 </div>
               </div>
 
@@ -403,18 +527,149 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   Correo Electrónico de Contacto *
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                   <input
                     id="ownerEmail"
                     type="email"
                     placeholder="contacto@turestaurante.co"
                     value={ownerEmail}
-                    onChange={e => setOwnerEmail(e.target.value)}
+                    onChange={e => { setOwnerEmail(e.target.value); clearFieldError('ownerEmail'); }}
+                    onBlur={() => handleFieldBlur('ownerEmail')}
+                    aria-invalid={!!errors.ownerEmail}
                     style={{ width: '100%', paddingLeft: '38px', borderColor: errors.ownerEmail ? '#EF4444' : undefined }}
                   />
                 </div>
-                {errors.ownerEmail && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.ownerEmail}</span>}
+                {errors.ownerEmail && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.ownerEmail}</span>}
               </div>
+
+              {/* Nueva sección: Tu cuenta de acceso (solo en modo remoto) */}
+              {authMode === 'remote' && (
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(200, 90, 56, 0.3)',
+                  borderRadius: '14px',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'white', fontSize: '0.86rem', fontWeight: 800 }}>
+                      <Lock size={16} style={{ color: 'var(--primary)' }} />
+                      <span>Tu cuenta de acceso</span>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+                      Define la contraseña con la que administrarás tu restaurante una vez aprobada la solicitud.
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label htmlFor="ownerPassword" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
+                        Contraseña *
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                        <input
+                          id="ownerPassword"
+                          type={showOwnerPassword ? 'text' : 'password'}
+                          placeholder="Mínimo 8 caracteres"
+                          value={ownerPassword}
+                          onChange={e => { setOwnerPassword(e.target.value); clearFieldError('ownerPassword'); }}
+                          onBlur={() => {
+                            handleFieldBlur('ownerPassword');
+                            if (ownerPasswordConfirm) handleFieldBlur('ownerPasswordConfirm');
+                          }}
+                          aria-invalid={!!errors.ownerPassword}
+                          style={{ width: '100%', paddingLeft: '38px', paddingRight: '38px', borderColor: errors.ownerPassword ? '#EF4444' : undefined }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowOwnerPassword(v => !v)}
+                          aria-label={showOwnerPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          {showOwnerPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                      {errors.ownerPassword && (
+                        <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>
+                          {errors.ownerPassword}
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="ownerPasswordConfirm" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
+                        Confirmar Contraseña *
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                        <input
+                          id="ownerPasswordConfirm"
+                          type={showOwnerPassword ? 'text' : 'password'}
+                          placeholder="Repite tu contraseña"
+                          value={ownerPasswordConfirm}
+                          onChange={e => { setOwnerPasswordConfirm(e.target.value); clearFieldError('ownerPasswordConfirm'); }}
+                          onBlur={() => handleFieldBlur('ownerPasswordConfirm')}
+                          aria-invalid={!!errors.ownerPasswordConfirm}
+                          style={{ width: '100%', paddingLeft: '38px', borderColor: errors.ownerPasswordConfirm ? '#EF4444' : undefined }}
+                        />
+                      </div>
+                      {errors.ownerPasswordConfirm && (
+                        <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>
+                          {errors.ownerPasswordConfirm}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {ownerPassword.length > 0 && (
+                    <div>
+                      <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                        {[0, 1, 2, 3, 4].map(i => (
+                          <div
+                            key={i}
+                            style={{
+                              flex: 1,
+                              height: '4px',
+                              borderRadius: '2px',
+                              background: i < passwordStrength.score
+                                ? passwordStrength.color
+                                : 'rgba(255, 255, 255, 0.15)',
+                              transition: 'all 0.3s'
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: passwordStrength.color }}>
+                        Seguridad: {passwordStrength.label}
+                      </span>
+                      {passwordStrength.score < 3 && (
+                        <div style={{ marginTop: '3px', display: 'flex', flexWrap: 'wrap', gap: '6px 12px' }}>
+                          {passwordStrength.checks.filter(c => !c.passed).map((c, i) => (
+                            <span key={i} style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              • {c.text}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Restaurant Details */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -427,10 +682,12 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     type="text"
                     placeholder="Ej: La Trattoria"
                     value={restaurantName}
-                    onChange={e => setRestaurantName(e.target.value)}
+                    onChange={e => { setRestaurantName(e.target.value); clearFieldError('restaurantName'); }}
+                    onBlur={() => handleFieldBlur('restaurantName')}
+                    aria-invalid={!!errors.restaurantName}
                     style={{ width: '100%', borderColor: errors.restaurantName ? '#EF4444' : undefined }}
                   />
-                  {errors.restaurantName && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.restaurantName}</span>}
+                  {errors.restaurantName && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.restaurantName}</span>}
                 </div>
 
                 <div>
@@ -440,7 +697,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   <select
                     id="category"
                     value={category}
-                    onChange={e => setCategory(e.target.value)}
+                    onChange={e => { setCategory(e.target.value); clearFieldError('category'); }}
+                    onBlur={() => handleFieldBlur('category')}
                     style={{ width: '100%' }}
                   >
                     <option value="Hamburguesas">Hamburguesas</option>
@@ -462,7 +720,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   Propuesta Gastronómica / Descripción Corta
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <FileText size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} />
+                  <FileText size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                   <textarea
                     id="description"
                     rows={2}
@@ -484,6 +742,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     id="cityId"
                     value={cityId}
                     onChange={e => handleCityChange(e.target.value)}
+                    onBlur={() => handleFieldBlur('cityId')}
                     style={{ width: '100%' }}
                   >
                     {activeCities.map(c => (
@@ -499,7 +758,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   <select
                     id="zoneId"
                     value={zoneId}
-                    onChange={e => setZoneId(e.target.value)}
+                    onChange={e => { setZoneId(e.target.value); clearFieldError('zoneId'); }}
+                    onBlur={() => handleFieldBlur('zoneId')}
                     style={{ width: '100%' }}
                   >
                     {cityZones.map(z => (
@@ -514,17 +774,19 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   Dirección o Referencia Comercial *
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <MapPin size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <MapPin size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                   <input
                     id="address"
                     type="text"
                     placeholder="Ej: Carrera 14 # 19-25, Sector Norte"
                     value={address}
-                    onChange={e => setAddress(e.target.value)}
+                    onChange={e => { setAddress(e.target.value); clearFieldError('address'); }}
+                    onBlur={() => handleFieldBlur('address')}
+                    aria-invalid={!!errors.address}
                     style={{ width: '100%', paddingLeft: '38px', borderColor: errors.address ? '#EF4444' : undefined }}
                   />
                 </div>
-                {errors.address && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.address}</span>}
+                {errors.address && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.address}</span>}
               </div>
 
               {/* Operations & Schedule */}
@@ -534,7 +796,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     Horario de Atención (Opcional)
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <Clock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <Clock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                     <input
                       id="scheduleHours"
                       type="text"
@@ -555,10 +817,12 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     type="number"
                     placeholder="Ej: 30"
                     value={estimatedDeliveryMinutes}
-                    onChange={e => setEstimatedDeliveryMinutes(e.target.value)}
+                    onChange={e => { setEstimatedDeliveryMinutes(e.target.value); clearFieldError('estimatedDeliveryMinutes'); }}
+                    onBlur={() => handleFieldBlur('estimatedDeliveryMinutes')}
+                    aria-invalid={!!errors.estimatedDeliveryMinutes}
                     style={{ width: '100%', borderColor: errors.estimatedDeliveryMinutes ? '#EF4444' : undefined }}
                   />
-                  {errors.estimatedDeliveryMinutes && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.estimatedDeliveryMinutes}</span>}
+                  {errors.estimatedDeliveryMinutes && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.estimatedDeliveryMinutes}</span>}
                 </div>
               </div>
 
@@ -586,7 +850,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                       Comprimido: {(logoCompression.original / 1024 / 1024).toFixed(1)}MB → {(logoCompression.final / 1024 / 1024).toFixed(1)}MB
                     </div>
                   )}
-                  {errors.logo && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.logo}</span>}
+                  {errors.logo && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.logo}</span>}
                 </div>
 
                 <div>
@@ -611,7 +875,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                       Comprimido: {(bannerCompression.original / 1024 / 1024).toFixed(1)}MB → {(bannerCompression.final / 1024 / 1024).toFixed(1)}MB
                     </div>
                   )}
-                  {errors.banner && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.banner}</span>}
+                  {errors.banner && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.banner}</span>}
                 </div>
               </div>
 
@@ -648,7 +912,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     <span>🍽️ Servicio en mesa (QR)</span>
                   </label>
                 </div>
-                {errors.deliveryModes && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '4px', display: 'block' }}>{errors.deliveryModes}</span>}
+                {errors.deliveryModes && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '4px', display: 'block', fontWeight: 600 }}>{errors.deliveryModes}</span>}
               </div>
 
               {/* Conditional Delivery Fee & Radius */}
@@ -667,10 +931,12 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                       type="number"
                       placeholder="Ej: 4000"
                       value={deliveryFee}
-                      onChange={e => setDeliveryFee(e.target.value)}
+                      onChange={e => { setDeliveryFee(e.target.value); clearFieldError('deliveryFee'); }}
+                      onBlur={() => handleFieldBlur('deliveryFee')}
+                      aria-invalid={!!errors.deliveryFee}
                       style={{ width: '100%', borderColor: errors.deliveryFee ? '#EF4444' : undefined }}
                     />
-                    {errors.deliveryFee && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.deliveryFee}</span>}
+                    {errors.deliveryFee && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.deliveryFee}</span>}
                   </div>
 
                   <div>
@@ -683,10 +949,12 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                       step="0.5"
                       placeholder="Ej: 5"
                       value={deliveryRadiusKm}
-                      onChange={e => setDeliveryRadiusKm(e.target.value)}
+                      onChange={e => { setDeliveryRadiusKm(e.target.value); clearFieldError('deliveryRadiusKm'); }}
+                      onBlur={() => handleFieldBlur('deliveryRadiusKm')}
+                      aria-invalid={!!errors.deliveryRadiusKm}
                       style={{ width: '100%', borderColor: errors.deliveryRadiusKm ? '#EF4444' : undefined }}
                     />
-                    {errors.deliveryRadiusKm && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.deliveryRadiusKm}</span>}
+                    {errors.deliveryRadiusKm && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.deliveryRadiusKm}</span>}
                   </div>
                 </motion.div>
               )}
@@ -716,10 +984,12 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     type="number"
                     placeholder="Ej: 20000"
                     value={minOrder}
-                    onChange={e => setMinOrder(e.target.value)}
+                    onChange={e => { setMinOrder(e.target.value); clearFieldError('minOrder'); }}
+                    onBlur={() => handleFieldBlur('minOrder')}
+                    aria-invalid={!!errors.minOrder}
                     style={{ width: '100%', borderColor: errors.minOrder ? '#EF4444' : undefined }}
                   />
-                  {errors.minOrder && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.minOrder}</span>}
+                  {errors.minOrder && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.minOrder}</span>}
                 </div>
               </div>
 
@@ -738,19 +1008,22 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
               </div>
 
               {/* Terms Checkbox */}
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${errors.terms ? '#EF4444' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '12px' }}>
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                   <input
                     type="checkbox"
                     checked={termsAccepted}
-                    onChange={e => setTermsAccepted(e.target.checked)}
+                    onChange={e => {
+                      setTermsAccepted(e.target.checked);
+                      if (e.target.checked) clearFieldError('terms');
+                    }}
                     style={{ marginTop: '2px' }}
                   />
                   <span>
                     Acepto los Términos del Servicio y la tarifa de comisión transparente del <strong>3% por pedido procesado</strong> en GastroSync.
                   </span>
                 </label>
-                {errors.terms && <span style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '4px', display: 'block' }}>{errors.terms}</span>}
+                {errors.terms && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '4px', display: 'block', fontWeight: 600 }}>{errors.terms}</span>}
               </div>
 
               {/* Submit Buttons */}
@@ -774,8 +1047,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                 >
                   {isSubmitting ? (
                     <>
-                      <div className="spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                      Enviando Solicitud...
+                      <span className="auth-spinner" aria-hidden="true" />
+                      <span>Enviando Solicitud...</span>
                     </>
                   ) : (
                     'Enviar Solicitud de Aliado'
