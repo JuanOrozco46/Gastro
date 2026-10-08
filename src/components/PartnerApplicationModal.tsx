@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/useApp';
 import { motion } from 'framer-motion';
-import { X, Building2, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck, Upload, Image, Clock, FileText, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react';
+import { X, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck, Upload, Image, Clock, FileText, AlertCircle, Lock, Eye, EyeOff, Store, Sparkles, Check, ShoppingBag, Bike, QrCode } from 'lucide-react';
 import type { OrderFulfillment } from '../types';
 import { PLATFORM_COMMISSION_RATE } from '../services/supabaseDataService';
 import {
@@ -337,729 +337,534 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     onClose();
   };
 
+
+  /* ── Progreso de campos obligatorios ── */
+  const requiredChecks: boolean[] = [
+    !validateName(ownerName),
+    !validatePhone(ownerPhone),
+    !validateEmail(ownerEmail),
+    ...(authMode === 'remote'
+      ? [!validateRegisterPassword(ownerPassword), !validatePasswordConfirm(ownerPassword, ownerPasswordConfirm)]
+      : []),
+    !!restaurantName.trim(),
+    !!address.trim(),
+    deliveryModes.length > 0,
+    termsAccepted,
+  ];
+  const completed = requiredChecks.filter(Boolean).length;
+  const progress = Math.round((completed / requiredChecks.length) * 100);
+
+  const ownerDone = !validateName(ownerName) && !validatePhone(ownerPhone) && !validateEmail(ownerEmail);
+  const accountDone = !validateRegisterPassword(ownerPassword) && !validatePasswordConfirm(ownerPassword, ownerPasswordConfirm);
+  const restaurantDone = !!restaurantName.trim() && !!category;
+  const locationDone = !!cityId && !!zoneId && !!address.trim();
+
+  const stepOffset = authMode === 'remote' ? 1 : 0;
+
+  const onDropFile = (e: React.DragEvent<HTMLLabelElement>, type: 'logo' | 'banner') => {
+    e.preventDefault();
+    if (!e.dataTransfer.files?.length) return;
+    handleFileChange({ target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>, type);
+  };
+
+  const inputCls = (name: string, extra = '') => `pam-input ${errors[name] ? 'has-error' : ''} ${extra}`;
+
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 10000,
-        background: 'rgba(8, 12, 20, 0.85)',
-        backdropFilter: 'blur(16px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1.25rem',
-        overflowY: 'auto'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <div
+      className="pam-overlay"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="partner-modal-title"
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        initial={{ opacity: 0, scale: 0.96, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 15 }}
-        className="card"
-        style={{
-          width: '100%',
-          maxWidth: '680px',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          background: 'var(--glass-dark)',
-          backdropFilter: 'blur(24px)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: '28px',
-          padding: '2rem',
-          position: 'relative'
-        }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className="pam-modal"
       >
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: 'none',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-          aria-label="Cerrar modal"
-        >
-          <X size={20} />
-        </button>
+        {/* ── Header ── */}
+        <header className="pam-header">
+          <div className="pam-header-glow" />
+          <button type="button" onClick={onClose} className="pam-close" aria-label="Cerrar modal">
+            <X size={18} />
+          </button>
+          <div className="pam-header-row">
+            <div className="pam-header-icon"><Store size={24} /></div>
+            <div>
+              <span className="pam-eyebrow">Programa de Aliados · GastroSync</span>
+              <h3 id="partner-modal-title">
+                {submittedSuccess ? '¡Solicitud enviada!' : 'Registra tu restaurante'}
+              </h3>
+              {!submittedSuccess && (
+                <p>Llega a más clientes en {selectedCityName}. Completa el formulario en menos de 5 minutos.</p>
+              )}
+            </div>
+          </div>
+
+          {!submittedSuccess && (
+            <>
+              <div className="pam-benefits">
+                <span><Sparkles size={13} /> Sin mensualidad</span>
+                <span><ShieldCheck size={13} /> Comisión del 3%</span>
+                <span><Clock size={13} /> Revisión en 24–48 h</span>
+              </div>
+              <div className="pam-progress">
+                <div className="pam-progress-label">
+                  <span>Progreso del formulario</span>
+                  <strong>{progress}%</strong>
+                </div>
+                <div className="pam-progress-track">
+                  <motion.div className="pam-progress-fill" animate={{ width: `${progress}%` }} transition={{ duration: 0.35 }} />
+                </div>
+              </div>
+            </>
+          )}
+        </header>
 
         {submittedSuccess ? (
-          <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
-              <CheckCircle2 size={36} />
-            </div>
-
-            <h3 id="partner-modal-title" style={{ fontSize: '1.5rem', fontWeight: 900, color: 'white', marginBottom: '10px' }}>
-              🎉 ¡Solicitud Registrada con Éxito!
-            </h3>
-
-            <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
-              Tu solicitud para vincular el restaurante <strong>{restaurantName}</strong> a la red local de GastroSync en <strong>{selectedCityName}</strong> ha sido recibida correctamente (Estado: <span style={{ color: '#F59E0B', fontWeight: 800 }}>Pendiente de Revisión</span>).
+          /* ── Pantalla de éxito ── */
+          <div className="pam-body pam-success">
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+              className="pam-success-icon"
+            >
+              <CheckCircle2 size={40} />
+            </motion.div>
+            <p className="pam-success-lead">
+              Recibimos la solicitud de <strong>{restaurantName}</strong> en <strong>{selectedCityName}</strong>.
+              Estado actual: <span className="pam-badge-pending">Pendiente de revisión</span>
             </p>
 
             {accountNotice && (
-              <div style={{ background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.35)', borderRadius: '14px', padding: '12px 14px', fontSize: '0.84rem', color: '#BFDBFE', marginBottom: '1rem', textAlign: 'left', lineHeight: 1.5 }}>
-                🔐 <strong>Cuenta existente detectada:</strong> {accountNotice}
-              </div>
+              <div className="pam-callout info"><Lock size={16} /><span><strong>Cuenta existente:</strong> {accountNotice}</span></div>
             )}
-
             {accountCreated && (
-              <div style={{ background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '14px', padding: '12px 14px', fontSize: '0.84rem', color: '#A7F3D0', marginBottom: '1rem', textAlign: 'left', lineHeight: 1.5 }}>
-                ✅ <strong>Cuenta de acceso creada ({ownerEmail}):</strong> Revisa tu bandeja de entrada para confirmar tu correo electrónico (si aplica).
+              <div className="pam-callout success">
+                <Mail size={16} />
+                <span><strong>Cuenta creada para {ownerEmail}.</strong> Revisa tu bandeja de entrada para confirmar tu correo.</span>
               </div>
             )}
 
-            <div style={{ background: 'rgba(255,255,255,0.04)', padding: '1rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.75rem', lineHeight: 1.5 }}>
-              ℹ️ <strong>Siguientes pasos:</strong> El equipo administrativo revisará tu propuesta comercial. {authMode === 'remote'
-                ? 'Una vez aprobada la solicitud, tu cuenta quedará vinculada automáticamente como propietario del restaurante para gestionar tu menú, zonas de despacho y pedidos en tiempo real.'
-                : 'Una vez aprobada, recibirás las credenciales de acceso para gestionar tu menú, zonas de despacho y pedidos en tiempo real.'}
-            </div>
+            <ol className="pam-timeline">
+              <li className="done">
+                <span className="dot"><Check size={12} strokeWidth={3} /></span>
+                <div><strong>Solicitud enviada</strong><p>Tus datos llegaron correctamente.</p></div>
+              </li>
+              <li className="current">
+                <span className="dot" />
+                <div><strong>Revisión del equipo</strong><p>Validamos tu información en 24–48 horas hábiles.</p></div>
+              </li>
+              <li>
+                <span className="dot" />
+                <div>
+                  <strong>Activación</strong>
+                  <p>
+                    {authMode === 'remote'
+                      ? 'Tu cuenta quedará vinculada como propietario para gestionar menú y pedidos.'
+                      : 'Recibirás tus credenciales para gestionar menú y pedidos.'}
+                  </p>
+                </div>
+              </li>
+            </ol>
 
-            <button
-              onClick={handleResetAndClose}
-              className="btn btn-primary"
-              style={{ padding: '12px 28px', fontSize: '0.95rem', fontWeight: 800, borderRadius: '14px', width: '100%' }}
-            >
-              Entendido / Cerrar
+            <button type="button" onClick={handleResetAndClose} className="pam-btn-primary pam-btn-block">
+              Entendido
             </button>
           </div>
         ) : (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: 'var(--primary-glow)', border: '1px solid var(--primary-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
-                <Building2 size={24} />
-              </div>
-              <div>
-                <h3 id="partner-modal-title" style={{ margin: 0, color: 'white', fontSize: '1.3rem', fontWeight: 900 }}>
-                  Únete como Restaurante Aliado
-                </h3>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                  Solicitud de vinculación comercial · GastroSync Multi-Ciudad
-                </span>
-              </div>
-            </div>
+          <form onSubmit={handleSubmit} noValidate className="pam-form">
+            <div className="pam-body">
+              {submitError && (
+                <div role="alert" className="pam-callout error"><AlertCircle size={16} /><span>{submitError}</span></div>
+              )}
 
-            {/* Business Disclaimer */}
-            <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '14px', padding: '10px 14px', fontSize: '0.8rem', color: '#FCD34D', marginBottom: '1.25rem', lineHeight: 1.45, display: 'flex', gap: '10px' }}>
-              <ShieldCheck size={18} style={{ flexShrink: 0, marginTop: '2px', color: '#F59E0B' }} />
-              <div>
-                {authMode === 'remote' ? (
-                  <>
-                    <strong>Registro y Revisión Previa:</strong> Crea tu cuenta de acceso y envía los datos de tu restaurante. Cuando el equipo administrativo apruebe tu solicitud, tu cuenta quedará vinculada como propietario.
-                  </>
-                ) : (
-                  <>
-                    <strong>Aviso de Revisión Previa:</strong> Registro formal sin contraseña inicial. Tu solicitud será evaluada por el equipo administrativo antes de activar tu perfil de restaurante.
-                  </>
-                )}
-              </div>
-            </div>
-
-            {submitError && (
-              <div role="alert" style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '14px', padding: '10px 14px', fontSize: '0.82rem', color: '#FCA5A5', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <AlertCircle size={18} style={{ flexShrink: 0, color: '#EF4444' }} />
-                <span>{submitError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              
-              {/* Owner Info Section */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label htmlFor="ownerName" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Nombre del Responsable *
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                    <input
-                      id="ownerName"
-                      type="text"
-                      placeholder="Ej: Carlos Gómez"
-                      value={ownerName}
-                      onChange={e => { setOwnerName(e.target.value); clearFieldError('ownerName'); }}
-                      onBlur={() => handleFieldBlur('ownerName')}
-                      aria-invalid={!!errors.ownerName}
-                      style={{ width: '100%', paddingLeft: '38px', borderColor: errors.ownerName ? '#EF4444' : undefined }}
-                    />
-                  </div>
-                  {errors.ownerName && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.ownerName}</span>}
-                </div>
-
-                <div>
-                  <label htmlFor="ownerPhone" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Teléfono de Contacto *
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Phone size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                    <input
-                      id="ownerPhone"
-                      type="tel"
-                      placeholder="Ej: (300) 123-4567"
-                      value={ownerPhone}
-                      onChange={e => { setOwnerPhone(e.target.value); clearFieldError('ownerPhone'); }}
-                      onBlur={() => handleFieldBlur('ownerPhone')}
-                      aria-invalid={!!errors.ownerPhone}
-                      style={{ width: '100%', paddingLeft: '38px', borderColor: errors.ownerPhone ? '#EF4444' : undefined }}
-                    />
-                  </div>
-                  {errors.ownerPhone && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.ownerPhone}</span>}
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="ownerEmail" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                  Correo Electrónico de Contacto *
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                  <input
-                    id="ownerEmail"
-                    type="email"
-                    placeholder="contacto@turestaurante.co"
-                    value={ownerEmail}
-                    onChange={e => { setOwnerEmail(e.target.value); clearFieldError('ownerEmail'); }}
-                    onBlur={() => handleFieldBlur('ownerEmail')}
-                    aria-invalid={!!errors.ownerEmail}
-                    style={{ width: '100%', paddingLeft: '38px', borderColor: errors.ownerEmail ? '#EF4444' : undefined }}
-                  />
-                </div>
-                {errors.ownerEmail && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.ownerEmail}</span>}
-              </div>
-
-              {/* Nueva sección: Tu cuenta de acceso (solo en modo remoto) */}
-              {authMode === 'remote' && (
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(200, 90, 56, 0.3)',
-                  borderRadius: '14px',
-                  padding: '14px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px'
-                }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'white', fontSize: '0.86rem', fontWeight: 800 }}>
-                      <Lock size={16} style={{ color: 'var(--primary)' }} />
-                      <span>Tu cuenta de acceso</span>
+              {/* 1. Responsable */}
+              <section className="pam-section">
+                <SectionHead step={1} title="Datos del responsable" desc="Persona de contacto para la revisión de la solicitud." done={ownerDone} />
+                <div className="pam-grid">
+                  <div className="pam-field">
+                    <label htmlFor="ownerName">Nombre completo <em>*</em></label>
+                    <div className="pam-input-wrap">
+                      <User size={16} className="pam-icon" />
+                      <input id="ownerName" type="text" placeholder="Ej: Carlos Gómez" value={ownerName}
+                        onChange={e => { setOwnerName(e.target.value); clearFieldError('ownerName'); }}
+                        onBlur={() => handleFieldBlur('ownerName')}
+                        aria-invalid={!!errors.ownerName} aria-describedby={errors.ownerName ? 'ownerName-error' : undefined}
+                        className={inputCls('ownerName')} />
                     </div>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
-                      Define la contraseña con la que administrarás tu restaurante una vez aprobada la solicitud.
-                    </span>
+                    <FieldError name="ownerName" error={errors.ownerName} />
                   </div>
+                  <div className="pam-field">
+                    <label htmlFor="ownerPhone">Teléfono <em>*</em></label>
+                    <div className="pam-input-wrap">
+                      <Phone size={16} className="pam-icon" />
+                      <input id="ownerPhone" type="tel" placeholder="Ej: 300 123 4567" value={ownerPhone}
+                        onChange={e => { setOwnerPhone(e.target.value); clearFieldError('ownerPhone'); }}
+                        onBlur={() => handleFieldBlur('ownerPhone')}
+                        aria-invalid={!!errors.ownerPhone} aria-describedby={errors.ownerPhone ? 'ownerPhone-error' : undefined}
+                        className={inputCls('ownerPhone')} />
+                    </div>
+                    <FieldError name="ownerPhone" error={errors.ownerPhone} />
+                  </div>
+                  <div className="pam-field pam-span-2">
+                    <label htmlFor="ownerEmail">Correo electrónico <em>*</em></label>
+                    <div className="pam-input-wrap">
+                      <Mail size={16} className="pam-icon" />
+                      <input id="ownerEmail" type="email" placeholder="contacto@turestaurante.co" value={ownerEmail}
+                        onChange={e => { setOwnerEmail(e.target.value); clearFieldError('ownerEmail'); }}
+                        onBlur={() => handleFieldBlur('ownerEmail')}
+                        aria-invalid={!!errors.ownerEmail} aria-describedby={errors.ownerEmail ? 'ownerEmail-error' : undefined}
+                        className={inputCls('ownerEmail')} />
+                    </div>
+                    <FieldError name="ownerEmail" error={errors.ownerEmail} />
+                  </div>
+                </div>
+              </section>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label htmlFor="ownerPassword" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                        Contraseña *
-                      </label>
-                      <div style={{ position: 'relative' }}>
-                        <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                        <input
-                          id="ownerPassword"
-                          type={showOwnerPassword ? 'text' : 'password'}
-                          placeholder="Mínimo 8 caracteres"
+              {/* 2. Cuenta de acceso */}
+              {authMode === 'remote' && (
+                <section className="pam-section">
+                  <SectionHead step={2} title="Tu cuenta de acceso" desc="Con esta contraseña administrarás tu restaurante cuando sea aprobado." done={accountDone} />
+                  <div className="pam-grid">
+                    <div className="pam-field">
+                      <label htmlFor="ownerPassword">Contraseña <em>*</em></label>
+                      <div className="pam-input-wrap">
+                        <Lock size={16} className="pam-icon" />
+                        <input id="ownerPassword" type={showOwnerPassword ? 'text' : 'password'} placeholder="Mínimo 8 caracteres"
                           value={ownerPassword}
                           onChange={e => { setOwnerPassword(e.target.value); clearFieldError('ownerPassword'); }}
-                          onBlur={() => {
-                            handleFieldBlur('ownerPassword');
-                            if (ownerPasswordConfirm) handleFieldBlur('ownerPasswordConfirm');
-                          }}
-                          aria-invalid={!!errors.ownerPassword}
-                          style={{ width: '100%', paddingLeft: '38px', paddingRight: '38px', borderColor: errors.ownerPassword ? '#EF4444' : undefined }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowOwnerPassword(v => !v)}
-                          aria-label={showOwnerPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                          style={{
-                            position: 'absolute',
-                            right: '10px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text-muted)',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            display: 'flex',
-                            alignItems: 'center'
-                          }}
-                        >
-                          {showOwnerPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                          onBlur={() => { handleFieldBlur('ownerPassword'); if (ownerPasswordConfirm) handleFieldBlur('ownerPasswordConfirm'); }}
+                          aria-invalid={!!errors.ownerPassword} aria-describedby={errors.ownerPassword ? 'ownerPassword-error' : undefined}
+                          className={inputCls('ownerPassword', 'with-toggle')} />
+                        <button type="button" className="pam-toggle" onClick={() => setShowOwnerPassword(v => !v)}
+                          aria-label={showOwnerPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+                          {showOwnerPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
-                      {errors.ownerPassword && (
-                        <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>
-                          {errors.ownerPassword}
-                        </span>
-                      )}
+                      <FieldError name="ownerPassword" error={errors.ownerPassword} />
                     </div>
-
-                    <div>
-                      <label htmlFor="ownerPasswordConfirm" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                        Confirmar Contraseña *
-                      </label>
-                      <div style={{ position: 'relative' }}>
-                        <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                        <input
-                          id="ownerPasswordConfirm"
-                          type={showOwnerPassword ? 'text' : 'password'}
-                          placeholder="Repite tu contraseña"
+                    <div className="pam-field">
+                      <label htmlFor="ownerPasswordConfirm">Confirmar contraseña <em>*</em></label>
+                      <div className="pam-input-wrap">
+                        <Lock size={16} className="pam-icon" />
+                        <input id="ownerPasswordConfirm" type={showOwnerPassword ? 'text' : 'password'} placeholder="Repite tu contraseña"
                           value={ownerPasswordConfirm}
                           onChange={e => { setOwnerPasswordConfirm(e.target.value); clearFieldError('ownerPasswordConfirm'); }}
                           onBlur={() => handleFieldBlur('ownerPasswordConfirm')}
-                          aria-invalid={!!errors.ownerPasswordConfirm}
-                          style={{ width: '100%', paddingLeft: '38px', borderColor: errors.ownerPasswordConfirm ? '#EF4444' : undefined }}
-                        />
+                          aria-invalid={!!errors.ownerPasswordConfirm} aria-describedby={errors.ownerPasswordConfirm ? 'ownerPasswordConfirm-error' : undefined}
+                          className={inputCls('ownerPasswordConfirm')} />
                       </div>
-                      {errors.ownerPasswordConfirm && (
-                        <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>
-                          {errors.ownerPasswordConfirm}
-                        </span>
-                      )}
+                      <FieldError name="ownerPasswordConfirm" error={errors.ownerPasswordConfirm} />
                     </div>
                   </div>
 
                   {ownerPassword.length > 0 && (
-                    <div>
-                      <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                    <div className="pam-strength">
+                      <div className="pam-strength-bars">
                         {[0, 1, 2, 3, 4].map(i => (
-                          <div
-                            key={i}
-                            style={{
-                              flex: 1,
-                              height: '4px',
-                              borderRadius: '2px',
-                              background: i < passwordStrength.score
-                                ? passwordStrength.color
-                                : 'rgba(255, 255, 255, 0.15)',
-                              transition: 'all 0.3s'
-                            }}
-                          />
+                          <span key={i} style={{ background: i < passwordStrength.score ? passwordStrength.color : undefined }} />
                         ))}
                       </div>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: passwordStrength.color }}>
-                        Seguridad: {passwordStrength.label}
-                      </span>
-                      {passwordStrength.score < 3 && (
-                        <div style={{ marginTop: '3px', display: 'flex', flexWrap: 'wrap', gap: '6px 12px' }}>
-                          {passwordStrength.checks.filter(c => !c.passed).map((c, i) => (
-                            <span key={i} style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                              • {c.text}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      <div className="pam-strength-row">
+                        <strong style={{ color: passwordStrength.color }}>Seguridad: {passwordStrength.label}</strong>
+                      </div>
+                      <ul className="pam-checks">
+                        {passwordStrength.checks.map((c, i) => (
+                          <li key={i} className={c.passed ? 'ok' : ''}>
+                            {c.passed ? <Check size={12} strokeWidth={3} /> : <span className="pam-check-dot" />} {c.text}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
-                </div>
+                </section>
               )}
 
-              {/* Restaurant Details */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label htmlFor="restaurantName" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Nombre del Restaurante *
-                  </label>
-                  <input
-                    id="restaurantName"
-                    type="text"
-                    placeholder="Ej: La Trattoria"
-                    value={restaurantName}
-                    onChange={e => { setRestaurantName(e.target.value); clearFieldError('restaurantName'); }}
-                    onBlur={() => handleFieldBlur('restaurantName')}
-                    aria-invalid={!!errors.restaurantName}
-                    style={{ width: '100%', borderColor: errors.restaurantName ? '#EF4444' : undefined }}
-                  />
-                  {errors.restaurantName && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.restaurantName}</span>}
+              {/* 3. Restaurante */}
+              <section className="pam-section">
+                <SectionHead step={2 + stepOffset} title="Tu restaurante" desc="Así te verán los clientes en GastroSync." done={restaurantDone} />
+                <div className="pam-field">
+                  <label htmlFor="restaurantName">Nombre del restaurante <em>*</em></label>
+                  <div className="pam-input-wrap">
+                    <Store size={16} className="pam-icon" />
+                    <input id="restaurantName" type="text" placeholder="Ej: La Trattoria" value={restaurantName}
+                      onChange={e => { setRestaurantName(e.target.value); clearFieldError('restaurantName'); }}
+                      onBlur={() => handleFieldBlur('restaurantName')}
+                      aria-invalid={!!errors.restaurantName} aria-describedby={errors.restaurantName ? 'restaurantName-error' : undefined}
+                      className={inputCls('restaurantName')} />
+                  </div>
+                  <FieldError name="restaurantName" error={errors.restaurantName} />
                 </div>
 
-                <div>
-                  <label htmlFor="category" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Categoría Gastronómica *
-                  </label>
-                  <select
-                    id="category"
-                    value={category}
-                    onChange={e => { setCategory(e.target.value); clearFieldError('category'); }}
-                    onBlur={() => handleFieldBlur('category')}
-                    style={{ width: '100%' }}
-                  >
-                    <option value="Hamburguesas">Hamburguesas</option>
-                    <option value="Italiana">Italiana / Pasta</option>
-                    <option value="Pizzería">Pizzería</option>
-                    <option value="Mexicana">Mexicana / Tacos</option>
-                    <option value="Asiática">Asiática / Sushi</option>
-                    <option value="Típica">Típica / Parrilla</option>
-                    <option value="Postres">Postres / Repostería</option>
-                    <option value="Cafetería">Cafetería / Panadería</option>
-                    <option value="Otra">Otra propuesta</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label htmlFor="description" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                  Propuesta Gastronómica / Descripción Corta
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <FileText size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                  <textarea
-                    id="description"
-                    rows={2}
-                    placeholder="Ej: Hamburguesas artesanales de carne 100% madurada, pan brioche horneado a diario..."
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                    style={{ width: '100%', paddingLeft: '38px', resize: 'vertical' }}
-                  />
-                </div>
-              </div>
-
-              {/* Location */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label htmlFor="cityId" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Ciudad de Operación *
-                  </label>
-                  <select
-                    id="cityId"
-                    value={cityId}
-                    onChange={e => handleCityChange(e.target.value)}
-                    onBlur={() => handleFieldBlur('cityId')}
-                    style={{ width: '100%' }}
-                  >
-                    {activeCities.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                <div className="pam-field">
+                  <label>Categoría gastronómica <em>*</em></label>
+                  <div className="pam-chips" role="radiogroup" aria-label="Categoría gastronómica">
+                    {CATEGORIES.map(c => (
+                      <button key={c.value} type="button" role="radio" aria-checked={category === c.value}
+                        className={`pam-chip ${category === c.value ? 'active' : ''}`}
+                        onClick={() => { setCategory(c.value); clearFieldError('category'); }}>
+                        <span>{c.emoji}</span> {c.label}
+                      </button>
                     ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="zoneId" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Zona Urbana *
-                  </label>
-                  <select
-                    id="zoneId"
-                    value={zoneId}
-                    onChange={e => { setZoneId(e.target.value); clearFieldError('zoneId'); }}
-                    onBlur={() => handleFieldBlur('zoneId')}
-                    style={{ width: '100%' }}
-                  >
-                    {cityZones.map(z => (
-                      <option key={z.id} value={z.id}>Zona {z.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="address" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                  Dirección o Referencia Comercial *
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <MapPin size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                  <input
-                    id="address"
-                    type="text"
-                    placeholder="Ej: Carrera 14 # 19-25, Sector Norte"
-                    value={address}
-                    onChange={e => { setAddress(e.target.value); clearFieldError('address'); }}
-                    onBlur={() => handleFieldBlur('address')}
-                    aria-invalid={!!errors.address}
-                    style={{ width: '100%', paddingLeft: '38px', borderColor: errors.address ? '#EF4444' : undefined }}
-                  />
-                </div>
-                {errors.address && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.address}</span>}
-              </div>
-
-              {/* Operations & Schedule */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label htmlFor="scheduleHours" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Horario de Atención (Opcional)
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Clock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                    <input
-                      id="scheduleHours"
-                      type="text"
-                      placeholder="Ej: Lun-Dom: 11:00 am - 10:00 pm"
-                      value={scheduleHours}
-                      onChange={e => setScheduleHours(e.target.value)}
-                      style={{ width: '100%', paddingLeft: '38px' }}
-                    />
                   </div>
+                  <FieldError name="category" error={errors.category} />
                 </div>
 
-                <div>
-                  <label htmlFor="estimatedDeliveryMinutes" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Tiempo de Prep. (Minutos, Opcional)
-                  </label>
-                  <input
-                    id="estimatedDeliveryMinutes"
-                    type="number"
-                    placeholder="Ej: 30"
-                    value={estimatedDeliveryMinutes}
-                    onChange={e => { setEstimatedDeliveryMinutes(e.target.value); clearFieldError('estimatedDeliveryMinutes'); }}
-                    onBlur={() => handleFieldBlur('estimatedDeliveryMinutes')}
-                    aria-invalid={!!errors.estimatedDeliveryMinutes}
-                    style={{ width: '100%', borderColor: errors.estimatedDeliveryMinutes ? '#EF4444' : undefined }}
-                  />
-                  {errors.estimatedDeliveryMinutes && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.estimatedDeliveryMinutes}</span>}
+                <div className="pam-field">
+                  <label htmlFor="description">Descripción corta <span className="pam-opt">Opcional</span></label>
+                  <div className="pam-input-wrap">
+                    <FileText size={16} className="pam-icon top" />
+                    <textarea id="description" rows={3} maxLength={280}
+                      placeholder="Ej: Hamburguesas artesanales de carne madurada y pan brioche horneado a diario."
+                      value={description} onChange={e => setDescription(e.target.value)} className="pam-input" />
+                  </div>
+                  <span className="pam-hint">{description.length}/280</span>
                 </div>
-              </div>
+              </section>
 
-              {/* Branding Image Uploads */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Logo del Restaurante (JPG, PNG, max 5MB)
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', cursor: 'pointer', border: '1px dashed rgba(255,255,255,0.2)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    <Upload size={16} />
-                    <span>{logoFile ? logoFile.name : 'Subir Logo'}</span>
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      style={{ display: 'none' }}
-                      onChange={e => handleFileChange(e, 'logo')}
-                    />
-                  </label>
-                  {logoPreviewUrl && (
-                    <img src={logoPreviewUrl} alt="Logo preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', marginTop: '8px' }} />
-                  )}
-                  {logoCompression && (
-                    <div style={{ fontSize: '0.7rem', color: '#10B981', marginTop: '4px' }}>
-                      Comprimido: {(logoCompression.original / 1024 / 1024).toFixed(1)}MB → {(logoCompression.final / 1024 / 1024).toFixed(1)}MB
+              {/* 4. Ubicación y operación */}
+              <section className="pam-section">
+                <SectionHead step={3 + stepOffset} title="Ubicación y operación" desc="Dónde estás y cómo trabajas." done={locationDone} />
+                <div className="pam-grid">
+                  <div className="pam-field">
+                    <label htmlFor="cityId">Ciudad <em>*</em></label>
+                    <div className="pam-input-wrap">
+                      <MapPin size={16} className="pam-icon" />
+                      <select id="cityId" value={cityId} onChange={e => handleCityChange(e.target.value)}
+                        onBlur={() => handleFieldBlur('cityId')} className={inputCls('cityId')}>
+                        {activeCities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
                     </div>
-                  )}
-                  {errors.logo && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.logo}</span>}
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Portada / Banner (JPG, PNG, max 12MB)
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', cursor: 'pointer', border: '1px dashed rgba(255,255,255,0.2)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    <Image size={16} />
-                    <span>{bannerFile ? bannerFile.name : 'Subir Portada'}</span>
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      style={{ display: 'none' }}
-                      onChange={e => handleFileChange(e, 'banner')}
-                    />
-                  </label>
-                  {bannerPreviewUrl && (
-                    <img src={bannerPreviewUrl} alt="Banner preview" style={{ width: '100px', height: '48px', objectFit: 'cover', borderRadius: '8px', marginTop: '8px' }} />
-                  )}
-                  {bannerCompression && (
-                    <div style={{ fontSize: '0.7rem', color: '#10B981', marginTop: '4px' }}>
-                      Comprimido: {(bannerCompression.original / 1024 / 1024).toFixed(1)}MB → {(bannerCompression.final / 1024 / 1024).toFixed(1)}MB
+                    <FieldError name="cityId" error={errors.cityId} />
+                  </div>
+                  <div className="pam-field">
+                    <label htmlFor="zoneId">Zona <em>*</em></label>
+                    <div className="pam-input-wrap">
+                      <MapPin size={16} className="pam-icon" />
+                      <select id="zoneId" value={zoneId} onChange={e => { setZoneId(e.target.value); clearFieldError('zoneId'); }}
+                        onBlur={() => handleFieldBlur('zoneId')} className={inputCls('zoneId')}>
+                        {cityZones.length === 0 && <option value="">Sin zonas disponibles</option>}
+                        {cityZones.map(z => <option key={z.id} value={z.id}>Zona {z.name}</option>)}
+                      </select>
                     </div>
-                  )}
-                  {errors.banner && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '2px', display: 'block' }}>{errors.banner}</span>}
-                </div>
-              </div>
-
-              {/* Delivery Modes Checkboxes */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '6px' }}>
-                  Modalidades de Atención Ofrecidas * (Selecciona al menos 1)
-                </label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${deliveryModes.includes('pickup') ? 'var(--primary)' : 'rgba(255,255,255,0.1)'}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.82rem', color: 'white' }}>
-                    <input
-                      type="checkbox"
-                      checked={deliveryModes.includes('pickup')}
-                      onChange={() => handleModeToggle('pickup')}
-                    />
-                    <span>🛍️ Recogida en local</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${deliveryModes.includes('restaurant_delivery') ? 'var(--primary)' : 'rgba(255,255,255,0.1)'}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.82rem', color: 'white' }}>
-                    <input
-                      type="checkbox"
-                      checked={deliveryModes.includes('restaurant_delivery')}
-                      onChange={() => handleModeToggle('restaurant_delivery')}
-                    />
-                    <span>🛵 Entrega propia del restaurante</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${deliveryModes.includes('table_service') ? 'var(--primary)' : 'rgba(255,255,255,0.1)'}`, padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.82rem', color: 'white' }}>
-                    <input
-                      type="checkbox"
-                      checked={deliveryModes.includes('table_service')}
-                      onChange={() => handleModeToggle('table_service')}
-                    />
-                    <span>🍽️ Servicio en mesa (QR)</span>
-                  </label>
-                </div>
-                {errors.deliveryModes && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '4px', display: 'block', fontWeight: 600 }}>{errors.deliveryModes}</span>}
-              </div>
-
-              {/* Conditional Delivery Fee & Radius */}
-              {deliveryModes.includes('restaurant_delivery') && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'rgba(255, 85, 51, 0.06)', border: '1px solid var(--primary-glass-border)', padding: '12px', borderRadius: '14px' }}
-                >
-                  <div>
-                    <label htmlFor="deliveryFee" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                      Tarifa de Entrega (COP, Opcional)
-                    </label>
-                    <input
-                      id="deliveryFee"
-                      type="number"
-                      placeholder="Ej: 4000"
-                      value={deliveryFee}
-                      onChange={e => { setDeliveryFee(e.target.value); clearFieldError('deliveryFee'); }}
-                      onBlur={() => handleFieldBlur('deliveryFee')}
-                      aria-invalid={!!errors.deliveryFee}
-                      style={{ width: '100%', borderColor: errors.deliveryFee ? '#EF4444' : undefined }}
-                    />
-                    {errors.deliveryFee && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.deliveryFee}</span>}
+                    <FieldError name="zoneId" error={errors.zoneId} />
                   </div>
-
-                  <div>
-                    <label htmlFor="deliveryRadiusKm" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                      Radio de Cobertura (Km, Opcional)
-                    </label>
-                    <input
-                      id="deliveryRadiusKm"
-                      type="number"
-                      step="0.5"
-                      placeholder="Ej: 5"
-                      value={deliveryRadiusKm}
-                      onChange={e => { setDeliveryRadiusKm(e.target.value); clearFieldError('deliveryRadiusKm'); }}
-                      onBlur={() => handleFieldBlur('deliveryRadiusKm')}
-                      aria-invalid={!!errors.deliveryRadiusKm}
-                      style={{ width: '100%', borderColor: errors.deliveryRadiusKm ? '#EF4444' : undefined }}
-                    />
-                    {errors.deliveryRadiusKm && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.deliveryRadiusKm}</span>}
+                  <div className="pam-field pam-span-2">
+                    <label htmlFor="address">Dirección o referencia <em>*</em></label>
+                    <div className="pam-input-wrap">
+                      <MapPin size={16} className="pam-icon" />
+                      <input id="address" type="text" placeholder="Ej: Carrera 14 # 19-25, Sector Norte" value={address}
+                        onChange={e => { setAddress(e.target.value); clearFieldError('address'); }}
+                        onBlur={() => handleFieldBlur('address')}
+                        aria-invalid={!!errors.address} aria-describedby={errors.address ? 'address-error' : undefined}
+                        className={inputCls('address')} />
+                    </div>
+                    <FieldError name="address" error={errors.address} />
                   </div>
-                </motion.div>
-              )}
-
-              {/* Optional Fields */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label htmlFor="whatsapp" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    WhatsApp de Pedidos (Opcional)
-                  </label>
-                  <input
-                    id="whatsapp"
-                    type="tel"
-                    placeholder="Ej: +57 300 123 4567"
-                    value={whatsapp}
-                    onChange={e => setWhatsapp(e.target.value)}
-                    style={{ width: '100%' }}
-                  />
+                  <div className="pam-field">
+                    <label htmlFor="scheduleHours">Horario <span className="pam-opt">Opcional</span></label>
+                    <div className="pam-input-wrap">
+                      <Clock size={16} className="pam-icon" />
+                      <input id="scheduleHours" type="text" placeholder="Lun–Dom 11:00 a. m. – 10:00 p. m." value={scheduleHours}
+                        onChange={e => setScheduleHours(e.target.value)} className="pam-input" />
+                    </div>
+                  </div>
+                  <div className="pam-field">
+                    <label htmlFor="estimatedDeliveryMinutes">Tiempo de preparación <span className="pam-opt">Opcional</span></label>
+                    <div className="pam-input-wrap">
+                      <Clock size={16} className="pam-icon" />
+                      <input id="estimatedDeliveryMinutes" type="number" min={1} placeholder="Ej: 30" value={estimatedDeliveryMinutes}
+                        onChange={e => { setEstimatedDeliveryMinutes(e.target.value); clearFieldError('estimatedDeliveryMinutes'); }}
+                        onBlur={() => handleFieldBlur('estimatedDeliveryMinutes')}
+                        className={inputCls('estimatedDeliveryMinutes', 'with-suffix')} />
+                      <span className="pam-suffix">min</span>
+                    </div>
+                    <FieldError name="estimatedDeliveryMinutes" error={errors.estimatedDeliveryMinutes} />
+                  </div>
                 </div>
+              </section>
 
-                <div>
-                  <label htmlFor="minOrder" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                    Pedido Mínimo (COP, Opcional)
+              {/* 5. Imagen de marca */}
+              <section className="pam-section">
+                <SectionHead step={4 + stepOffset} title="Imagen de marca" desc="Opcional, pero los restaurantes con fotos reciben más pedidos." done={!!logoFile || !!bannerFile} />
+                <div className="pam-uploads">
+                  <label className={`pam-drop logo ${logoPreviewUrl ? 'has-file' : ''} ${errors.logo ? 'has-error' : ''}`}
+                    onDragOver={e => e.preventDefault()} onDrop={e => onDropFile(e, 'logo')}>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={e => handleFileChange(e, 'logo')} />
+                    {logoPreviewUrl ? (
+                      <img src={logoPreviewUrl} alt="Vista previa del logo" />
+                    ) : (
+                      <div className="pam-drop-empty"><Upload size={20} /><strong>Logo</strong><span>JPG, PNG o WEBP · máx. 5 MB</span></div>
+                    )}
+                    {logoPreviewUrl && <span className="pam-drop-change">Cambiar</span>}
                   </label>
-                  <input
-                    id="minOrder"
-                    type="number"
-                    placeholder="Ej: 20000"
-                    value={minOrder}
-                    onChange={e => { setMinOrder(e.target.value); clearFieldError('minOrder'); }}
-                    onBlur={() => handleFieldBlur('minOrder')}
-                    aria-invalid={!!errors.minOrder}
-                    style={{ width: '100%', borderColor: errors.minOrder ? '#EF4444' : undefined }}
-                  />
-                  {errors.minOrder && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '3px', display: 'block', fontWeight: 600 }}>{errors.minOrder}</span>}
+                  <label className={`pam-drop banner ${bannerPreviewUrl ? 'has-file' : ''} ${errors.banner ? 'has-error' : ''}`}
+                    onDragOver={e => e.preventDefault()} onDrop={e => onDropFile(e, 'banner')}>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={e => handleFileChange(e, 'banner')} />
+                    {bannerPreviewUrl ? (
+                      <img src={bannerPreviewUrl} alt="Vista previa de la portada" />
+                    ) : (
+                      <div className="pam-drop-empty"><Image size={20} /><strong>Portada</strong><span>Arrastra una imagen o haz clic · máx. 12 MB</span></div>
+                    )}
+                    {bannerPreviewUrl && <span className="pam-drop-change">Cambiar</span>}
+                  </label>
                 </div>
-              </div>
-
-              <div>
-                <label htmlFor="notes" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: 'white', marginBottom: '4px' }}>
-                  Comentarios o Notas Adicionales (Opcional)
-                </label>
-                <textarea
-                  id="notes"
-                  rows={2}
-                  placeholder="Cuéntanos brevemente sobre tu carta, especialidades o inquietudes..."
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              {/* Terms Checkbox */}
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${errors.terms ? '#EF4444' : 'rgba(255,255,255,0.08)'}`, borderRadius: '14px', padding: '12px' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  <input
-                    type="checkbox"
-                    checked={termsAccepted}
-                    onChange={e => {
-                      setTermsAccepted(e.target.checked);
-                      if (e.target.checked) clearFieldError('terms');
-                    }}
-                    style={{ marginTop: '2px' }}
-                  />
-                  <span>
-                    Acepto los Términos del Servicio y la tarifa de comisión transparente del <strong>3% por pedido procesado</strong> en GastroSync.
+                {(logoCompression || bannerCompression) && (
+                  <span className="pam-hint ok">
+                    <Check size={12} /> Imágenes optimizadas automáticamente
+                    {logoCompression && ` · logo ${(logoCompression.original / 1048576).toFixed(1)}→${(logoCompression.final / 1048576).toFixed(1)} MB`}
+                    {bannerCompression && ` · portada ${(bannerCompression.original / 1048576).toFixed(1)}→${(bannerCompression.final / 1048576).toFixed(1)} MB`}
                   </span>
-                </label>
-                {errors.terms && <span role="alert" style={{ fontSize: '0.72rem', color: '#EF4444', marginTop: '4px', display: 'block', fontWeight: 600 }}>{errors.terms}</span>}
-              </div>
+                )}
+                <FieldError name="logo" error={errors.logo} />
+                <FieldError name="banner" error={errors.banner} />
+              </section>
 
-              {/* Submit Buttons */}
-              <div style={{ display: 'flex', gap: '12px', marginTop: '0.75rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={onClose}
-                  disabled={isSubmitting}
-                  style={{ flex: 1, padding: '12px', borderRadius: '14px', opacity: isSubmitting ? 0.5 : 1 }}
-                >
-                  Cancelar
+              {/* 6. Modalidades */}
+              <section className="pam-section">
+                <SectionHead step={5 + stepOffset} title="Modalidades de atención" desc="Selecciona al menos una." done={deliveryModes.length > 0} />
+                <div className="pam-modes">
+                  {DELIVERY_OPTIONS.map(opt => {
+                    const active = deliveryModes.includes(opt.value);
+                    const Icon = opt.icon;
+                    return (
+                      <button key={opt.value} type="button" aria-pressed={active}
+                        className={`pam-mode ${active ? 'active' : ''}`} onClick={() => handleModeToggle(opt.value)}>
+                        <span className="pam-mode-check">{active && <Check size={12} strokeWidth={3} />}</span>
+                        <span className="pam-mode-icon"><Icon size={20} /></span>
+                        <strong>{opt.title}</strong>
+                        <span>{opt.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <FieldError name="deliveryModes" error={errors.deliveryModes} />
+
+                {deliveryModes.includes('restaurant_delivery') && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="pam-subpanel">
+                    <div className="pam-grid">
+                      <div className="pam-field">
+                        <label htmlFor="deliveryFee">Tarifa de domicilio <span className="pam-opt">Opcional</span></label>
+                        <div className="pam-input-wrap">
+                          <span className="pam-prefix">$</span>
+                          <input id="deliveryFee" type="number" min={0} placeholder="4000" value={deliveryFee}
+                            onChange={e => { setDeliveryFee(e.target.value); clearFieldError('deliveryFee'); }}
+                            onBlur={() => handleFieldBlur('deliveryFee')}
+                            className={inputCls('deliveryFee', 'with-suffix')} />
+                          <span className="pam-suffix">COP</span>
+                        </div>
+                        <FieldError name="deliveryFee" error={errors.deliveryFee} />
+                      </div>
+                      <div className="pam-field">
+                        <label htmlFor="deliveryRadiusKm">Radio de cobertura <span className="pam-opt">Opcional</span></label>
+                        <div className="pam-input-wrap">
+                          <MapPin size={16} className="pam-icon" />
+                          <input id="deliveryRadiusKm" type="number" min={0} step="0.5" placeholder="5" value={deliveryRadiusKm}
+                            onChange={e => { setDeliveryRadiusKm(e.target.value); clearFieldError('deliveryRadiusKm'); }}
+                            onBlur={() => handleFieldBlur('deliveryRadiusKm')}
+                            className={inputCls('deliveryRadiusKm', 'with-suffix')} />
+                          <span className="pam-suffix">km</span>
+                        </div>
+                        <FieldError name="deliveryRadiusKm" error={errors.deliveryRadiusKm} />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                <div className="pam-grid">
+                  <div className="pam-field">
+                    <label htmlFor="whatsapp">WhatsApp de pedidos <span className="pam-opt">Opcional</span></label>
+                    <div className="pam-input-wrap">
+                      <Phone size={16} className="pam-icon" />
+                      <input id="whatsapp" type="tel" placeholder="+57 300 123 4567" value={whatsapp}
+                        onChange={e => setWhatsapp(e.target.value)} className="pam-input" />
+                    </div>
+                  </div>
+                  <div className="pam-field">
+                    <label htmlFor="minOrder">Pedido mínimo <span className="pam-opt">Opcional</span></label>
+                    <div className="pam-input-wrap">
+                      <span className="pam-prefix">$</span>
+                      <input id="minOrder" type="number" min={0} placeholder="20000" value={minOrder}
+                        onChange={e => { setMinOrder(e.target.value); clearFieldError('minOrder'); }}
+                        onBlur={() => handleFieldBlur('minOrder')}
+                        className={inputCls('minOrder', 'with-suffix')} />
+                      <span className="pam-suffix">COP</span>
+                    </div>
+                    <FieldError name="minOrder" error={errors.minOrder} />
+                  </div>
+                  <div className="pam-field pam-span-2">
+                    <label htmlFor="notes">Notas adicionales <span className="pam-opt">Opcional</span></label>
+                    <textarea id="notes" rows={2} placeholder="Cuéntanos sobre tu carta, especialidades o inquietudes..."
+                      value={notes} onChange={e => setNotes(e.target.value)} className="pam-input no-icon" />
+                  </div>
+                </div>
+              </section>
+
+              {/* Términos */}
+              <label className={`pam-terms ${termsAccepted ? 'checked' : ''} ${errors.terms ? 'has-error' : ''}`}>
+                <input type="checkbox" checked={termsAccepted}
+                  onChange={e => { setTermsAccepted(e.target.checked); if (e.target.checked) clearFieldError('terms'); }} />
+                <span className="pam-terms-box">{termsAccepted && <Check size={13} strokeWidth={3} />}</span>
+                <span>
+                  Acepto los <strong>Términos del Servicio</strong> y la comisión transparente del <strong>3% por pedido procesado</strong> en GastroSync.
+                </span>
+              </label>
+              <FieldError name="terms" error={errors.terms} />
+            </div>
+
+            {/* ── Footer fijo ── */}
+            <footer className="pam-footer">
+              <span className="pam-footer-hint">
+                {completed}/{requiredChecks.length} campos obligatorios
+              </span>
+              <div className="pam-footer-actions">
+                <button type="button" className="pam-btn-ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</button>
+                <button type="submit" className="pam-btn-primary" disabled={isSubmitting}>
+                  {isSubmitting ? (<><span className="auth-spinner" aria-hidden="true" /> Enviando...</>) : 'Enviar solicitud'}
                 </button>
-                <motion.button
-                  whileHover={!isSubmitting ? { scale: 1.02 } : {}}
-                  whileTap={!isSubmitting ? { scale: 0.98 } : {}}
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="btn btn-primary"
-                  style={{ flex: 2, padding: '12px', fontWeight: 900, borderRadius: '14px', opacity: isSubmitting ? 0.7 : 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <span className="auth-spinner" aria-hidden="true" />
-                      <span>Enviando Solicitud...</span>
-                    </>
-                  ) : (
-                    'Enviar Solicitud de Aliado'
-                  )}
-                </motion.button>
               </div>
-
-            </form>
-          </div>
+            </footer>
+          </form>
         )}
       </motion.div>
     </div>
   );
 };
+
+const FieldError: React.FC<{ name: string; error?: string }> = ({ name, error }) =>
+  error ? (
+    <span id={`${name}-error`} role="alert" className="pam-error">
+      <AlertCircle size={12} /> {error}
+    </span>
+  ) : null;
+
+const SectionHead: React.FC<{ step: number; title: string; desc?: string; done?: boolean }> = ({ step, title, desc, done }) => (
+  <div className="pam-section-head">
+    <span className={`pam-step ${done ? 'done' : ''}`}>{done ? <Check size={14} strokeWidth={3} /> : step}</span>
+    <div>
+      <h4>{title}</h4>
+      {desc && <p>{desc}</p>}
+    </div>
+  </div>
+);
+
+const CATEGORIES = [
+  { value: 'Hamburguesas', label: 'Hamburguesas', emoji: '🍔' },
+  { value: 'Italiana', label: 'Italiana', emoji: '🍝' },
+  { value: 'Pizzería', label: 'Pizzería', emoji: '🍕' },
+  { value: 'Mexicana', label: 'Mexicana', emoji: '🌮' },
+  { value: 'Asiática', label: 'Asiática', emoji: '🍣' },
+  { value: 'Típica', label: 'Típica / Parrilla', emoji: '🥩' },
+  { value: 'Postres', label: 'Postres', emoji: '🍰' },
+  { value: 'Cafetería', label: 'Cafetería', emoji: '☕' },
+  { value: 'Otra', label: 'Otra', emoji: '🍽️' },
+];
+
+const DELIVERY_OPTIONS: { value: OrderFulfillment; title: string; desc: string; icon: React.ComponentType<{ size?: number }> }[] = [
+  { value: 'pickup', title: 'Recogida en local', desc: 'El cliente pasa por su pedido', icon: ShoppingBag },
+  { value: 'restaurant_delivery', title: 'Domicilio propio', desc: 'Tú entregas con tus repartidores', icon: Bike },
+  { value: 'table_service', title: 'Servicio en mesa', desc: 'Pedidos por código QR', icon: QrCode },
+];

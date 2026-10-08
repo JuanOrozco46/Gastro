@@ -699,17 +699,40 @@ export const LoginScreen: React.FC = () => {
         {/* Dedicated Restaurant Onboarding Card */}
         <div style={{
           marginTop: '1.5rem',
-          padding: '1.25rem',
-          borderRadius: 'var(--radius-md)',
-          background: 'var(--primary-light)',
-          border: '1px solid var(--primary-border)',
-          textAlign: 'center'
+          padding: '1.2rem 1.25rem',
+          borderRadius: '14px',
+          background: 'linear-gradient(135deg, rgba(200, 169, 126, 0.14) 0%, rgba(200, 169, 126, 0.05) 100%)',
+          border: '1px solid rgba(200, 169, 126, 0.35)',
+          textAlign: 'left',
+          position: 'relative',
+          overflow: 'hidden'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-main)', fontWeight: 800, marginBottom: '6px', fontSize: '0.92rem' }}>
-            <Building2 size={18} style={{ color: 'var(--primary)' }} /> ¿Tienes un restaurante en Armenia?
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+            <div style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #d4a359 0%, #b8843b 100%)',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 4px 10px rgba(184, 132, 59, 0.28)'
+            }}>
+              <Building2 size={18} />
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-main)', fontWeight: 800, fontSize: '0.92rem', lineHeight: 1.25 }}>
+                ¿Tienes un restaurante en el Quindío?
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#9a6b28', fontWeight: 700, marginTop: '2px' }}>
+                Sin mensualidad · Comisión del 3% · Menú QR y Domicilios
+              </div>
+            </div>
           </div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.9rem', lineHeight: 1.5 }}>
-            Haz visible tu negocio y recibe pedidos directos. Configura tu menú digital y empieza a vender hoy.
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.85rem', lineHeight: 1.5 }}>
+            Digitaliza tu restaurante, recibe pedidos directos a cocina y gestiona tus mesas en minutos.
           </p>
           <motion.button
             whileHover={{ scale: 1.01 }}
@@ -719,17 +742,21 @@ export const LoginScreen: React.FC = () => {
             style={{
               width: '100%',
               padding: '11px 18px',
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--primary)',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #c8964e 0%, #b37d33 100%)',
               color: '#FFFFFF',
               fontWeight: 700,
               fontSize: '0.88rem',
               border: 'none',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(200, 169, 126, 0.3)'
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 6px 16px rgba(179, 125, 51, 0.28)'
             }}
           >
-            🤝 Registrar Mi Restaurante Aliado
+            <span>🤝 Registrar mi restaurante aliado</span>
           </motion.button>
         </div>
 
