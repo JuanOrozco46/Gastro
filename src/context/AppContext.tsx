@@ -267,13 +267,13 @@ const location = useLocationSlice();
           });
 
           if (userAccount) {
-            setCurrentUser(userAccount);
-            setUserRole(userAccount.role);
             if (userAccount.tenantId) {
               const match = liveTenants.find(t => t.id === userAccount.tenantId);
               if (match) setCurrentTenant(match);
             }
-          } else {
+            setCurrentUser(userAccount);
+            setUserRole(userAccount.role);
+          } else if (!sessionResponse.data.session?.user) {
             await signOutFromSupabase();
           }
         } catch (err) {
@@ -302,14 +302,14 @@ const location = useLocationSlice();
           }
 
           setEmailVerificationState('confirmed');
-          const userAccount = await resolveSupabaseUserProfile(session.user.id, session.user.email || '', session.user.user_metadata?.needs_password_set);
-          setCurrentUser(userAccount);
-          setUserRole(userAccount.role);
-          if (userAccount.tenantId) {
-            const match = remoteTenantsRef.current.find(t => t.id === userAccount.tenantId);
-            if (match) setCurrentTenant(match);
-          }
-          // Recargar catálogo público tras login para asegurar que el feed y locales sean visibles.
+          // 1. Resolver el perfil (y aprovisionar el restaurante en BD si es un restaurante nuevo)
+          const userAccount = await resolveSupabaseUserProfile(
+            session.user.id,
+            session.user.email || '',
+            session.user.user_metadata?.needs_password_set
+          );
+
+          // 2. Recargar catálogo en vivo ANTES de cambiar la vista para que el restaurante recién creado ya esté en `tenants`
           const [livePosts, liveProducts, liveTenants] = await Promise.all([
             fetchLivePosts(),
             fetchLiveProducts(),
@@ -319,9 +319,20 @@ const location = useLocationSlice();
           setPosts(livePosts);
           setRemoteProducts(liveProducts);
           setProducts(liveProducts);
-          setRemoteTenants(liveTenants);
-          remoteTenantsRef.current = liveTenants;
-          setTenants(liveTenants);
+          if (liveTenants.length > 0) {
+            setRemoteTenants(liveTenants);
+            remoteTenantsRef.current = liveTenants;
+            setTenants(liveTenants);
+          }
+
+          if (userAccount.tenantId) {
+            const sourceTenants = liveTenants.length > 0 ? liveTenants : remoteTenantsRef.current;
+            const match = sourceTenants.find(t => t.id === userAccount.tenantId);
+            if (match) setCurrentTenant(match);
+          }
+
+          setCurrentUser(userAccount);
+          setUserRole(userAccount.role);
           
           if (window.location.pathname.startsWith('/auth/callback')) {
             window.history.replaceState({}, document.title, '/');
@@ -583,8 +594,18 @@ const location = useLocationSlice();
     const res = await signUpWithSupabase(email, pass, name, options);
     if (res.success && res.user) {
       if (res.emailConfirmed) {
+        if (res.user.tenantId) {
+          const liveTenants = await fetchLiveTenants();
+          if (liveTenants && liveTenants.length > 0) {
+            setTenants(liveTenants);
+            setRemoteTenants(liveTenants);
+            remoteTenantsRef.current = liveTenants;
+            const matchedTenant = liveTenants.find(t => t.id === res.user?.tenantId);
+            if (matchedTenant) setCurrentTenant(matchedTenant);
+          }
+        }
         setCurrentUser(res.user);
-        setUserRole('client_delivery');
+        setUserRole(res.user.role);
         setEmailVerificationState('confirmed');
         showToast(`🎉 ¡Cuenta creada exitosamente para ${res.user.username ? `@${res.user.username}` : res.user.name}!`);
       } else {
@@ -596,6 +617,26 @@ const location = useLocationSlice();
     }
     return { success: false, error: res.error || 'Error al crear la cuenta.' };
   };
+
+  // Salvaguarda reactiva: si el usuario autenticado tiene un tenantId recién creado que aún no está en memoria, recargarlo de inmediato
+  useEffect(() => {
+    if (authMode !== 'remote' || !isSupabaseConfigured || !currentUser?.tenantId) return;
+    const targetTenantId = currentUser.tenantId;
+    if (remoteTenantsRef.current.some(t => t.id === targetTenantId)) return;
+
+    let cancelled = false;
+    fetchLiveTenants().then(liveTenants => {
+      if (cancelled || liveTenants.length === 0) return;
+      setTenants(liveTenants);
+      setRemoteTenants(liveTenants);
+      remoteTenantsRef.current = liveTenants;
+      const matched = liveTenants.find(t => t.id === targetTenantId);
+      if (matched) setCurrentTenant(matched);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authMode, currentUser?.tenantId]);
 
   const updateUserProfile = async (
     updates: {
@@ -686,6 +727,16 @@ const location = useLocationSlice();
           user.email || '',
           user.user_metadata?.needs_password_set
         );
+        if (userAccount.tenantId) {
+          const liveTenants = await fetchLiveTenants();
+          if (liveTenants && liveTenants.length > 0) {
+            setTenants(liveTenants);
+            setRemoteTenants(liveTenants);
+            remoteTenantsRef.current = liveTenants;
+            const matchedTenant = liveTenants.find(t => t.id === userAccount.tenantId);
+            if (matchedTenant) setCurrentTenant(matchedTenant);
+          }
+        }
         setCurrentUser(userAccount);
         setUserRole(userAccount.role);
         return;
@@ -701,6 +752,16 @@ const location = useLocationSlice();
         session.user.email || '',
         session.user.user_metadata?.needs_password_set
       );
+      if (userAccount.tenantId) {
+        const liveTenants = await fetchLiveTenants();
+        if (liveTenants && liveTenants.length > 0) {
+          setTenants(liveTenants);
+          setRemoteTenants(liveTenants);
+          remoteTenantsRef.current = liveTenants;
+          const matchedTenant = liveTenants.find(t => t.id === userAccount.tenantId);
+          if (matchedTenant) setCurrentTenant(matchedTenant);
+        }
+      }
       setCurrentUser(userAccount);
       setUserRole(userAccount.role);
     } else {
@@ -1805,15 +1866,53 @@ const location = useLocationSlice();
       return { success: false, error: err };
     }
 
-    showToast('⏳ Conectando con Supabase para crear restaurante y enviar invitación...');
+    showToast('⏳ Conectando con Supabase para crear restaurante y activar acceso del propietario...');
     
     try {
-      const { data, error } = await supabase.functions.invoke('approve_restaurant', {
-        body: { applicationId: targetApp.id }
+      let activatedTenantId: string | undefined;
+      let apiMsg: string | undefined;
+
+      // 1) Intentar primero mediante el RPC atómico en PostgreSQL (crea restaurante + restaurant_members activo + perfil restaurant_owner)
+      const { data: rpcRaw, error: rpcError } = await supabase.rpc('activate_approved_restaurant_rpc', {
+        p_application_id: targetApp.id
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const rpcData = rpcRaw as {
+        success?: boolean;
+        error?: string;
+        tenantId?: string;
+        message?: string;
+        needs_invite?: boolean;
+      } | null;
+
+      if (!rpcError && rpcData?.success && rpcData.tenantId && !rpcData.needs_invite) {
+        activatedTenantId = rpcData.tenantId;
+        apiMsg = rpcData.message;
+      } else {
+        // 2) Si el propietario aún no tiene usuario en auth.users (needs_invite) o el RPC requiere Edge Function, invocar approve_restaurant
+        const { data, error } = await supabase.functions.invoke('approve_restaurant', {
+          body: { applicationId: targetApp.id }
+        });
+
+        if (error) {
+          if (rpcData?.success && rpcData.tenantId) {
+            activatedTenantId = rpcData.tenantId;
+            apiMsg = rpcData.message;
+          } else {
+            throw error;
+          }
+        } else if (data?.error) {
+          if (rpcData?.success && rpcData.tenantId) {
+            activatedTenantId = rpcData.tenantId;
+            apiMsg = rpcData.message;
+          } else {
+            throw new Error(data.error);
+          }
+        } else {
+          activatedTenantId = data?.tenantId || rpcData?.tenantId;
+          apiMsg = data?.message || rpcData?.message;
+        }
+      }
 
       const reviewerEmail = currentUser.email;
 
@@ -1823,15 +1922,21 @@ const location = useLocationSlice();
             ...app,
             activatedAt: Date.now(),
             activatedByEmail: reviewerEmail,
-            activatedTenantId: data.tenantId || 'created_in_db'
+            activatedTenantId: activatedTenantId || 'created_in_db'
           };
         }
         return app;
       }));
 
-      const apiMsg = data?.message || `¡Restaurante "${targetApp.restaurantName}" creado exitosamente!`;
-      showToast(`🎉 ${apiMsg}`);
-      return { success: true, message: apiMsg, tenantId: data.tenantId };
+      const liveTenants = await fetchLiveTenants();
+      if (liveTenants && liveTenants.length > 0) {
+        setTenants(liveTenants);
+        setRemoteTenants(liveTenants);
+      }
+
+      const finalMsg = apiMsg || `¡Restaurante "${targetApp.restaurantName}" creado exitosamente!`;
+      showToast(`🎉 ${finalMsg}`);
+      return { success: true, message: finalMsg, tenantId: activatedTenantId };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al procesar la activación en la nube.';
       showToast(`⚠️ ${msg}`);

@@ -176,16 +176,31 @@ serve(async (req) => {
       if (!restaurantId) throw new Error('Error al crear el restaurante.' + (lastInsertError ? ` (${lastInsertError})` : ''));
       createdRestaurantId = restaurantId;
 
-      // 4. Vincular al usuario como dueño
+      // 4. Vincular al usuario como dueño activo
       const { error: memberError } = await supabaseAdmin.from('restaurant_members').insert({
         restaurant_id: restaurantId,
         user_id: newOwnerId,
-        role: 'owner'
+        email: ownerEmail,
+        role: 'owner',
+        status: 'active',
+        accepted_at: new Date().toISOString()
       });
 
       if (memberError) {
-        throw new Error('Error al vincular el usuario al restaurante.');
+        throw new Error('Error al vincular el usuario al restaurante: ' + memberError.message);
       }
+
+      // 4b. Sincronizar perfil del propietario con rol de restaurante y datos de la solicitud
+      await supabaseAdmin.from('profiles').upsert({
+        id: newOwnerId,
+        full_name: application.owner_name?.trim() || ownerEmail,
+        phone: application.owner_phone?.trim() || null,
+        default_address: application.address?.trim() || null,
+        platform_role: 'customer',
+        business_role: 'restaurant_owner',
+        tenant_id: restaurantId,
+        updated_at: new Date().toISOString()
+      });
 
       // 5. Marcar la solicitud como activada (verificando el resultado)
       const { error: finalError } = await supabaseAdmin.from('restaurant_applications').update({

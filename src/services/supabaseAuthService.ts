@@ -148,10 +148,30 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
     const { data: authUserData } = await supabase.auth.getUser();
     const meta = authUserData?.user?.id === userId ? (authUserData.user.user_metadata || {}) : {};
 
-    // 1. Obtener perfil general (con columnas extendidas de la migración 042)
+    // 0b. Sincronizar / aprovisionar membresía de restaurante vía RPC SECURITY DEFINER
+    interface OwnerProvisionRpcResult {
+      is_member?: boolean;
+      tenant_id?: string;
+      member_role?: string;
+      business_role?: string;
+      full_name?: string;
+    }
+    let rpcMemberInfo: OwnerProvisionRpcResult | null = null;
+    try {
+      const { data: rpcData } = await supabase.rpc('resolve_or_provision_restaurant_owner');
+      if (rpcData && typeof rpcData === 'object') {
+        rpcMemberInfo = rpcData as OwnerProvisionRpcResult;
+      }
+    } catch {
+      // Continuar con las consultas directas si el RPC no está disponible
+    }
+
+    // 1. Obtener perfil general (con columnas extendidas de las migraciones 015 y 042)
     let profile: {
       full_name?: string;
       platform_role?: string;
+      business_role?: string | null;
+      tenant_id?: string | null;
       username?: string | null;
       avatar_url?: string | null;
       phone?: string | null;
@@ -161,7 +181,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
 
     const { data: extProfile, error: extErr } = await supabase
       .from('profiles')
-      .select('full_name, platform_role, username, avatar_url, phone, default_address, default_delivery_notes')
+      .select('full_name, platform_role, business_role, tenant_id, username, avatar_url, phone, default_address, default_delivery_notes')
       .eq('id', userId)
       .maybeSingle();
 
@@ -170,13 +190,20 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
     } else {
       const { data: basicProfile } = await supabase
         .from('profiles')
-        .select('full_name, platform_role')
+        .select('full_name, platform_role, business_role, tenant_id')
         .eq('id', userId)
         .maybeSingle();
       profile = basicProfile;
     }
 
-    const fullName = profile?.full_name || (typeof meta.full_name === 'string' ? meta.full_name : '') || cached?.name || email.split('@')[0];
+    const rawProfileName = profile?.full_name && !profile.full_name.includes('@') ? profile.full_name : undefined;
+    const fullName =
+      rawProfileName ||
+      rpcMemberInfo?.full_name ||
+      (typeof meta.full_name === 'string' && meta.full_name.trim() ? meta.full_name : '') ||
+      profile?.full_name ||
+      cached?.name ||
+      email.split('@')[0];
     const platformRole = profile?.platform_role || 'customer';
     const username = profile?.username || (typeof meta.username === 'string' ? meta.username : undefined) || cached?.username;
     const avatarUrl = profile?.avatar_url || (typeof meta.avatar_url === 'string' ? meta.avatar_url : undefined) || cached?.avatarUrl;
@@ -207,14 +234,30 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
     }
 
     // 2. Verificar si es miembro de algún restaurante (Dueño / Staff)
-    const { data: member } = await supabase
-      .from('restaurant_members')
-      .select('restaurant_id, role')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .maybeSingle();
+    if (rpcMemberInfo?.is_member && rpcMemberInfo.tenant_id) {
+      const isOwner = rpcMemberInfo.member_role === 'owner' || rpcMemberInfo.business_role === 'restaurant_owner';
+      return {
+        id: userId,
+        email,
+        ...commonExtras,
+        role: isOwner ? 'admin' : 'kitchen',
+        businessRole: isOwner ? 'restaurant_owner' : 'restaurant_staff',
+        tenantId: rpcMemberInfo.tenant_id,
+        needsPasswordSet
+      };
+    }
 
-    if (member) {
+    const { data: members } = await supabase
+      .from('restaurant_members')
+      .select('restaurant_id, role, status')
+      .eq('user_id', userId)
+      .or('status.eq.active,status.is.null')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    const member = members?.find(m => m.role === 'owner') || members?.[0] || null;
+
+    if (member && member.restaurant_id) {
       if (member.role === 'owner') {
         return {
           id: userId,
@@ -236,6 +279,39 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
           needsPasswordSet
         };
       }
+    }
+
+    // 3. Fallback: Verificar si es dueño directo en public.restaurants o en public.profiles
+    const { data: ownedRestaurants } = await supabase
+      .from('restaurants')
+      .select('id')
+      .eq('owner_user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const ownedTenantId = ownedRestaurants?.[0]?.id || (profile?.business_role === 'restaurant_owner' ? profile.tenant_id : null);
+    if (ownedTenantId) {
+      return {
+        id: userId,
+        email,
+        ...commonExtras,
+        role: 'admin',
+        businessRole: 'restaurant_owner',
+        tenantId: ownedTenantId,
+        needsPasswordSet
+      };
+    }
+
+    if (profile?.business_role === 'restaurant_staff' && profile.tenant_id) {
+      return {
+        id: userId,
+        email,
+        ...commonExtras,
+        role: 'kitchen',
+        businessRole: 'restaurant_staff',
+        tenantId: profile.tenant_id,
+        needsPasswordSet
+      };
     }
 
     // Default: Cliente final de entregas
@@ -382,19 +458,6 @@ export async function signUpWithSupabase(
       });
     }
 
-    const userAccount: UserAccount = {
-      id: data.user.id,
-      email: normalizedEmail,
-      name: cleanName,
-      username: cleanUsername,
-      avatarUrl: finalAvatarUrl,
-      phone: cleanPhone,
-      defaultAddress: cleanAddress,
-      defaultDeliveryNotes: cleanNotes,
-      role: 'client_delivery',
-      businessRole: 'customer'
-    };
-
     saveLocalProfileCache([data.user.id, normalizedEmail], {
       name: cleanName,
       username: cleanUsername,
@@ -403,6 +466,21 @@ export async function signUpWithSupabase(
       defaultAddress: cleanAddress,
       defaultDeliveryNotes: cleanNotes
     });
+
+    const userAccount: UserAccount = data.session
+      ? await resolveSupabaseUserProfile(data.user.id, normalizedEmail)
+      : {
+          id: data.user.id,
+          email: normalizedEmail,
+          name: cleanName,
+          username: cleanUsername,
+          avatarUrl: finalAvatarUrl,
+          phone: cleanPhone,
+          defaultAddress: cleanAddress,
+          defaultDeliveryNotes: cleanNotes,
+          role: 'client_delivery',
+          businessRole: 'customer'
+        };
 
     return { 
       success: true, 

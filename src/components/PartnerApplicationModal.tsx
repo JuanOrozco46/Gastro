@@ -28,11 +28,19 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     return selectedCityId || (activeCities.length > 0 ? activeCities[0].id : '');
   });
 
-  const selectedCityName = activeCities.find(c => c.id === cityId)?.name || 'Tu ciudad';
+  const effectiveCityId = activeCities.some(c => c.id === cityId)
+    ? cityId
+    : (activeCities.some(c => c.id === selectedCityId) ? selectedCityId : (activeCities[0]?.id || cityId));
 
-  const cityZones = zones.filter(z => z.cityId === cityId && z.isActive);
+  const selectedCityName = activeCities.find(c => c.id === effectiveCityId)?.name || 'Tu ciudad';
+
+  const cityZones = zones.filter(z => z.cityId === effectiveCityId && z.isActive);
 
   const [zoneId, setZoneId] = useState<string>(() => (cityZones.length > 0 ? cityZones[0].id : ''));
+
+  const effectiveZoneId = cityZones.some(z => z.id === zoneId)
+    ? zoneId
+    : (cityZones[0]?.id || '');
 
   const handleCityChange = (newCityId: string) => {
     setCityId(newCityId);
@@ -111,9 +119,9 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
       case 'category':
         return validateRequired(category, 'La categoría gastronómica');
       case 'cityId':
-        return validateRequired(cityId, 'La ciudad de operación');
+        return validateRequired(effectiveCityId, 'La ciudad de operación');
       case 'zoneId':
-        return validateRequired(zoneId, 'La zona urbana');
+        return validateRequired(effectiveZoneId, 'La zona urbana');
       case 'address':
         return validateRequired(address, 'La dirección o referencia comercial');
       case 'estimatedDeliveryMinutes':
@@ -252,32 +260,16 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
 
     setIsSubmitting(true);
     try {
-      // 1) Si estamos en modo remoto, crear la cuenta de acceso del propietario
-      if (authMode === 'remote') {
-        const regRes = await registerAccount(ownerName.trim(), ownerEmail.trim(), ownerPassword, 'client_delivery');
-        if (typeof regRes === 'object' && regRes !== null && !regRes.success) {
-          const isAlreadyRegistered = /ya existe|ya se encuentra registrado|already registered|already exists/i.test(regRes.error || '');
-          if (isAlreadyRegistered) {
-            setAccountNotice('Ya tienes una cuenta; la solicitud se vinculará a tu correo.');
-            setAccountCreated(false);
-          } else {
-            setSubmitError(regRes.error || 'No se pudo crear tu cuenta de acceso.');
-            return;
-          }
-        } else {
-          setAccountCreated(true);
-        }
-      }
-
-      // 2) Enviar solicitud del restaurante; las imágenes (opcionales) se suben después con URLs firmadas.
+      // 1) Enviar primero la solicitud del restaurante para que cuando se registre/inicie sesión la cuenta,
+      // resolve_or_provision_restaurant_owner encuentre la solicitud y asigne inmediatamente el rol de restaurante.
       const ok = await submitRestaurantApplication({
         ownerName: ownerName.trim(),
         ownerEmail: ownerEmail.trim(),
         ownerPhone: ownerPhone.trim(),
         restaurantName: restaurantName.trim(),
         category: category.trim(),
-        cityId,
-        zoneId,
+        cityId: effectiveCityId,
+        zoneId: effectiveZoneId,
         address: address.trim(),
         description: description.trim() || undefined,
         scheduleHours: scheduleHours.trim() || undefined,
@@ -292,9 +284,32 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
         termsVersion: '2026-10'
       }, { logo: logoFile, banner: bannerFile });
 
-      if (ok) {
-        setSubmittedSuccess(true);
+      if (!ok) {
+        setSubmitError('No se pudo registrar la solicitud del restaurante. Verifica los datos e intenta de nuevo.');
+        return;
       }
+
+      // 2) Si estamos en modo remoto, crear la cuenta de acceso del propietario
+      if (authMode === 'remote') {
+        const regRes = await registerAccount(ownerName.trim(), ownerEmail.trim(), ownerPassword, 'admin', {
+          phone: ownerPhone.trim(),
+          defaultAddress: address.trim()
+        });
+        if (typeof regRes === 'object' && regRes !== null && !regRes.success) {
+          const isAlreadyRegistered = /ya existe|ya se encuentra registrado|already registered|already exists/i.test(regRes.error || '');
+          if (isAlreadyRegistered) {
+            setAccountNotice('Ya tienes una cuenta; la solicitud quedó vinculada a tu correo y podrás entrar como restaurante al iniciar sesión.');
+            setAccountCreated(false);
+          } else {
+            setAccountNotice(regRes.error || 'Solicitud registrada. Si ya tenías cuenta, inicia sesión con tu correo.');
+            setAccountCreated(false);
+          }
+        } else {
+          setAccountCreated(true);
+        }
+      }
+
+      setSubmittedSuccess(true);
     } catch (err: unknown) {
       console.error('Error submitting application:', err);
       setSubmitError('Ocurrió un error inesperado al enviar la solicitud. Por favor intenta de nuevo.');
@@ -357,7 +372,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
   const ownerDone = !validateName(ownerName) && !validatePhone(ownerPhone) && !validateEmail(ownerEmail);
   const accountDone = !validateRegisterPassword(ownerPassword) && !validatePasswordConfirm(ownerPassword, ownerPasswordConfirm);
   const restaurantDone = !!restaurantName.trim() && !!category;
-  const locationDone = !!cityId && !!zoneId && !!address.trim();
+  const locationDone = !!effectiveCityId && !!effectiveZoneId && !!address.trim();
 
   const stepOffset = authMode === 'remote' ? 1 : 0;
 
@@ -633,7 +648,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     <label htmlFor="cityId">Ciudad <em>*</em></label>
                     <div className="pam-input-wrap">
                       <MapPin size={16} className="pam-icon" />
-                      <select id="cityId" value={cityId} onChange={e => handleCityChange(e.target.value)}
+                      <select id="cityId" value={effectiveCityId} onChange={e => handleCityChange(e.target.value)}
                         onBlur={() => handleFieldBlur('cityId')} className={inputCls('cityId')}>
                         {activeCities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
@@ -644,7 +659,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     <label htmlFor="zoneId">Zona <em>*</em></label>
                     <div className="pam-input-wrap">
                       <MapPin size={16} className="pam-icon" />
-                      <select id="zoneId" value={zoneId} onChange={e => { setZoneId(e.target.value); clearFieldError('zoneId'); }}
+                      <select id="zoneId" value={effectiveZoneId} onChange={e => { setZoneId(e.target.value); clearFieldError('zoneId'); }}
                         onBlur={() => handleFieldBlur('zoneId')} className={inputCls('zoneId')}>
                         {cityZones.length === 0 && <option value="">Sin zonas disponibles</option>}
                         {cityZones.map(z => <option key={z.id} value={z.id}>Zona {z.name}</option>)}
