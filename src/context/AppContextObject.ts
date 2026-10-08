@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, City, Zone, CheckoutDetails, RestaurantApplication, UserLocationState, RestaurantMember } from '../types';
+import type { Product, Order, CartItem, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, UserRegistrationOptions, City, Zone, CheckoutDetails, RestaurantApplication, UserLocationState, RestaurantMember } from '../types';
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
 
 export interface AppContextType {
@@ -47,7 +47,18 @@ export interface AppContextType {
   restaurantApplications: RestaurantApplication[];
   loginWithCredentials: (email: string, pass: string) => Promise<{ success: boolean; error?: string }> | boolean;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }> | void;
-  registerAccount: (name: string, email: string, pass: string, role?: UserRole) => Promise<{ success: boolean; error?: string }> | void;
+  registerAccount: (name: string, email: string, pass: string, role?: UserRole, options?: UserRegistrationOptions) => Promise<{ success: boolean; error?: string }> | void;
+  updateUserProfile: (
+    updates: {
+      name?: string;
+      username?: string;
+      phone?: string;
+      defaultAddress?: string;
+      defaultDeliveryNotes?: string;
+      avatarUrl?: string;
+    },
+    avatarFile?: File | null
+  ) => Promise<{ success: boolean; error?: string }>;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   setCurrentTenantBySlug: (slug: string) => void;
   toggleTenantOpenStatus: (tenantId: string) => Promise<void>;

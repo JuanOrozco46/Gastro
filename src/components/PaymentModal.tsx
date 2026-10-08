@@ -20,7 +20,7 @@ interface PaymentModalProps {
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'pickup', prefilledTableId, prefilledTableToken, entryPoint }) => {
-  const { cart, currentTenant, currentUser, submitOrderWithPayment, retryRemotePayment, authMode, isSubmittingOrder, orderError } = useApp();
+  const { cart, currentTenant, currentUser, submitOrderWithPayment, retryRemotePayment, updateUserProfile, authMode, isSubmittingOrder, orderError } = useApp();
   const [method, setMethod] = useState<PaymentMethod>('wompi');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -47,11 +47,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
 
   const [fulfillment, setFulfillment] = useState<OrderFulfillment>(initialMode);
 
-  // Customer & Delivery Form State
-  const [customerName, setCustomerName] = useState(currentUser?.name || 'Cliente Demo');
-  const [customerPhone, setCustomerPhone] = useState('+57 300 123 4567');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [deliveryNotes, setDeliveryNotes] = useState('');
+  // Customer & Delivery Form State (autocompleted from currentUser profile)
+  const [customerName, setCustomerName] = useState(currentUser?.name || '');
+  const [customerPhone, setCustomerPhone] = useState(currentUser?.phone || '');
+  const [deliveryAddress, setDeliveryAddress] = useState(currentUser?.defaultAddress || '');
+  const [deliveryNotes, setDeliveryNotes] = useState(currentUser?.defaultDeliveryNotes || '');
 
   // Table Service Form State
   const initialTableNum = (() => {
@@ -71,17 +71,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
 
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
   const [prevTenantId, setPrevTenantId] = useState(currentTenant.id);
+  const [prevUserId, setPrevUserId] = useState(currentUser?.id || currentUser?.email || '');
 
-  if (isOpen !== prevIsOpen || currentTenant.id !== prevTenantId) {
+  const currentUserKey = currentUser?.id || currentUser?.email || '';
+  if (isOpen !== prevIsOpen || currentTenant.id !== prevTenantId || currentUserKey !== prevUserId) {
     setPrevIsOpen(isOpen);
     setPrevTenantId(currentTenant.id);
+    setPrevUserId(currentUserKey);
     if (isOpen) {
       setFormError(null);
       setSuccess(false);
       setFulfillment(initialMode);
-      if (currentUser?.name) {
-        setCustomerName(currentUser.name);
-      }
+      if (currentUser?.name) setCustomerName(currentUser.name);
+      if (currentUser?.phone) setCustomerPhone(currentUser.phone);
+      if (currentUser?.defaultAddress) setDeliveryAddress(currentUser.defaultAddress);
+      if (currentUser?.defaultDeliveryNotes) setDeliveryNotes(currentUser.defaultDeliveryNotes);
     }
   }
 
@@ -137,9 +141,33 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       }
     }
 
+    // Si el usuario tiene @handle, incluirlo junto al nombre para identificación clara en cocina
+    const baseName = customerName.trim() || currentUser?.name || 'Cliente';
+    const formattedCustomerName =
+      currentUser?.username && !baseName.includes(`@${currentUser.username}`)
+        ? `${baseName} (@${currentUser.username})`
+        : baseName;
+
+    // Guardar en segundo plano teléfono / dirección si el usuario los completó o actualizó en el checkout
+    if (currentUser) {
+      const profilePatch: { phone?: string; defaultAddress?: string; defaultDeliveryNotes?: string } = {};
+      if (customerPhone.trim() && customerPhone.trim() !== currentUser.phone) {
+        profilePatch.phone = customerPhone.trim();
+      }
+      if (fulfillment === 'restaurant_delivery' && deliveryAddress.trim() && deliveryAddress.trim() !== currentUser.defaultAddress) {
+        profilePatch.defaultAddress = deliveryAddress.trim();
+      }
+      if (fulfillment === 'restaurant_delivery' && deliveryNotes.trim() && deliveryNotes.trim() !== currentUser.defaultDeliveryNotes) {
+        profilePatch.defaultDeliveryNotes = deliveryNotes.trim();
+      }
+      if (Object.keys(profilePatch).length > 0) {
+        void updateUserProfile(profilePatch);
+      }
+    }
+
     const checkoutDetails: CheckoutDetails = {
       fulfillment,
-      customerName: customerName.trim(),
+      customerName: formattedCustomerName,
       customerPhone: customerPhone.trim(),
       deliveryAddress: fulfillment === 'restaurant_delivery' ? {
         label: 'Dirección de Entrega',
@@ -459,11 +487,91 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
               </div>
               )}
 
+              {/* Autocompleted Profile Banner */}
+              {currentUser && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '10px 14px',
+                  borderRadius: '14px',
+                  background: 'linear-gradient(135deg, rgba(212, 163, 89, 0.14) 0%, rgba(16, 185, 129, 0.08) 100%)',
+                  border: '1px solid rgba(212, 163, 89, 0.3)',
+                  marginBottom: '1rem'
+                }}>
+                  <div style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                    background: 'rgba(212, 163, 89, 0.2)',
+                    border: '1.5px solid rgba(212, 163, 89, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '0.82rem',
+                    color: '#f3d29c'
+                  }}>
+                    {currentUser.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt={currentUser.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      (currentUser.name || 'U').slice(0, 2).toUpperCase()
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <strong style={{ color: '#fff', fontSize: '0.84rem' }}>{currentUser.name}</strong>
+                      {currentUser.username && (
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          color: '#f3d29c',
+                          background: 'rgba(212, 163, 89, 0.18)',
+                          padding: '1px 7px',
+                          borderRadius: '999px'
+                        }}>
+                          @{currentUser.username}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#cbd5e1', marginTop: '2px' }}>
+                      ✓ Datos de tu perfil autocompletados para el pedido
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Step 2: Form Fields per Fulfillment Mode */}
               {fulfillment === 'pickup' && (
-                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 14px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '1.25rem', fontSize: '0.82rem' }}>
-                  <p style={{ color: 'white', fontWeight: 700, margin: 0 }}>📍 Dirección de Recogida:</p>
-                  <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{currentTenant.name} · {currentTenant.address || 'Armenia, Quindío'}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 14px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.82rem' }}>
+                    <p style={{ color: 'white', fontWeight: 700, margin: 0 }}>📍 Dirección de Recogida:</p>
+                    <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{currentTenant.name} · {currentTenant.address || 'Armenia, Quindío'}</p>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '4px' }}>Nombre de quien recoge</label>
+                      <input
+                        type="text"
+                        placeholder="Tu nombre"
+                        value={customerName}
+                        onChange={e => setCustomerName(e.target.value)}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '4px' }}>Teléfono de contacto</label>
+                      <input
+                        type="tel"
+                        placeholder="Ej. 300 123 4567"
+                        value={customerPhone}
+                        onChange={e => setCustomerPhone(e.target.value)}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 

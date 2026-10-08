@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/useApp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Lock, Mail, User,
-  Eye, EyeOff, Utensils,
+  Lock, Mail, User, Phone, MapPin, Camera, Trash2,
+  Eye, EyeOff, Utensils, Check, Sparkles,
   AlertCircle, Building2, CheckCircle2, X, KeyRound
 } from 'lucide-react';
 import { PartnerApplicationModal } from './PartnerApplicationModal';
 import {
   validateEmail,
   validateName,
+  validatePhone,
+  validateUsername,
+  normalizeUsername,
+  suggestUsernameFromName,
   validateRegisterPassword,
   validatePasswordConfirm,
   evaluatePasswordStrength
@@ -28,6 +32,9 @@ interface TabFieldErrors {
   email: string | null;
   password: string | null;
   name: string | null;
+  username: string | null;
+  phone: string | null;
+  defaultAddress: string | null;
   confirmPassword: string | null;
 }
 
@@ -35,8 +42,44 @@ const EMPTY_FIELD_ERRORS: TabFieldErrors = {
   email: null,
   password: null,
   name: null,
+  username: null,
+  phone: null,
+  defaultAddress: null,
   confirmPassword: null,
 };
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function RegisterSectionHead({
+  step,
+  done,
+  title,
+  desc
+}: {
+  step: number;
+  done: boolean;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <div className="pam-section-head">
+      <div className={`pam-step ${done ? 'done' : ''}`}>
+        {done ? <Check size={15} strokeWidth={3} /> : step}
+      </div>
+      <div className="pam-section-title-wrap">
+        <h3 className="pam-section-title">{title}</h3>
+        <p className="pam-section-desc">{desc}</p>
+      </div>
+    </div>
+  );
+}
 
 export const LoginScreen: React.FC = () => {
   const { authMode, loginWithCredentials, loginWithGoogle, registerAccount, sendPasswordReset } = useApp();
@@ -46,6 +89,15 @@ export const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameTouched, setUsernameTouched] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [defaultAddress, setDefaultAddress] = useState('');
+  const [defaultDeliveryNotes, setDefaultDeliveryNotes] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const [isCompressingAvatar, setIsCompressingAvatar] = useState(false);
+
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -101,6 +153,21 @@ export const LoginScreen: React.FC = () => {
     setTabFieldError('name', validateName(name));
   };
 
+  const handleUsernameBlur = () => {
+    setTabFieldError('username', validateUsername(username));
+  };
+
+  const handlePhoneBlur = () => {
+    setTabFieldError('phone', validatePhone(phone));
+  };
+
+  const handleAddressBlur = () => {
+    setTabFieldError(
+      'defaultAddress',
+      defaultAddress.trim().length >= 5 ? null : 'Ingresa tu dirección habitual de entrega.'
+    );
+  };
+
   const handleConfirmPasswordBlur = () => {
     setTabFieldError('confirmPassword', validatePasswordConfirm(password, confirmPassword));
   };
@@ -119,8 +186,34 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setName(e.target.value);
+    const val = e.target.value;
+    setName(val);
     setTabFieldError('name', null);
+    setLoginError(null);
+    if (!usernameTouched) {
+      const suggested = suggestUsernameFromName(val);
+      setUsername(suggested);
+      if (suggested) setTabFieldError('username', null);
+    }
+  };
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUsernameTouched(true);
+    const clean = normalizeUsername(e.target.value);
+    setUsername(clean);
+    setTabFieldError('username', null);
+    setLoginError(null);
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhone(e.target.value);
+    setTabFieldError('phone', null);
+    setLoginError(null);
+  };
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDefaultAddress(e.target.value);
+    setTabFieldError('defaultAddress', null);
     setLoginError(null);
   };
 
@@ -130,11 +223,56 @@ export const LoginScreen: React.FC = () => {
     setLoginError(null);
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
+    if (!rawFile.type.startsWith('image/')) {
+      setLoginError('Selecciona una imagen válida (JPG, PNG o WEBP) para tu foto de perfil.');
+      return;
+    }
+    setIsCompressingAvatar(true);
+    setLoginError(null);
+    try {
+      const { compressImage } = await import('../utils/imageCompression');
+      const result = await compressImage(rawFile, 0.35, 320);
+      const dataUrl = await fileToDataUrl(result.file);
+      setAvatarFile(result.file);
+      setAvatarPreview(dataUrl);
+    } catch {
+      setLoginError('No se pudo procesar la foto de perfil.');
+    } finally {
+      setIsCompressingAvatar(false);
+    }
+  };
+
   // Cycle features every 3.5s
   React.useEffect(() => {
     const t = setInterval(() => setActiveFeature(i => (i + 1) % FEATURES.length), 3500);
     return () => clearInterval(t);
   }, []);
+
+  // Section completion & live progress for Register tab
+  const registerProgress = useMemo(() => {
+    const step1Done = !validateName(name) && !validateUsername(username);
+    const step2Done = !validatePhone(phone) && defaultAddress.trim().length >= 5;
+    const step3Done =
+      !validateEmail(email) &&
+      !validateRegisterPassword(password) &&
+      !validatePasswordConfirm(password, confirmPassword);
+
+    const checks = [
+      !validateName(name),
+      !validateUsername(username),
+      !validatePhone(phone),
+      defaultAddress.trim().length >= 5,
+      !validateEmail(email),
+      !validateRegisterPassword(password) && !validatePasswordConfirm(password, confirmPassword)
+    ];
+    const doneCount = checks.filter(Boolean).length;
+    const pct = Math.round((doneCount / checks.length) * 100);
+
+    return { step1Done, step2Done, step3Done, doneCount, totalCount: checks.length, pct };
+  }, [name, username, phone, defaultAddress, email, password, confirmPassword]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,14 +290,21 @@ export const LoginScreen: React.FC = () => {
       }
     } else {
       const nameErr = validateName(name);
+      const usernameErr = validateUsername(username);
+      const phoneErr = validatePhone(phone);
+      const addressErr = defaultAddress.trim().length >= 5 ? null : 'Ingresa tu dirección habitual de entrega.';
       const emailErr = validateEmail(email);
       const passErr = validateRegisterPassword(password);
       const confirmErr = validatePasswordConfirm(password, confirmPassword);
-      if (nameErr || emailErr || passErr || confirmErr) {
+
+      if (nameErr || usernameErr || phoneErr || addressErr || emailErr || passErr || confirmErr) {
         setErrorsByTab(prev => ({
           ...prev,
           register: {
             name: nameErr,
+            username: usernameErr,
+            phone: phoneErr,
+            defaultAddress: addressErr,
             email: emailErr,
             password: passErr,
             confirmPassword: confirmErr,
@@ -180,7 +325,14 @@ export const LoginScreen: React.FC = () => {
           setLoginError('Correo o contraseña incorrectos.');
         }
       } else {
-        const res = await registerAccount(name.trim(), email, password, 'client_delivery');
+        const res = await registerAccount(name.trim(), email, password, 'client_delivery', {
+          username: normalizeUsername(username),
+          phone: phone.trim(),
+          defaultAddress: defaultAddress.trim(),
+          defaultDeliveryNotes: defaultDeliveryNotes.trim() || undefined,
+          avatarFile,
+          avatarDataUrl: avatarPreview || undefined
+        });
         if (typeof res === 'object' && !res.success) {
           setLoginError(res.error || 'Error al crear la cuenta.');
         }
@@ -386,6 +538,7 @@ export const LoginScreen: React.FC = () => {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
         className="login-form-panel"
+        style={tab === 'register' ? { maxWidth: '560px' } : undefined}
       >
         {/* Connection Status */}
         {authMode === 'demo' && (
@@ -427,7 +580,6 @@ export const LoginScreen: React.FC = () => {
         )}
 
         {/* Tab Switcher */}
-        {/* Tab Switcher */}
         <div className="auth-tabs" role="tablist" aria-label="Opciones de acceso">
           <button
             type="button"
@@ -462,66 +614,38 @@ export const LoginScreen: React.FC = () => {
           </motion.div>
         )}
 
-        {/* Credentials Form */}
-        <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-          {tab === 'register' && (
+        {/* ── TAB: LOGIN ── */}
+        {tab === 'login' ? (
+          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
             <div className="auth-field">
-              <label htmlFor="auth-name" className="auth-label">Nombre completo</label>
+              <label htmlFor="auth-email" className="auth-label">Correo electrónico</label>
               <div className="auth-input-wrap">
                 <div className="auth-field-icon">
-                  <User size={18} />
+                  <Mail size={18} />
                 </div>
                 <input
-                  id="auth-name"
-                  type="text"
-                  placeholder="Ej. María Fernanda López"
-                  value={name}
-                  onChange={handleNameChange}
-                  onBlur={handleNameBlur}
-                  aria-invalid={!!fieldErrors.name}
-                  aria-describedby={fieldErrors.name ? 'auth-name-error' : undefined}
-                  className={`auth-input ${fieldErrors.name ? 'auth-input-error' : ''}`}
+                  id="auth-email"
+                  type="email"
+                  placeholder="tu.correo@ejemplo.com"
+                  value={email}
+                  onChange={handleEmailChange}
+                  onBlur={handleEmailBlur}
+                  aria-invalid={!!fieldErrors.email}
+                  aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
+                  className={`auth-input ${fieldErrors.email ? 'auth-input-error' : ''}`}
                   required
                 />
               </div>
-              {fieldErrors.name && (
-                <div id="auth-name-error" role="alert" className="auth-field-error">
-                  {fieldErrors.name}
+              {fieldErrors.email && (
+                <div id="auth-email-error" role="alert" className="auth-field-error">
+                  {fieldErrors.email}
                 </div>
               )}
             </div>
-          )}
 
-          <div className="auth-field">
-            <label htmlFor="auth-email" className="auth-label">Correo electrónico</label>
-            <div className="auth-input-wrap">
-              <div className="auth-field-icon">
-                <Mail size={18} />
-              </div>
-              <input
-                id="auth-email"
-                type="email"
-                placeholder="tu.correo@ejemplo.com"
-                value={email}
-                onChange={handleEmailChange}
-                onBlur={handleEmailBlur}
-                aria-invalid={!!fieldErrors.email}
-                aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
-                className={`auth-input ${fieldErrors.email ? 'auth-input-error' : ''}`}
-                required
-              />
-            </div>
-            {fieldErrors.email && (
-              <div id="auth-email-error" role="alert" className="auth-field-error">
-                {fieldErrors.email}
-              </div>
-            )}
-          </div>
-
-          <div className="auth-field">
-            <div className="auth-label-row">
-              <label htmlFor="auth-password" className="auth-label">Contraseña</label>
-              {tab === 'login' && (
+            <div className="auth-field">
+              <div className="auth-label-row">
+                <label htmlFor="auth-password" className="auth-label">Contraseña</label>
                 <button
                   type="button"
                   onClick={() => {
@@ -535,166 +659,461 @@ export const LoginScreen: React.FC = () => {
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
-              )}
-            </div>
-            <div className="auth-input-wrap">
-              <div className="auth-field-icon">
-                <Lock size={18} />
               </div>
-              <input
-                id="auth-password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••••••"
-                value={password}
-                onChange={handlePasswordChange}
-                onBlur={handlePasswordBlur}
-                aria-invalid={!!fieldErrors.password}
-                aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
-                className={`auth-input has-icon-right ${fieldErrors.password ? 'auth-input-error' : ''}`}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(v => !v)}
-                className="field-toggle-pw"
-                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-
-            {/* Field error for password */}
-            {fieldErrors.password && (
-              <div id="auth-password-error" role="alert" className="auth-field-error">
-                {fieldErrors.password}
-              </div>
-            )}
-
-            {/* Password Strength Indicator (only on register) */}
-            {tab === 'register' && password.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                style={{ marginTop: '8px' }}
-              >
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
-                  {[0, 1, 2, 3, 4].map(i => (
-                    <div
-                      key={i}
-                      style={{
-                        flex: 1,
-                        height: '4px',
-                        borderRadius: '2px',
-                        background: i < passwordStrength.score
-                          ? passwordStrength.color
-                          : 'var(--neutral-border)',
-                        transition: 'all 0.3s'
-                      }}
-                    />
-                  ))}
-                </div>
-                <span style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  color: passwordStrength.color
-                }}>
-                  Seguridad: {passwordStrength.label}
-                </span>
-                {passwordStrength.score < 3 && (
-                  <div style={{ marginTop: '4px' }}>
-                    {passwordStrength.checks.filter(c => !c.passed).map((c, i) => (
-                      <span key={i} style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                        • {c.text}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </div>
-
-          {tab === 'register' && (
-            <div className="auth-field">
-              <label htmlFor="auth-confirm-password" className="auth-label">Confirmar contraseña</label>
               <div className="auth-input-wrap">
                 <div className="auth-field-icon">
                   <Lock size={18} />
                 </div>
                 <input
-                  id="auth-confirm-password"
+                  id="auth-password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••••••"
-                  value={confirmPassword}
-                  onChange={handleConfirmPasswordChange}
-                  onBlur={handleConfirmPasswordBlur}
-                  aria-invalid={!!fieldErrors.confirmPassword}
-                  aria-describedby={fieldErrors.confirmPassword ? 'auth-confirm-password-error' : undefined}
-                  className={`auth-input has-icon-right ${fieldErrors.confirmPassword ? 'auth-input-error' : ''}`}
+                  value={password}
+                  onChange={handlePasswordChange}
+                  onBlur={handlePasswordBlur}
+                  aria-invalid={!!fieldErrors.password}
+                  aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
+                  className={`auth-input has-icon-right ${fieldErrors.password ? 'auth-input-error' : ''}`}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="field-toggle-pw"
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
-              {fieldErrors.confirmPassword && (
-                <div id="auth-confirm-password-error" role="alert" className="auth-field-error">
-                  {fieldErrors.confirmPassword}
+              {fieldErrors.password && (
+                <div id="auth-password-error" role="alert" className="auth-field-error">
+                  {fieldErrors.password}
                 </div>
               )}
             </div>
-          )}
 
-          <button
-            type="submit"
-            className="auth-submit"
-            disabled={loading}
-          >
-            {loading && <span className="auth-spinner" aria-hidden="true" />}
-            <span>
-              {loading
-                ? (tab === 'login' ? 'Validando...' : 'Creando cuenta...')
-                : (tab === 'login' ? 'Iniciar Sesión' : 'Crear Mi Cuenta')
-              }
-            </span>
-          </button>
+            <button
+              type="submit"
+              className="auth-submit"
+              disabled={loading}
+            >
+              {loading && <span className="auth-spinner" aria-hidden="true" />}
+              <span>{loading ? 'Validando...' : 'Iniciar Sesión'}</span>
+            </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-            <div style={{ flex: 1, height: '1px', background: 'var(--neutral-border)' }} />
-            <span style={{ padding: '0 10px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, color: 'var(--text-muted)' }}>o también</span>
-            <div style={{ flex: 1, height: '1px', background: 'var(--neutral-border)' }} />
-          </div>
+            <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--neutral-border)' }} />
+              <span style={{ padding: '0 10px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, color: 'var(--text-muted)' }}>o también</span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--neutral-border)' }} />
+            </div>
 
-          <motion.button
-            whileHover={{ scale: 1.01, backgroundColor: 'var(--neutral-surface-alt)' }}
-            whileTap={{ scale: 0.99 }}
-            type="button"
-            onClick={() => loginWithGoogle()}
-            disabled={authMode === 'demo'}
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1.5px solid var(--neutral-border-strong)',
-              background: '#FFFFFF',
-              color: '#141210',
-              fontWeight: 700,
-              fontSize: '0.9rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              cursor: authMode === 'remote' ? 'pointer' : 'not-allowed',
-              opacity: authMode === 'remote' ? 1 : 0.5,
-              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-            </svg>
-            Continuar con Google
-          </motion.button>
-        </form>
+            <motion.button
+              whileHover={{ scale: 1.01, backgroundColor: 'var(--neutral-surface-alt)' }}
+              whileTap={{ scale: 0.99 }}
+              type="button"
+              onClick={() => loginWithGoogle()}
+              disabled={authMode === 'demo'}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1.5px solid var(--neutral-border-strong)',
+                background: '#FFFFFF',
+                color: '#141210',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                cursor: authMode === 'remote' ? 'pointer' : 'not-allowed',
+                opacity: authMode === 'remote' ? 1 : 0.5,
+                boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+              </svg>
+              Continuar con Google
+            </motion.button>
+          </form>
+        ) : (
+          /* ── TAB: REGISTER (Editorial Step-by-Step User Onboarding) ── */
+          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Editorial Header & Live Progress */}
+            <div className="urm-hero-card">
+              <div className="urm-hero-top">
+                <div className="pam-icon-badge" style={{ width: '40px', height: '40px', borderRadius: '11px' }}>
+                  <User size={20} />
+                </div>
+                <div>
+                  <div className="pam-eyebrow" style={{ marginBottom: '2px' }}>
+                    <Sparkles size={11} /> Perfil Gastronómico · Quindío
+                  </div>
+                  <div className="urm-hero-title">Crea tu cuenta de comensal</div>
+                </div>
+              </div>
+
+              <div className="pam-pills" style={{ marginTop: '10px' }}>
+                <span className="pam-pill"><span className="pam-pill-dot" /> Tu @ único en comentarios</span>
+                <span className="pam-pill"><span className="pam-pill-dot" /> Pedidos autocompletados</span>
+                <span className="pam-pill"><span className="pam-pill-dot" /> Foto de perfil</span>
+              </div>
+
+              <div className="pam-progress" style={{ marginTop: '12px' }}>
+                <div className="pam-progress-meta">
+                  <span>Progreso de tu perfil ({registerProgress.doneCount}/{registerProgress.totalCount})</span>
+                  <span>{registerProgress.pct}%</span>
+                </div>
+                <div className="pam-progress-track">
+                  <div className="pam-progress-fill" style={{ width: `${registerProgress.pct}%` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* ── SECCIÓN 1: Identidad, Foto de Perfil y @ ── */}
+            <section className="pam-section">
+              <RegisterSectionHead
+                step={1}
+                done={registerProgress.step1Done}
+                title="Identidad y foto de perfil"
+                desc="Tu foto y tu @ aparecerán en tus comentarios sobre los platos"
+              />
+
+              {/* Avatar Picker */}
+              <div className="urm-avatar-box">
+                <div className="urm-avatar-preview">
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Vista previa de perfil" />
+                  ) : (
+                    <span>{(name.trim() || 'TU').slice(0, 2).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="urm-avatar-info">
+                  <div className="urm-avatar-title">
+                    Foto de perfil <span style={{ fontWeight: 500, color: '#8a8279', fontSize: '0.72rem' }}>(Opcional)</span>
+                  </div>
+                  <p className="urm-avatar-sub">
+                    Sube tu foto para que aparezca junto a tu <strong>@{username || 'usuario'}</strong> al comentar.
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+                    <label className="urm-avatar-btn">
+                      <Camera size={14} />
+                      <span>
+                        {isCompressingAvatar
+                          ? 'Optimizando...'
+                          : avatarPreview
+                          ? 'Cambiar foto'
+                          : 'Subir foto de perfil'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleAvatarChange}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                    {avatarPreview && (
+                      <button
+                        type="button"
+                        className="urm-avatar-remove"
+                        onClick={() => {
+                          setAvatarPreview('');
+                          setAvatarFile(null);
+                        }}
+                      >
+                        <Trash2 size={13} /> Quitar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pam-grid-2">
+                <div className="auth-field">
+                  <label htmlFor="auth-name" className="auth-label">Nombre completo *</label>
+                  <div className="auth-input-wrap">
+                    <div className="auth-field-icon">
+                      <User size={17} />
+                    </div>
+                    <input
+                      id="auth-name"
+                      type="text"
+                      placeholder="Ej. María Fernanda López"
+                      value={name}
+                      onChange={handleNameChange}
+                      onBlur={handleNameBlur}
+                      aria-invalid={!!fieldErrors.name}
+                      aria-describedby={fieldErrors.name ? 'auth-name-error' : undefined}
+                      className={`auth-input ${fieldErrors.name ? 'auth-input-error' : ''}`}
+                      required
+                    />
+                  </div>
+                  {fieldErrors.name && (
+                    <div id="auth-name-error" role="alert" className="auth-field-error">
+                      {fieldErrors.name}
+                    </div>
+                  )}
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="auth-username" className="auth-label">Tu usuario @ *</label>
+                  <div className="auth-input-wrap">
+                    <div className="urm-at-prefix">@</div>
+                    <input
+                      id="auth-username"
+                      type="text"
+                      placeholder="maria_lopez"
+                      value={username}
+                      onChange={handleUsernameChange}
+                      onBlur={handleUsernameBlur}
+                      aria-invalid={!!fieldErrors.username}
+                      aria-describedby={fieldErrors.username ? 'auth-username-error' : undefined}
+                      className={`auth-input ${fieldErrors.username ? 'auth-input-error' : ''}`}
+                      style={{ paddingLeft: '38px' }}
+                      maxLength={24}
+                      required
+                    />
+                  </div>
+                  {fieldErrors.username ? (
+                    <div id="auth-username-error" role="alert" className="auth-field-error">
+                      {fieldErrors.username}
+                    </div>
+                  ) : (
+                    <span className="pam-hint">Solo minúsculas, números, puntos o guiones bajos.</span>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* ── SECCIÓN 2: Datos para Autocompletar Pedidos ── */}
+            <section className="pam-section">
+              <RegisterSectionHead
+                step={2}
+                done={registerProgress.step2Done}
+                title="Datos para tus pedidos"
+                desc="Se autocompletarán automáticamente cada vez que hagas un pedido"
+              />
+
+              <div className="pam-grid-1">
+                <div className="auth-field">
+                  <label htmlFor="auth-phone" className="auth-label">Teléfono / WhatsApp de contacto *</label>
+                  <div className="auth-input-wrap">
+                    <div className="auth-field-icon">
+                      <Phone size={17} />
+                    </div>
+                    <input
+                      id="auth-phone"
+                      type="tel"
+                      placeholder="Ej. +57 300 123 4567"
+                      value={phone}
+                      onChange={handlePhoneChange}
+                      onBlur={handlePhoneBlur}
+                      aria-invalid={!!fieldErrors.phone}
+                      aria-describedby={fieldErrors.phone ? 'auth-phone-error' : undefined}
+                      className={`auth-input ${fieldErrors.phone ? 'auth-input-error' : ''}`}
+                      required
+                    />
+                  </div>
+                  {fieldErrors.phone && (
+                    <div id="auth-phone-error" role="alert" className="auth-field-error">
+                      {fieldErrors.phone}
+                    </div>
+                  )}
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="auth-address" className="auth-label">Dirección habitual de entrega *</label>
+                  <div className="auth-input-wrap">
+                    <div className="auth-field-icon">
+                      <MapPin size={17} />
+                    </div>
+                    <input
+                      id="auth-address"
+                      type="text"
+                      placeholder="Ej. Cra 14 # 19-20, Barrio Norte, Armenia"
+                      value={defaultAddress}
+                      onChange={handleAddressChange}
+                      onBlur={handleAddressBlur}
+                      aria-invalid={!!fieldErrors.defaultAddress}
+                      aria-describedby={fieldErrors.defaultAddress ? 'auth-address-error' : undefined}
+                      className={`auth-input ${fieldErrors.defaultAddress ? 'auth-input-error' : ''}`}
+                      required
+                    />
+                  </div>
+                  {fieldErrors.defaultAddress && (
+                    <div id="auth-address-error" role="alert" className="auth-field-error">
+                      {fieldErrors.defaultAddress}
+                    </div>
+                  )}
+                </div>
+
+                <div className="auth-field">
+                  <label htmlFor="auth-delivery-notes" className="auth-label">
+                    Notas de entrega <span style={{ fontWeight: 500, color: '#8a8279' }}>(Opcional)</span>
+                  </label>
+                  <input
+                    id="auth-delivery-notes"
+                    type="text"
+                    placeholder="Ej. Apto 302, Torre B, timbrar en portería"
+                    value={defaultDeliveryNotes}
+                    onChange={e => setDefaultDeliveryNotes(e.target.value)}
+                    className="auth-input no-icon-left"
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* ── SECCIÓN 3: Credenciales de Acceso ── */}
+            <section className="pam-section">
+              <RegisterSectionHead
+                step={3}
+                done={registerProgress.step3Done}
+                title="Credenciales de acceso"
+                desc="Tu correo y contraseña segura para entrar a GastroSync"
+              />
+
+              <div className="pam-grid-1">
+                <div className="auth-field">
+                  <label htmlFor="auth-reg-email" className="auth-label">Correo electrónico *</label>
+                  <div className="auth-input-wrap">
+                    <div className="auth-field-icon">
+                      <Mail size={17} />
+                    </div>
+                    <input
+                      id="auth-reg-email"
+                      type="email"
+                      placeholder="tu.correo@ejemplo.com"
+                      value={email}
+                      onChange={handleEmailChange}
+                      onBlur={handleEmailBlur}
+                      aria-invalid={!!fieldErrors.email}
+                      aria-describedby={fieldErrors.email ? 'auth-reg-email-error' : undefined}
+                      className={`auth-input ${fieldErrors.email ? 'auth-input-error' : ''}`}
+                      required
+                    />
+                  </div>
+                  {fieldErrors.email && (
+                    <div id="auth-reg-email-error" role="alert" className="auth-field-error">
+                      {fieldErrors.email}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pam-grid-2">
+                  <div className="auth-field">
+                    <label htmlFor="auth-reg-password" className="auth-label">Contraseña *</label>
+                    <div className="auth-input-wrap">
+                      <div className="auth-field-icon">
+                        <Lock size={17} />
+                      </div>
+                      <input
+                        id="auth-reg-password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Mínimo 8 caracteres"
+                        value={password}
+                        onChange={handlePasswordChange}
+                        onBlur={handlePasswordBlur}
+                        aria-invalid={!!fieldErrors.password}
+                        aria-describedby={fieldErrors.password ? 'auth-reg-password-error' : undefined}
+                        className={`auth-input has-icon-right ${fieldErrors.password ? 'auth-input-error' : ''}`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="field-toggle-pw"
+                        aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {fieldErrors.password && (
+                      <div id="auth-reg-password-error" role="alert" className="auth-field-error">
+                        {fieldErrors.password}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="auth-field">
+                    <label htmlFor="auth-confirm-password" className="auth-label">Confirmar contraseña *</label>
+                    <div className="auth-input-wrap">
+                      <div className="auth-field-icon">
+                        <Lock size={17} />
+                      </div>
+                      <input
+                        id="auth-confirm-password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Repite tu contraseña"
+                        value={confirmPassword}
+                        onChange={handleConfirmPasswordChange}
+                        onBlur={handleConfirmPasswordBlur}
+                        aria-invalid={!!fieldErrors.confirmPassword}
+                        aria-describedby={fieldErrors.confirmPassword ? 'auth-confirm-password-error' : undefined}
+                        className={`auth-input ${fieldErrors.confirmPassword ? 'auth-input-error' : ''}`}
+                        required
+                      />
+                    </div>
+                    {fieldErrors.confirmPassword && (
+                      <div id="auth-confirm-password-error" role="alert" className="auth-field-error">
+                        {fieldErrors.confirmPassword}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Password Strength Meter & Live Checklist */}
+                {password.length > 0 && (
+                  <div className="pam-strength">
+                    <div className="pam-strength-bars">
+                      {[1, 2, 3, 4].map(lvl => (
+                        <div
+                          key={lvl}
+                          className="pam-strength-bar"
+                          style={{
+                            background: passwordStrength.score >= lvl ? passwordStrength.color : undefined
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <div className="pam-strength-meta">
+                      <span style={{ color: '#6f6860' }}>Nivel de seguridad</span>
+                      <span style={{ color: passwordStrength.color }}>{passwordStrength.label}</span>
+                    </div>
+                    <div className="pam-checks">
+                      {passwordStrength.checks.map((c, idx) => (
+                        <div key={idx} className={`pam-check ${c.passed ? 'ok' : ''}`}>
+                          <span className="pam-check-dot">{c.passed ? '✓' : ''}</span>
+                          <span>{c.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <button
+              type="submit"
+              className="pam-btn-submit"
+              style={{ width: '100%', justifyContent: 'center', padding: '13px 20px', fontSize: '0.92rem' }}
+              disabled={loading || isCompressingAvatar}
+            >
+              {loading && <span className="auth-spinner" aria-hidden="true" />}
+              <span>
+                {loading
+                  ? 'Creando tu perfil...'
+                  : username
+                  ? `Crear mi cuenta como @${username}`
+                  : 'Crear Mi Cuenta'}
+              </span>
+            </button>
+          </form>
+        )}
 
         {/* Dedicated Restaurant Onboarding Card */}
         <div style={{

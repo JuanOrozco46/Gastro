@@ -101,8 +101,14 @@ export const validateCachedSession = (): UserAccount | null => {
     }
 
     return {
+      id: typeof obj.id === 'string' ? obj.id : undefined,
       name: obj.name.trim(),
       email: obj.email.trim().toLowerCase(),
+      username: typeof obj.username === 'string' && obj.username.trim() ? obj.username.trim() : undefined,
+      avatarUrl: typeof obj.avatarUrl === 'string' && obj.avatarUrl.trim() ? obj.avatarUrl.trim() : undefined,
+      phone: typeof obj.phone === 'string' && obj.phone.trim() ? obj.phone.trim() : undefined,
+      defaultAddress: typeof obj.defaultAddress === 'string' && obj.defaultAddress.trim() ? obj.defaultAddress.trim() : undefined,
+      defaultDeliveryNotes: typeof obj.defaultDeliveryNotes === 'string' && obj.defaultDeliveryNotes.trim() ? obj.defaultDeliveryNotes.trim() : undefined,
       role: obj.role as UserRole,
       businessRole: obj.businessRole as BusinessUserRole | undefined,
       tenantId: obj.tenantId as string | undefined

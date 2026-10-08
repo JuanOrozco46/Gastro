@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import type { Product, Order, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount } from '../types';
+import type { Product, Order, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, UserRegistrationOptions, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount } from '../types';
 import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
+import { normalizeUsername } from '../utils/formValidation';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant, fetchRestaurantMembers as fetchRemoteMembers, inviteRestaurantStaff as inviteRemoteStaff, resendStaffInvitation as resendRemoteInvitation, suspendRestaurantMember as suspendRemoteMember, reactivateRestaurantMember as reactivateRemoteMember, revokeRestaurantMember as revokeRemoteMember, acceptRestaurantInvitation as acceptRemoteInvitation } from '../services/supabaseDataService';
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
-import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession, resendVerificationEmailAuth } from '../services/supabaseAuthService';
+import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession, resendVerificationEmailAuth, updateSupabaseUserProfile, saveLocalProfileCache } from '../services/supabaseAuthService';
 import { DEMO_LOGIN_ENABLED } from './demoGate';
 import { DEFAULT_CITIES, DEFAULT_ZONES, EMPTY_TENANT, DEFAULT_TENANTS, DEFAULT_PRODUCTS, DEFAULT_POSTS, DEFAULT_STORIES, DEFAULT_ORDERS, DEFAULT_TRANSACTIONS, DEFAULT_DRIVERS } from './defaultData';
 import { useLocationSlice } from './useLocationSlice';
@@ -477,28 +478,55 @@ const location = useLocationSlice();
     return await signInWithGoogleOAuth();
   };
 
-  const registerAccount = async (name: string, email: string, pass: string, _role?: UserRole): Promise<{ success: boolean; error?: string }> => {
+  const registerAccount = async (
+    name: string,
+    email: string,
+    pass: string,
+    _role?: UserRole,
+    options?: UserRegistrationOptions
+  ): Promise<{ success: boolean; error?: string }> => {
+    const cleanUsername = options?.username ? normalizeUsername(options.username) : undefined;
+    const cleanPhone = options?.phone?.trim() || undefined;
+    const cleanAddress = options?.defaultAddress?.trim() || undefined;
+    const cleanNotes = options?.defaultDeliveryNotes?.trim() || undefined;
+    const avatarUrl = options?.avatarDataUrl || undefined;
+
     if (authMode === 'demo') {
+      const normalizedEmail = email.trim().toLowerCase();
       const userAccount: UserAccount = {
-        email: email.trim().toLowerCase(),
+        id: `demo_${Date.now()}`,
+        email: normalizedEmail,
         name: name.trim(),
+        username: cleanUsername,
+        avatarUrl,
+        phone: cleanPhone,
+        defaultAddress: cleanAddress,
+        defaultDeliveryNotes: cleanNotes,
         role: 'client_delivery',
         businessRole: 'customer'
       };
       setCurrentUser(userAccount);
       setUserRole('client_delivery');
       try { localStorage.setItem('gs_demo_session_v1', JSON.stringify(userAccount)); } catch {}
-      showToast(`🎉 ¡Cuenta demo creada exitosamente para ${userAccount.name}!`);
+      saveLocalProfileCache([userAccount.id || '', normalizedEmail], {
+        name: userAccount.name,
+        username: cleanUsername,
+        avatarUrl,
+        phone: cleanPhone,
+        defaultAddress: cleanAddress,
+        defaultDeliveryNotes: cleanNotes
+      });
+      showToast(`🎉 ¡Cuenta creada exitosamente para @${cleanUsername || userAccount.name}!`);
       return { success: true };
     }
 
-    const res = await signUpWithSupabase(email, pass, name);
+    const res = await signUpWithSupabase(email, pass, name, options);
     if (res.success && res.user) {
       if (res.emailConfirmed) {
         setCurrentUser(res.user);
         setUserRole('client_delivery');
         setEmailVerificationState('confirmed');
-        showToast(`🎉 ¡Cuenta creada exitosamente para ${res.user.name}!`);
+        showToast(`🎉 ¡Cuenta creada exitosamente para ${res.user.username ? `@${res.user.username}` : res.user.name}!`);
       } else {
         setEmailVerificationState('pending');
         setPendingVerificationEmail(res.user.email);
@@ -507,6 +535,73 @@ const location = useLocationSlice();
       return { success: true };
     }
     return { success: false, error: res.error || 'Error al crear la cuenta.' };
+  };
+
+  const updateUserProfile = async (
+    updates: {
+      name?: string;
+      username?: string;
+      phone?: string;
+      defaultAddress?: string;
+      defaultDeliveryNotes?: string;
+      avatarUrl?: string;
+    },
+    avatarFile?: File | null
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) {
+      return { success: false, error: 'Debes iniciar sesión para actualizar tu perfil.' };
+    }
+
+    const cleanUsername = updates.username !== undefined ? normalizeUsername(updates.username) : currentUser.username;
+    const res = await updateSupabaseUserProfile(
+      currentUser.id || currentUser.email,
+      currentUser.email,
+      { ...updates, username: cleanUsername },
+      avatarFile
+    );
+
+    if (!res.success) {
+      return { success: false, error: res.error || 'No se pudo actualizar el perfil.' };
+    }
+
+    const nextUser: UserAccount = {
+      ...currentUser,
+      name: updates.name !== undefined ? updates.name.trim() : currentUser.name,
+      username: cleanUsername || undefined,
+      avatarUrl: res.avatarUrl !== undefined ? res.avatarUrl : currentUser.avatarUrl,
+      phone: updates.phone !== undefined ? (updates.phone.trim() || undefined) : currentUser.phone,
+      defaultAddress: updates.defaultAddress !== undefined ? (updates.defaultAddress.trim() || undefined) : currentUser.defaultAddress,
+      defaultDeliveryNotes: updates.defaultDeliveryNotes !== undefined ? (updates.defaultDeliveryNotes.trim() || undefined) : currentUser.defaultDeliveryNotes
+    };
+
+    setCurrentUser(nextUser);
+    try {
+      if (authMode === 'demo') {
+        localStorage.setItem('gs_demo_session_v1', JSON.stringify(nextUser));
+      }
+    } catch {}
+
+    // Actualizar comentarios propios en memoria para reflejar el nuevo @ y foto al instante
+    const updateCommentList = (list: Post[]) =>
+      list.map(p => ({
+        ...p,
+        comments: (p.comments || []).map(c => {
+          const isMine = (c.userId && nextUser.id && c.userId === nextUser.id) || c.userName === currentUser.name;
+          if (!isMine) return c;
+          return {
+            ...c,
+            userName: nextUser.name,
+            userHandle: nextUser.username,
+            userAvatar: nextUser.avatarUrl || c.userAvatar || '🥑',
+            userAvatarUrl: nextUser.avatarUrl
+          };
+        })
+      }));
+
+    setPosts(prev => updateCommentList(prev));
+    setRemotePosts(prev => updateCommentList(prev));
+
+    return { success: true };
   };
 
   const resendVerificationEmail = async () => {
@@ -1118,12 +1213,20 @@ const location = useLocationSlice();
   };
 
   const addComment = async (postId: string, text: string, _userName = 'Tú (Cliente)'): Promise<boolean> => {
-    if (!currentUser?.id) {
+    if (!currentUser) {
       showToast('⚠️ Inicia sesión para comentar.');
       return false;
     }
     if (authMode === 'remote') {
-      const newComment = await addRemoteComment(postId, currentUser.id, text);
+      if (!currentUser.id) {
+        showToast('⚠️ Inicia sesión para comentar.');
+        return false;
+      }
+      const newComment = await addRemoteComment(postId, currentUser.id, text, {
+        name: currentUser.name,
+        username: currentUser.username,
+        avatarUrl: currentUser.avatarUrl
+      });
       if (!newComment) {
         showToast('❌ No se pudo guardar el comentario.');
         return false;
@@ -1144,8 +1247,11 @@ const location = useLocationSlice();
         const newComment = {
           id: `c_${Date.now()}`,
           postId,
+          userId: currentUser.id || currentUser.email,
           userName: currentUser.name,
-          userAvatar: '🥑',
+          userHandle: currentUser.username,
+          userAvatar: currentUser.avatarUrl || '🥑',
+          userAvatarUrl: currentUser.avatarUrl,
           text,
           timeAgo: 'Justo ahora',
           likes: 0
@@ -1160,6 +1266,41 @@ const location = useLocationSlice();
   };
 
   const deleteComment = async (postId: string, commentId: string) => {
+    if (!currentUser) {
+      showToast('⚠️ Inicia sesión para gestionar comentarios.');
+      return;
+    }
+
+    const sourceList = authMode === 'remote' ? remotePosts : posts;
+    const targetPost = sourceList.find(p => p.id === postId);
+    const targetComment = targetPost?.comments?.find(c => c.id === commentId);
+
+    const isCommentAuthor = Boolean(
+      targetComment && (
+        (targetComment.userId && (targetComment.userId === currentUser.id || targetComment.userId === currentUser.email)) ||
+        (!targetComment.userId && (
+          targetComment.userName === currentUser.name ||
+          (targetComment.userHandle && currentUser.username && targetComment.userHandle === currentUser.username) ||
+          targetComment.userName === 'Tú (Cliente)'
+        ))
+      )
+    );
+
+    const isPostRestaurant = Boolean(
+      targetPost &&
+      currentUser.tenantId &&
+      currentUser.tenantId === targetPost.tenantId &&
+      (currentUser.businessRole === 'restaurant_owner' ||
+       currentUser.businessRole === 'restaurant_staff' ||
+       currentUser.role === 'admin' ||
+       currentUser.role === 'kitchen')
+    );
+
+    if (!isCommentAuthor && !isPostRestaurant) {
+      showToast('❌ Solo el autor del comentario o el restaurante pueden eliminarlo.');
+      return;
+    }
+
     if (authMode === 'remote' && currentUser?.id) {
       const ok = await deleteRemoteComment(commentId, currentUser.id);
       if (!ok) {
@@ -1664,6 +1805,7 @@ const location = useLocationSlice();
       loginWithCredentials,
       loginWithGoogle,
       registerAccount,
+      updateUserProfile,
       resendVerificationEmail,
       refreshEmailVerification,
       signOutUnverifiedUser,

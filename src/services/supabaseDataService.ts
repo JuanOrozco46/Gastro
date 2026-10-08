@@ -163,7 +163,46 @@ export async function fetchLiveProducts(): Promise<Product[]> {
   }
 }
 
-export async function fetchRemoteComments(postId: string) {
+interface CommentAuthorMeta {
+  fullName: string;
+  username?: string;
+  avatarUrl?: string;
+}
+
+async function fetchProfilesMetaMap(userIds: string[]): Promise<Map<string, CommentAuthorMeta>> {
+  const map = new Map<string, CommentAuthorMeta>();
+  if (!isSupabaseConfigured || !supabase || userIds.length === 0) return map;
+
+  const { data: extProfiles, error: extErr } = await supabase
+    .from('profiles')
+    .select('id, full_name, username, avatar_url')
+    .in('id', userIds);
+
+  if (!extErr && extProfiles) {
+    extProfiles.forEach((p: { id: string; full_name: string; username?: string | null; avatar_url?: string | null }) => {
+      map.set(p.id, {
+        fullName: p.full_name || 'Usuario',
+        username: p.username || undefined,
+        avatarUrl: p.avatar_url || undefined
+      });
+    });
+    return map;
+  }
+
+  const { data: basicProfiles } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .in('id', userIds);
+
+  if (basicProfiles) {
+    basicProfiles.forEach((p: { id: string; full_name: string }) => {
+      map.set(p.id, { fullName: p.full_name || 'Usuario' });
+    });
+  }
+  return map;
+}
+
+export async function fetchRemoteComments(postId: string): Promise<PostComment[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
     const { data: comments, error } = await supabase
@@ -179,32 +218,35 @@ export async function fetchRemoteComments(postId: string) {
     if (!comments || comments.length === 0) return [];
 
     const userIds = Array.from(new Set(comments.map((c: { user_id: string }) => c.user_id)));
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', userIds);
+    const profileMap = await fetchProfilesMetaMap(userIds);
 
-    const profileMap = new Map();
-    if (profiles) {
-      profiles.forEach((p: { id: string, full_name: string }) => profileMap.set(p.id, p.full_name));
-    }
-
-    return comments.map((c: { id: string, post_id: string, user_id: string, content: string, created_at: string }) => ({
-      id: c.id,
-      postId: c.post_id,
-      userName: profileMap.get(c.user_id) || 'Usuario',
-      userAvatar: '🥑',
-      text: c.content,
-      timeAgo: formatTimeAgo(c.created_at),
-      likes: 0
-    }));
+    return comments.map((c: { id: string; post_id: string; user_id: string; content: string; created_at: string }) => {
+      const meta = profileMap.get(c.user_id);
+      return {
+        id: c.id,
+        postId: c.post_id,
+        userId: c.user_id,
+        userName: meta?.fullName || 'Usuario',
+        userHandle: meta?.username,
+        userAvatar: meta?.avatarUrl || '🥑',
+        userAvatarUrl: meta?.avatarUrl,
+        text: c.content,
+        timeAgo: formatTimeAgo(c.created_at),
+        likes: 0
+      };
+    });
   } catch (err) {
     console.error('⚠️ Excepción al cargar comentarios:', err);
     return [];
   }
 }
 
-export async function addRemoteComment(postId: string, userId: string, text: string) {
+export async function addRemoteComment(
+  postId: string,
+  userId: string,
+  text: string,
+  authorFallback?: { name?: string; username?: string; avatarUrl?: string }
+): Promise<PostComment | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   
   const trimmed = text.trim();
@@ -225,18 +267,20 @@ export async function addRemoteComment(postId: string, userId: string, text: str
       return null;
     }
     
-    // Obtener profile separado
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', userId)
-      .maybeSingle();
+    const profileMap = await fetchProfilesMetaMap([userId]);
+    const meta = profileMap.get(userId);
+    const finalName = meta?.fullName || authorFallback?.name || 'Usuario';
+    const finalHandle = meta?.username || authorFallback?.username;
+    const finalAvatarUrl = meta?.avatarUrl || authorFallback?.avatarUrl;
     
     return {
       id: data.id,
       postId: data.post_id,
-      userName: profile?.full_name || 'Usuario',
-      userAvatar: '🥑',
+      userId: data.user_id,
+      userName: finalName,
+      userHandle: finalHandle,
+      userAvatar: finalAvatarUrl || '🥑',
+      userAvatarUrl: finalAvatarUrl,
       text: data.content,
       timeAgo: formatTimeAgo(data.created_at),
       likes: 0
@@ -247,11 +291,17 @@ export async function addRemoteComment(postId: string, userId: string, text: str
   }
 }
 
-export async function deleteRemoteComment(commentId: string, userId: string): Promise<boolean> {
+export async function deleteRemoteComment(commentId: string, _userId?: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
-    const { error } = await supabase.from('post_comments').delete().eq('id', commentId).eq('user_id', userId);
-    return !error;
+    // La política RLS post_comments_delete_author_or_restaurant valida si auth.uid()
+    // es el autor del comentario o el dueño/staff del restaurante dueño del post.
+    const { data, error } = await supabase
+      .from('post_comments')
+      .delete()
+      .eq('id', commentId)
+      .select('id');
+    return !error && Array.isArray(data) && data.length > 0;
   } catch {
     return false;
   }
@@ -421,23 +471,19 @@ export async function fetchLivePosts(): Promise<Post[]> {
     if (commentsData.data && commentsData.data.length > 0) {
       // Get profiles for all comment authors
       const userIds = Array.from(new Set(commentsData.data.map((c: { user_id: string }) => c.user_id)));
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', userIds);
-        
-      const profileMap = new Map();
-      if (profiles) {
-        profiles.forEach((p: { id: string, full_name: string }) => profileMap.set(p.id, p.full_name));
-      }
+      const profileMap = await fetchProfilesMetaMap(userIds);
 
       commentsData.data.forEach((comment: { id: string; post_id: string; user_id: string; content: string; created_at: string }) => {
         const postComments = commentsMap.get(comment.post_id) || [];
+        const meta = profileMap.get(comment.user_id);
         postComments.push({
           id: comment.id,
           postId: comment.post_id,
-          userName: profileMap.get(comment.user_id) || 'Usuario',
-          userAvatar: '🥑',
+          userId: comment.user_id,
+          userName: meta?.fullName || 'Usuario',
+          userHandle: meta?.username,
+          userAvatar: meta?.avatarUrl || '🥑',
+          userAvatarUrl: meta?.avatarUrl,
           text: comment.content,
           timeAgo: formatTimeAgo(comment.created_at),
           likes: 0

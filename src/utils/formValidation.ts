@@ -35,6 +35,39 @@ export function validateRequired(value: string, label: string): string | null {
   return value.trim() ? null : `${label} es obligatorio.`;
 }
 
+const USERNAME_RE = /^[a-z0-9._]{3,24}$/;
+
+/** Normaliza un handle eliminando @ iniciales, espacios y caracteres no permitidos. */
+export function normalizeUsername(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9._]/g, '')
+    .slice(0, 24);
+}
+
+/** Sugiere un @handle limpio a partir del nombre completo del usuario. */
+export function suggestUsernameFromName(fullName: string): string {
+  const clean = normalizeUsername(fullName).replace(/^[._]+|[._]+$/g, '');
+  if (clean.length >= 3) return clean;
+  return '';
+}
+
+export function validateUsername(value: string): string | null {
+  const clean = value.trim().toLowerCase().replace(/^@+/, '');
+  if (!clean) return 'Define tu usuario @ (ej: maria_lopez).';
+  if (clean.length < 3) return 'Tu @ debe tener al menos 3 caracteres.';
+  if (clean.length > 24) return 'Tu @ no puede superar 24 caracteres.';
+  if (!USERNAME_RE.test(clean)) {
+    return 'Usa solo letras minúsculas, números, puntos (.) o guión bajo (_).';
+  }
+  return null;
+}
+
 /* ── Fuerza de contraseña (compartida por registro de cliente y aliado) ── */
 
 export interface PasswordStrength {

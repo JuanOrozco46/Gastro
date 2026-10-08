@@ -46,10 +46,29 @@ export interface UserAccount {
   id?: string;
   email: string;
   name: string;
+  /** Handle de usuario sin el signo @ inicial (ej. "maria_lopez") */
+  username?: string;
+  /** URL pública o DataURL comprimido de la foto de perfil */
+  avatarUrl?: string;
+  /** Teléfono de contacto para autocompletar en pedidos */
+  phone?: string;
+  /** Dirección habitual de entrega para autocompletar en pedidos */
+  defaultAddress?: string;
+  /** Notas de entrega habituales (ej. Apto, portería) */
+  defaultDeliveryNotes?: string;
   role: UserRole;
   businessRole?: BusinessUserRole;
   tenantId?: string;
   needsPasswordSet?: boolean;
+}
+
+export interface UserRegistrationOptions {
+  username?: string;
+  phone?: string;
+  defaultAddress?: string;
+  defaultDeliveryNotes?: string;
+  avatarFile?: File | null;
+  avatarDataUrl?: string;
 }
 
 export interface City {
@@ -204,8 +223,11 @@ export type Restaurant = Tenant;
 export interface PostComment {
   id: string;
   postId: string;
+  userId?: string;
   userName: string;
+  userHandle?: string;
   userAvatar: string;
+  userAvatarUrl?: string;
   text: string;
   timeAgo: string;
   likes: number;

@@ -1,6 +1,7 @@
 export { isSupabaseConfigured } from '../lib/supabase';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { UserAccount } from '../types';
+import type { UserAccount, UserRegistrationOptions } from '../types';
+import { normalizeUsername } from '../utils/formValidation';
 
 export type SupabaseAuthMode = 'remote' | 'demo';
 export type AuthUser = UserAccount;
@@ -12,6 +13,64 @@ export interface AuthActionResult {
   error?: string;
   sessionExists?: boolean;
   emailConfirmed?: boolean;
+}
+
+const LOCAL_PROFILES_CACHE_KEY = 'gs_user_profiles_cache_v1';
+
+interface CachedProfileExtras {
+  name?: string;
+  username?: string;
+  avatarUrl?: string;
+  phone?: string;
+  defaultAddress?: string;
+  defaultDeliveryNotes?: string;
+}
+
+export function getLocalProfileCache(key: string): CachedProfileExtras | null {
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(LOCAL_PROFILES_CACHE_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw) as Record<string, CachedProfileExtras>;
+    return map[key.toLowerCase()] || null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLocalProfileCache(keys: string[], extras: CachedProfileExtras): void {
+  try {
+    const raw = localStorage.getItem(LOCAL_PROFILES_CACHE_KEY);
+    const map: Record<string, CachedProfileExtras> = raw ? JSON.parse(raw) : {};
+    for (const k of keys) {
+      if (!k) continue;
+      const norm = k.toLowerCase();
+      map[norm] = { ...(map[norm] || {}), ...extras };
+    }
+    localStorage.setItem(LOCAL_PROFILES_CACHE_KEY, JSON.stringify(map));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+export async function uploadUserAvatarToStorage(userId: string, file: File): Promise<string | null> {
+  if (!isSupabaseConfigured || !supabase || !userId) return null;
+  try {
+    const ext = file.name.split('.').pop() || 'webp';
+    const path = `avatars/${userId}/avatar_${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('gastro-media')
+      .upload(path, file, { upsert: true, contentType: file.type || 'image/webp' });
+    if (uploadError) {
+      console.warn('⚠️ No se pudo subir el avatar al bucket gastro-media:', uploadError.message);
+      return null;
+    }
+    const { data } = supabase.storage.from('gastro-media').getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch (err) {
+    console.warn('⚠️ Excepción subiendo avatar:', err);
+    return null;
+  }
 }
 
 /**
@@ -30,6 +89,9 @@ export function translateAuthError(errMessage: string): string {
   }
   if (msg.includes('user already registered') || msg.includes('already exists') || msg.includes('already been registered')) {
     return 'Ya existe una cuenta con este correo. Inicia sesión.';
+  }
+  if (msg.includes('idx_profiles_username_lower_unique') || msg.includes('profiles_username')) {
+    return 'Ese usuario @ ya está en uso. Elige otro distinto.';
   }
   if (msg.includes('email not confirmed')) {
     return 'Confirma tu correo antes de entrar.';
@@ -60,14 +122,21 @@ export function translateAuthError(errMessage: string): string {
 
 /**
  * Consulta las tablas `public.profiles` y `public.restaurant_members`
- * para determinar el rol del usuario autenticado en la plataforma.
+ * para determinar el rol y datos de perfil (@username, avatar, teléfono, dirección) del usuario.
  */
 export async function resolveSupabaseUserProfile(userId: string, email: string, needsPasswordSet?: boolean): Promise<UserAccount> {
+  const cached = getLocalProfileCache(userId) || getLocalProfileCache(email);
+
   if (!isSupabaseConfigured || !supabase) {
     return {
       id: userId,
       email,
-      name: email.split('@')[0],
+      name: cached?.name || email.split('@')[0],
+      username: cached?.username,
+      avatarUrl: cached?.avatarUrl,
+      phone: cached?.phone,
+      defaultAddress: cached?.defaultAddress,
+      defaultDeliveryNotes: cached?.defaultDeliveryNotes,
       role: 'client_delivery',
       businessRole: 'customer',
       needsPasswordSet
@@ -75,21 +144,62 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
   }
 
   try {
-    // 1. Obtener perfil general
-    const { data: profile } = await supabase
+    // 0. Leer metadatos del usuario autenticado (fallback inmediato)
+    const { data: authUserData } = await supabase.auth.getUser();
+    const meta = authUserData?.user?.id === userId ? (authUserData.user.user_metadata || {}) : {};
+
+    // 1. Obtener perfil general (con columnas extendidas de la migración 042)
+    let profile: {
+      full_name?: string;
+      platform_role?: string;
+      username?: string | null;
+      avatar_url?: string | null;
+      phone?: string | null;
+      default_address?: string | null;
+      default_delivery_notes?: string | null;
+    } | null = null;
+
+    const { data: extProfile, error: extErr } = await supabase
       .from('profiles')
-      .select('full_name, platform_role')
+      .select('full_name, platform_role, username, avatar_url, phone, default_address, default_delivery_notes')
       .eq('id', userId)
       .maybeSingle();
 
-    const fullName = profile?.full_name || email.split('@')[0];
+    if (!extErr) {
+      profile = extProfile;
+    } else {
+      const { data: basicProfile } = await supabase
+        .from('profiles')
+        .select('full_name, platform_role')
+        .eq('id', userId)
+        .maybeSingle();
+      profile = basicProfile;
+    }
+
+    const fullName = profile?.full_name || (typeof meta.full_name === 'string' ? meta.full_name : '') || cached?.name || email.split('@')[0];
     const platformRole = profile?.platform_role || 'customer';
+    const username = profile?.username || (typeof meta.username === 'string' ? meta.username : undefined) || cached?.username;
+    const avatarUrl = profile?.avatar_url || (typeof meta.avatar_url === 'string' ? meta.avatar_url : undefined) || cached?.avatarUrl;
+    const phone = profile?.phone || (typeof meta.phone === 'string' ? meta.phone : undefined) || cached?.phone;
+    const defaultAddress = profile?.default_address || (typeof meta.default_address === 'string' ? meta.default_address : undefined) || cached?.defaultAddress;
+    const defaultDeliveryNotes = profile?.default_delivery_notes || (typeof meta.default_delivery_notes === 'string' ? meta.default_delivery_notes : undefined) || cached?.defaultDeliveryNotes;
+
+    const commonExtras = {
+      name: fullName,
+      username: username || undefined,
+      avatarUrl: avatarUrl || undefined,
+      phone: phone || undefined,
+      defaultAddress: defaultAddress || undefined,
+      defaultDeliveryNotes: defaultDeliveryNotes || undefined
+    };
+
+    saveLocalProfileCache([userId, email], commonExtras);
 
     if (platformRole === 'platform_admin') {
       return {
         id: userId,
         email,
-        name: fullName,
+        ...commonExtras,
         role: 'platform_admin',
         businessRole: 'platform_admin',
         needsPasswordSet
@@ -109,7 +219,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
         return {
           id: userId,
           email,
-          name: fullName,
+          ...commonExtras,
           role: 'admin',
           businessRole: 'restaurant_owner',
           tenantId: member.restaurant_id,
@@ -119,7 +229,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
         return {
           id: userId,
           email,
-          name: fullName,
+          ...commonExtras,
           role: 'kitchen',
           businessRole: 'restaurant_staff',
           tenantId: member.restaurant_id,
@@ -132,7 +242,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
     return {
       id: userId,
       email,
-      name: fullName,
+      ...commonExtras,
       role: 'client_delivery',
       businessRole: 'customer',
       needsPasswordSet
@@ -142,7 +252,12 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
     return {
       id: userId,
       email,
-      name: email.split('@')[0],
+      name: cached?.name || email.split('@')[0],
+      username: cached?.username,
+      avatarUrl: cached?.avatarUrl,
+      phone: cached?.phone,
+      defaultAddress: cached?.defaultAddress,
+      defaultDeliveryNotes: cached?.defaultDeliveryNotes,
       role: 'client_delivery',
       businessRole: 'customer',
       needsPasswordSet
@@ -182,9 +297,14 @@ export async function signInWithSupabase(email: string, pass: string): Promise<A
 }
 
 /**
- * Registra un nuevo usuario cliente en Supabase Auth y crea su perfil en `public.profiles`.
+ * Registra un nuevo usuario cliente en Supabase Auth y crea su perfil enriquecido en `public.profiles`.
  */
-export async function signUpWithSupabase(email: string, pass: string, fullName: string): Promise<AuthActionResult> {
+export async function signUpWithSupabase(
+  email: string,
+  pass: string,
+  fullName: string,
+  options?: UserRegistrationOptions
+): Promise<AuthActionResult> {
   if (!isSupabaseConfigured || !supabase) {
     return { success: false, error: 'Supabase no está configurado.' };
   }
@@ -192,13 +312,39 @@ export async function signUpWithSupabase(email: string, pass: string, fullName: 
   try {
     const normalizedEmail = email.trim().toLowerCase();
     const cleanName = fullName.trim() || 'Cliente GastroSync';
+    const cleanUsername = options?.username ? normalizeUsername(options.username) : undefined;
+    const cleanPhone = options?.phone?.trim() || undefined;
+    const cleanAddress = options?.defaultAddress?.trim() || undefined;
+    const cleanNotes = options?.defaultDeliveryNotes?.trim() || undefined;
+    let finalAvatarUrl = options?.avatarDataUrl || undefined;
+
+    // Verificar disponibilidad del @username si se especificó
+    if (cleanUsername) {
+      const { data: existingHandle } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('username', cleanUsername)
+        .maybeSingle();
+
+      if (existingHandle) {
+        return {
+          success: false,
+          error: `El usuario @${cleanUsername} ya está registrado. Prueba con otro @.`
+        };
+      }
+    }
 
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password: pass,
       options: {
         data: {
-          full_name: cleanName
+          full_name: cleanName,
+          username: cleanUsername || null,
+          avatar_url: finalAvatarUrl || null,
+          phone: cleanPhone || null,
+          default_address: cleanAddress || null,
+          default_delivery_notes: cleanNotes || null
         }
       }
     });
@@ -207,20 +353,56 @@ export async function signUpWithSupabase(email: string, pass: string, fullName: 
       return { success: false, error: translateAuthError(error?.message || '') };
     }
 
-    // Insertar en la tabla public.profiles si no existe
-    await supabase.from('profiles').upsert({
+    // Si hay sesión activa y archivo de avatar, subir al bucket gastro-media
+    if (data.session && options?.avatarFile) {
+      const uploadedUrl = await uploadUserAvatarToStorage(data.user.id, options.avatarFile);
+      if (uploadedUrl) {
+        finalAvatarUrl = uploadedUrl;
+      }
+    }
+
+    // Upsert en public.profiles (si hay sesión activa)
+    const { error: upsertErr } = await supabase.from('profiles').upsert({
       id: data.user.id,
       full_name: cleanName,
+      username: cleanUsername || null,
+      avatar_url: finalAvatarUrl || null,
+      phone: cleanPhone || null,
+      default_address: cleanAddress || null,
+      default_delivery_notes: cleanNotes || null,
       platform_role: 'customer'
     });
+
+    if (upsertErr) {
+      // Fallback en caso de que la tabla no acepte algún campo opcional
+      await supabase.from('profiles').upsert({
+        id: data.user.id,
+        full_name: cleanName,
+        platform_role: 'customer'
+      });
+    }
 
     const userAccount: UserAccount = {
       id: data.user.id,
       email: normalizedEmail,
       name: cleanName,
+      username: cleanUsername,
+      avatarUrl: finalAvatarUrl,
+      phone: cleanPhone,
+      defaultAddress: cleanAddress,
+      defaultDeliveryNotes: cleanNotes,
       role: 'client_delivery',
       businessRole: 'customer'
     };
+
+    saveLocalProfileCache([data.user.id, normalizedEmail], {
+      name: cleanName,
+      username: cleanUsername,
+      avatarUrl: finalAvatarUrl,
+      phone: cleanPhone,
+      defaultAddress: cleanAddress,
+      defaultDeliveryNotes: cleanNotes
+    });
 
     return { 
       success: true, 
@@ -232,6 +414,97 @@ export async function signUpWithSupabase(email: string, pass: string, fullName: 
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: translateAuthError(msg) };
   }
+}
+
+/**
+ * Actualiza los datos de perfil del usuario (@username, avatar, teléfono, dirección habitual).
+ */
+export async function updateSupabaseUserProfile(
+  userId: string,
+  email: string,
+  updates: {
+    name?: string;
+    username?: string;
+    phone?: string;
+    defaultAddress?: string;
+    defaultDeliveryNotes?: string;
+    avatarUrl?: string;
+  },
+  avatarFile?: File | null
+): Promise<{ success: boolean; avatarUrl?: string; error?: string }> {
+  const cleanUsername = updates.username !== undefined ? normalizeUsername(updates.username) : undefined;
+  let finalAvatarUrl = updates.avatarUrl;
+
+  if (isSupabaseConfigured && supabase && userId) {
+    try {
+      if (cleanUsername) {
+        const { data: existingHandle } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('username', cleanUsername)
+          .neq('id', userId)
+          .maybeSingle();
+
+        if (existingHandle) {
+          return {
+            success: false,
+            error: `El usuario @${cleanUsername} ya está en uso por otra cuenta.`
+          };
+        }
+      }
+
+      if (avatarFile) {
+        const uploaded = await uploadUserAvatarToStorage(userId, avatarFile);
+        if (uploaded) {
+          finalAvatarUrl = uploaded;
+        }
+      }
+
+      const dbPayload: Record<string, unknown> = {
+        updated_at: new Date().toISOString()
+      };
+      if (updates.name !== undefined) dbPayload.full_name = updates.name.trim();
+      if (cleanUsername !== undefined) dbPayload.username = cleanUsername || null;
+      if (finalAvatarUrl !== undefined) dbPayload.avatar_url = finalAvatarUrl || null;
+      if (updates.phone !== undefined) dbPayload.phone = updates.phone.trim() || null;
+      if (updates.defaultAddress !== undefined) dbPayload.default_address = updates.defaultAddress.trim() || null;
+      if (updates.defaultDeliveryNotes !== undefined) dbPayload.default_delivery_notes = updates.defaultDeliveryNotes.trim() || null;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(dbPayload)
+        .eq('id', userId);
+
+      if (error) {
+        return { success: false, error: translateAuthError(error.message) };
+      }
+
+      await supabase.auth.updateUser({
+        data: {
+          ...(updates.name !== undefined ? { full_name: updates.name.trim() } : {}),
+          ...(cleanUsername !== undefined ? { username: cleanUsername || null } : {}),
+          ...(finalAvatarUrl !== undefined ? { avatar_url: finalAvatarUrl || null } : {}),
+          ...(updates.phone !== undefined ? { phone: updates.phone.trim() || null } : {}),
+          ...(updates.defaultAddress !== undefined ? { default_address: updates.defaultAddress.trim() || null } : {}),
+          ...(updates.defaultDeliveryNotes !== undefined ? { default_delivery_notes: updates.defaultDeliveryNotes.trim() || null } : {})
+        }
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: translateAuthError(msg) };
+    }
+  }
+
+  saveLocalProfileCache([userId, email], {
+    ...(updates.name !== undefined ? { name: updates.name.trim() } : {}),
+    ...(cleanUsername !== undefined ? { username: cleanUsername } : {}),
+    ...(finalAvatarUrl !== undefined ? { avatarUrl: finalAvatarUrl } : {}),
+    ...(updates.phone !== undefined ? { phone: updates.phone.trim() } : {}),
+    ...(updates.defaultAddress !== undefined ? { defaultAddress: updates.defaultAddress.trim() } : {}),
+    ...(updates.defaultDeliveryNotes !== undefined ? { defaultDeliveryNotes: updates.defaultDeliveryNotes.trim() } : {})
+  });
+
+  return { success: true, avatarUrl: finalAvatarUrl };
 }
 
 /**
