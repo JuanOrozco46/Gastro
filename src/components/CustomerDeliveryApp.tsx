@@ -383,13 +383,15 @@ export const CustomerDeliveryApp: React.FC = () => {
   const activePosts = authMode === 'remote' ? remotePosts : posts;
 
   const zoneFilteredPosts = useMemo(() => {
+      const city = activeCity ?? cities.find(c => c.isActive) ?? cities[0] ?? { id: 'fallback-city', name: 'Fallback', slug: 'fallback', countryCode: 'CO', currencyCode: 'COP', isActive: true };
+      const hasTenantsInCity = Array.from(tenantMap.values()).some(t => t.status === 'active' && t.cityId === city.id);
+
       return activePosts.reduce<Post[]>((acc, post) => {
         const tenant = tenantMap.get(post.tenantId);
         if (!tenant || tenant.status !== 'active') {
           return acc;
         }
-        const city = activeCity ?? cities.find(c => c.isActive) ?? cities[0] ?? { id: 'fallback-city', name: 'Fallback', slug: 'fallback', countryCode: 'CO', currencyCode: 'COP', isActive: true };
-        if (!city || tenant.cityId !== city.id) {
+        if (city && hasTenantsInCity && tenant.cityId !== city.id) {
           return acc;
         }
         if (selectedZoneId && tenant.zoneId !== selectedZoneId) {
@@ -406,8 +408,10 @@ export const CustomerDeliveryApp: React.FC = () => {
     }, [activePosts, tenantMap, selectedZoneId, activeCity, cities]);
 
   const activeTenantsInZoneCount = useMemo(() => {
+    const hasTenantsInCity = activeCity ? tenants.some(t => t.status === 'active' && t.cityId === activeCity.id) : false;
     return tenants.filter(t => {
-      if (t.status !== 'active' || !activeCity || t.cityId !== activeCity.id) return false;
+      if (t.status !== 'active') return false;
+      if (activeCity && hasTenantsInCity && t.cityId !== activeCity.id) return false;
       if (!selectedZoneId) return true;
       return t.zoneId === selectedZoneId;
     }).length;
@@ -424,8 +428,12 @@ export const CustomerDeliveryApp: React.FC = () => {
   const cartTenant = cartTenantId ? tenantMap.get(cartTenantId) : null;
   const isCartTenantOpen = cartTenant?.isOpen ?? true;
   const activeOrdersCount = orders.filter(o =>
-    o && o.status !== 'delivered' &&
-    o.type && (o.type.toLowerCase().includes('domicilio') || o.type.toLowerCase().includes('mesa'))
+    o &&
+    o.status !== 'delivered' &&
+    o.status !== 'cancelled' &&
+    Boolean(currentUser) &&
+    ((Boolean(currentUser?.id) && o.customerId === currentUser?.id) ||
+      (Boolean(currentUser?.email) && o.customerId === currentUser?.email))
   ).length;
 
   const handleOrder = useCallback((productId: string, tenantIdOrSlug: string) => {
@@ -984,7 +992,17 @@ export const CustomerDeliveryApp: React.FC = () => {
       )}
 
       {activeTab === 'directory' && (
-        <RestaurantDirectory selectedZone={selectedZoneId || 'all'} onSelectTenantAndGoToFeed={() => setActiveTab('feed')} />
+        <RestaurantDirectory
+          selectedZone={selectedZoneId || 'all'}
+          onOpenTenantProfile={(tenantId) => setSelectedTenantProfile(tenantId)}
+          onSelectTenantAndGoToFeed={(slug) => {
+            const targetTenant = tenants.find(t => t.slug === slug || t.id === slug);
+            if (targetTenant) {
+              setSearchQuery(targetTenant.name);
+            }
+            setActiveTab('feed');
+          }}
+        />
       )}
 
       {activeTab === 'orders' && (
@@ -1043,11 +1061,16 @@ export const CustomerDeliveryApp: React.FC = () => {
 
       {/* ── Restaurant Profile Modal ── */}
       {selectedTenantProfile && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<FallbackLoader message="Cargando local..." />}>
           <RestaurantProfileModal
             tenantId={selectedTenantProfile}
+            initialTab="menu"
             onClose={() => setSelectedTenantProfile(null)}
             onOrderProduct={handleOrder}
+            onOpenCart={() => {
+              setSelectedTenantProfile(null);
+              setIsMobileCartOpen(true);
+            }}
           />
         </Suspense>
       )}

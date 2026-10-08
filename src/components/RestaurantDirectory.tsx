@@ -10,11 +10,13 @@ import {
 interface RestaurantDirectoryProps {
   selectedZone?: string;
   onSelectTenantAndGoToFeed: (slug: string) => void;
+  onOpenTenantProfile?: (tenantId: string) => void;
 }
 
 export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
   selectedZone,
-  onSelectTenantAndGoToFeed
+  onSelectTenantAndGoToFeed,
+  onOpenTenantProfile
 }) => {
   const { tenants, products, cities, zones, selectedCityId, selectedZoneId, addToCart, setCurrentTenantBySlug, isCatalogLoading, catalogError } = useApp();
 
@@ -36,10 +38,14 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
 
   // Filter & Sort logic
   const filteredTenants = useMemo(() => {
+    const hasTenantsInActiveCity = activeCity
+      ? tenants.some(t => t.status === 'active' && t.cityId === activeCity.id)
+      : false;
+
     return tenants
       .filter(t => {
         if (t.status !== 'active') return false;
-        if (activeCity && t.cityId !== activeCity.id) return false;
+        if (activeCity && hasTenantsInActiveCity && t.cityId !== activeCity.id) return false;
         const zoneFilter = selectedZone || selectedZoneId;
         if (zoneFilter && zoneFilter !== 'all' && t.zoneId !== zoneFilter) {
           return false;
@@ -164,7 +170,13 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
             </div>
             <div className="spotlight-body">
               <div className="spotlight-header">
-                <span className="spotlight-emoji">{featuredTenant.logoEmoji || '🍽️'}</span>
+                <span className="spotlight-emoji" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {featuredTenant.logoUrl ? (
+                    <img src={featuredTenant.logoUrl} alt={featuredTenant.name} style={{ width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover' }} />
+                  ) : (
+                    featuredTenant.logoEmoji || '🍽️'
+                  )}
+                </span>
                 <div>
                   <h4 className="spotlight-title">{featuredTenant.name}</h4>
                   <span className="spotlight-sub">{featuredTenant.category} • {featuredTenant.address}</span>
@@ -181,7 +193,11 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                   style={{ borderRadius: '10px', fontWeight: 800 }}
                   onClick={() => {
                     setCurrentTenantBySlug(featuredTenant.slug);
-                    onSelectTenantAndGoToFeed(featuredTenant.slug);
+                    if (onOpenTenantProfile) {
+                      onOpenTenantProfile(featuredTenant.id);
+                    } else {
+                      setSelectedTenantForModal(featuredTenant);
+                    }
                   }}
                 >
                   Ver Menú <ShoppingBag size={14} />
@@ -436,8 +452,12 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                   </div>
 
                   {/* Logo Emoji Floating Avatar */}
-                  <div className="tenant-logo-avatar">
-                    {tenant.logoEmoji || '🏪'}
+                  <div className="tenant-logo-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {tenant.logoUrl ? (
+                      <img src={tenant.logoUrl} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      tenant.logoEmoji || '🏪'
+                    )}
                   </div>
                 </div>
 
@@ -498,14 +518,17 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       className="btn btn-primary tenant-btn-primary"
-                      disabled={!tenant.isOpen}
                       style={{ borderRadius: '12px', fontWeight: 800 }}
                       onClick={() => {
                         setCurrentTenantBySlug(tenant.slug);
-                        onSelectTenantAndGoToFeed(tenant.slug);
+                        if (onOpenTenantProfile) {
+                          onOpenTenantProfile(tenant.id);
+                        } else {
+                          setSelectedTenantForModal(tenant);
+                        }
                       }}
                     >
-                      <ShoppingBag size={16} /> Ver Publicaciones & Menú
+                      <ShoppingBag size={16} /> Ver Local & Menú
                     </motion.button>
 
                     <button
@@ -557,8 +580,12 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                 <X size={20} />
               </button>
 
-              <div className="modal-logo-box" style={{ background: '#0F172A', border: '3px solid rgba(255,255,255,0.14)' }}>
-                {selectedTenantForModal.logoEmoji || '🏪'}
+              <div className="modal-logo-box" style={{ background: '#0F172A', border: '3px solid rgba(255,255,255,0.14)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {selectedTenantForModal.logoUrl ? (
+                  <img src={selectedTenantForModal.logoUrl} alt={selectedTenantForModal.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  selectedTenantForModal.logoEmoji || '🏪'
+                )}
               </div>
             </div>
 
@@ -625,8 +652,12 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                   <div className="modal-products-grid">
                     {modalProducts.map(product => (
                       <div key={product.id} className="modal-product-card" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div className="product-emoji-container">
-                          {product.emoji}
+                        <div className="product-emoji-container" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {product.image ? (
+                            <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '10px' }} />
+                          ) : (
+                            product.emoji
+                          )}
                         </div>
                         <div className="product-info flex-1">
                           <h4 className="product-name" style={{ color: 'white' }}>{product.name}</h4>

@@ -142,6 +142,36 @@ const location = useLocationSlice();
     } catch {}
   }, [provisionedOwnerAccounts]);
 
+  const [orders, setOrders] = useState<Order[]>(() => {
+    if (isSupabaseConfigured) {
+      try {
+        localStorage.removeItem('gs_orders_v5');
+      } catch {}
+      return [];
+    }
+    try {
+      const saved = localStorage.getItem('gs_demo_orders_v1');
+      return saved ? JSON.parse(saved) : DEFAULT_ORDERS;
+    } catch {
+      return DEFAULT_ORDERS;
+    }
+  });
+
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    if (isSupabaseConfigured) {
+      try {
+        localStorage.removeItem('gs_transactions_v5');
+      } catch {}
+      return [];
+    }
+    try {
+      const saved = localStorage.getItem('gs_demo_transactions_v1');
+      return saved ? JSON.parse(saved) : DEFAULT_TRANSACTIONS;
+    } catch {
+      return DEFAULT_TRANSACTIONS;
+    }
+  });
+
   // Carga inicial de datos desde Supabase
   useEffect(() => {
     if (authMode === 'remote') {
@@ -187,12 +217,12 @@ const location = useLocationSlice();
 
           setRemoteTenants(liveTenants);
           remoteTenantsRef.current = liveTenants;
-          if (liveTenants.length > 0) {
-            setTenants(liveTenants);
-          }
-          
+          setTenants(liveTenants);
+
           setRemoteProducts(liveProducts);
+          setProducts(liveProducts);
           setRemotePosts(livePosts);
+          setPosts(livePosts);
           setRestaurantApplications(liveApps);
 
           const activeCities = liveCities.length > 0 ? liveCities : DEFAULT_CITIES;
@@ -201,26 +231,36 @@ const location = useLocationSlice();
           if (liveCities.length > 0) setCities(liveCities);
           if (liveZones.length > 0) setZones(liveZones);
 
-          // Validate selected city ID exists
+          const activeRemoteTenants = liveTenants.filter(t => t.status === 'active');
+
+          // Validate selected city ID exists and has active tenants if any exist
           setSelectedCityIdState(prev => {
             const exists = activeCities.some(c => c.id === prev && c.isActive);
-            if (exists) return prev;
-            const fallback = activeCities[0]?.id || DEFAULT_CITIES[0].id;
+            const hasTenantsInPrevCity =
+              activeRemoteTenants.length === 0 || activeRemoteTenants.some(t => t.cityId === prev);
+            if (exists && hasTenantsInPrevCity) return prev;
+            const cityWithTenants = activeRemoteTenants[0]?.cityId;
+            const fallback =
+              (cityWithTenants && activeCities.some(c => c.id === cityWithTenants) ? cityWithTenants : null) ||
+              activeCities[0]?.id ||
+              DEFAULT_CITIES[0].id;
             try { localStorage.setItem('gs_selected_city_v1', fallback); } catch { /* ignore */ }
             return fallback;
           });
 
-          // Validate selected zone ID exists and belongs to city
+          // Validate selected zone ID exists and belongs to city (and doesn't hide all active tenants)
           setSelectedZoneIdState(prev => {
             if (!prev) return null;
             const exists = activeZones.some(z => z.id === prev && z.isActive);
-            if (exists) return prev;
+            const hasTenantsInZone =
+              activeRemoteTenants.length === 0 || activeRemoteTenants.some(t => t.zoneId === prev);
+            if (exists && hasTenantsInZone) return prev;
             try { localStorage.removeItem('gs_selected_zone_v1'); } catch { /* ignore */ }
             return null;
           });
 
           setCurrentTenant(prev => {
-            if (prev.id === EMPTY_TENANT.id && liveTenants.length > 0) {
+            if ((prev.id === EMPTY_TENANT.id || !liveTenants.some(t => t.id === prev.id)) && liveTenants.length > 0) {
               return liveTenants[0];
             }
             return prev;
@@ -269,28 +309,33 @@ const location = useLocationSlice();
             const match = remoteTenantsRef.current.find(t => t.id === userAccount.tenantId);
             if (match) setCurrentTenant(match);
           }
-          // Recargar catálogo público tras login para asegurar que el feed sea visible.
+          // Recargar catálogo público tras login para asegurar que el feed y locales sean visibles.
           const [livePosts, liveProducts, liveTenants] = await Promise.all([
             fetchLivePosts(),
             fetchLiveProducts(),
             fetchLiveTenants()
           ]);
           setRemotePosts(livePosts);
+          setPosts(livePosts);
           setRemoteProducts(liveProducts);
-          if (liveTenants.length > 0) {
-            setRemoteTenants(liveTenants);
-            remoteTenantsRef.current = liveTenants;
-            setTenants(liveTenants);
-          }
+          setProducts(liveProducts);
+          setRemoteTenants(liveTenants);
+          remoteTenantsRef.current = liveTenants;
+          setTenants(liveTenants);
           
           if (window.location.pathname.startsWith('/auth/callback')) {
             window.history.replaceState({}, document.title, '/');
           }
         } else if (event === 'SIGNED_OUT') {
-          // Solo limpiamos datos de sesión del usuario.
-          // Los posts, tenants y productos son públicos y deben mantenerse visibles.
+          // Limpiar inmediatamente datos de sesión y pedidos del usuario anterior
           setCurrentUser(null);
           setUserRole('login');
+          setOrders([]);
+          setTransactions([]);
+          try {
+            localStorage.removeItem('gs_orders_v5');
+            localStorage.removeItem('gs_transactions_v5');
+          } catch {}
         }
       });
 
@@ -301,27 +346,11 @@ const location = useLocationSlice();
     }
   }, [authMode, setCities, setZones, setSelectedCityIdState, setSelectedZoneIdState]);
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem('gs_orders_v5');
-      return saved ? JSON.parse(saved) : DEFAULT_ORDERS;
-    } catch {
-      return DEFAULT_ORDERS;
-    }
-  });
-
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    try {
-      const saved = localStorage.getItem('gs_transactions_v5');
-      return saved ? JSON.parse(saved) : DEFAULT_TRANSACTIONS;
-    } catch {
-      return DEFAULT_TRANSACTIONS;
-    }
-  });
-
   const [drivers, setDrivers] = useState<Driver[]>(DEFAULT_DRIVERS);
   const [equityWeight, setEquityWeight] = useState<number>(0.5);
   const { toast, showToast } = useToastSlice(authMode === 'remote');
+
+  const catalogTenants = authMode === 'remote' ? remoteTenants : tenants;
 
   const {
     cart,
@@ -332,7 +361,7 @@ const location = useLocationSlice();
     clearCartAndAdd,
     removeFromCart,
     clearCart
-  } = useCartSlice(tenants, currentTenant, showToast);
+  } = useCartSlice(catalogTenants, currentTenant, showToast);
 
   const playChime = () => {
     try {
@@ -358,50 +387,81 @@ const location = useLocationSlice();
   };
 
   useEffect(() => {
-    localStorage.setItem('gs_orders_v5', JSON.stringify(orders));
+    if (!isSupabaseConfigured) {
+      try {
+        localStorage.setItem('gs_demo_orders_v1', JSON.stringify(orders));
+      } catch {}
+    }
   }, [orders]);
 
   useEffect(() => {
-    localStorage.setItem('gs_transactions_v5', JSON.stringify(transactions));
+    if (!isSupabaseConfigured) {
+      try {
+        localStorage.setItem('gs_demo_transactions_v1', JSON.stringify(transactions));
+      } catch {}
+    }
   }, [transactions]);
 
-  // Carga y suscripción WebSockets en tiempo real para pedidos
+  // Carga y suscripción WebSockets en tiempo real para pedidos (aislamiento estricto por usuario / restaurante)
   useEffect(() => {
     if (isSupabaseConfigured) {
       let activeUnsub = () => {};
+      let cancelled = false;
 
       const syncOrders = async () => {
-        if (currentUser?.tenantId) {
-          const liveOrders = await fetchLiveOrdersForRestaurant(currentUser.tenantId);
-          if (liveOrders.length > 0) {
-            setOrders(liveOrders);
+        if (!currentUser) {
+          setOrders([]);
+          return;
+        }
+
+        const isRestaurantAccount = Boolean(
+          currentUser.tenantId &&
+          (currentUser.businessRole === 'restaurant_owner' ||
+            currentUser.businessRole === 'restaurant_staff' ||
+            currentUser.role === 'admin' ||
+            currentUser.role === 'kitchen')
+        );
+
+        if (isRestaurantAccount && currentUser.tenantId) {
+          const tenantId = currentUser.tenantId;
+          const liveOrders = await fetchLiveOrdersForRestaurant(tenantId);
+          if (!cancelled) {
+            setOrders(liveOrders.filter(o => o.tenantId === tenantId));
           }
-          activeUnsub = subscribeToRestaurantOrders(currentUser.tenantId, async () => {
-            const updated = await fetchLiveOrdersForRestaurant(currentUser.tenantId!);
-            setOrders(updated);
-            playChime();
-            showToast('🔔 ¡Nueva comanda o actualización recibida en tiempo real!');
+          activeUnsub = subscribeToRestaurantOrders(tenantId, async () => {
+            const updated = await fetchLiveOrdersForRestaurant(tenantId);
+            if (!cancelled) {
+              setOrders(updated.filter(o => o.tenantId === tenantId));
+              playChime();
+              showToast('🔔 ¡Nueva comanda o actualización recibida en tiempo real!');
+            }
           });
-        } else if (currentUser?.id && currentUser.businessRole === 'customer') {
-          const liveOrders = await fetchLiveOrdersForCustomer(currentUser.id);
-          if (liveOrders.length > 0) {
-            setOrders(liveOrders);
+        } else if (currentUser.id) {
+          const customerId = currentUser.id;
+          const liveOrders = await fetchLiveOrdersForCustomer(customerId);
+          if (!cancelled) {
+            setOrders(liveOrders.filter(o => o.customerId === customerId));
           }
-          activeUnsub = subscribeToCustomerOrders(currentUser.id, async () => {
-            const updated = await fetchLiveOrdersForCustomer(currentUser.id!);
-            setOrders(updated);
-            showToast('🚴 El estado de tu pedido ha sido actualizado por la cocina.');
+          activeUnsub = subscribeToCustomerOrders(customerId, async () => {
+            const updated = await fetchLiveOrdersForCustomer(customerId);
+            if (!cancelled) {
+              setOrders(updated.filter(o => o.customerId === customerId));
+              showToast('🚴 El estado de tu pedido ha sido actualizado por la cocina.');
+            }
           });
+        } else {
+          setOrders([]);
         }
       };
 
       syncOrders();
 
       return () => {
+        cancelled = true;
         activeUnsub();
       };
     }
-  }, [currentUser, currentTenant, showToast]);
+  }, [currentUser, showToast]);
 
   const loginWithCredentials = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     if (authMode === 'demo') {
@@ -739,10 +799,14 @@ const location = useLocationSlice();
     }
     setUserRole('login');
     setCurrentUser(null);
+    setOrders([]);
+    setTransactions([]);
     setCart([]);
     try {
       localStorage.removeItem('gs_demo_session_v1');
       localStorage.removeItem('gs_cart_v5');
+      localStorage.removeItem('gs_orders_v5');
+      localStorage.removeItem('gs_transactions_v5');
     } catch {}
     showToast('Sesión cerrada correctamente');
   };
@@ -785,11 +849,10 @@ const location = useLocationSlice();
   };
 
   const setCurrentTenantBySlug = (slug: string) => {
-    const found = tenants.find(t => t.slug === slug);
+    const sourceTenants = authMode === 'remote' ? remoteTenants : tenants;
+    const found = sourceTenants.find(t => t.slug === slug || t.id === slug);
     if (found) {
       setCurrentTenant(found);
-      // No vaciar el carrito automáticamente:
-      // setCart([]);
     }
   };
 
@@ -799,7 +862,8 @@ const location = useLocationSlice();
       return;
     }
 
-    const tenant = tenants.find(t => t.id === tenantId);
+    const sourceTenants = authMode === 'remote' ? remoteTenants : tenants;
+    const tenant = sourceTenants.find(t => t.id === tenantId);
     if (!tenant) return;
 
     if (tenant.status !== 'active') {
@@ -815,6 +879,7 @@ const location = useLocationSlice();
         showToast('❌ No pudimos actualizar el estado del restaurante.');
         return;
       }
+      setRemoteTenants(prev => prev.map(t => t.id === tenantId ? { ...t, isOpen: nextStatus } : t));
     }
 
     setTenants(prev => prev.map(t => {
@@ -836,6 +901,7 @@ const location = useLocationSlice();
         showToast('⚠️ Hubo un error al guardar los cambios en el servidor.');
         return;
       }
+      setRemoteTenants(prev => prev.map(t => t.id === tenantId ? { ...t, ...updates } : t));
     }
     
     // Solo actualizar la UI tras confirmación remota
@@ -875,6 +941,10 @@ const location = useLocationSlice();
     setIsSubmittingOrder(true);
     setOrderError(null);
 
+    const sourceTenants = authMode === 'remote' ? remoteTenants : tenants;
+    const cartTenantId = cart[0]?.product?.tenantId;
+    const orderTenant = (cartTenantId ? sourceTenants.find(t => t.id === cartTenantId) : undefined) || currentTenant;
+
     const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
     let fulfillment: OrderFulfillment = 'pickup';
@@ -883,6 +953,8 @@ const location = useLocationSlice();
     let customerPhone = '';
     let deliveryAddress: CustomerDeliveryAddress | undefined = undefined;
     let tableNumber: string | undefined = undefined;
+    let tableId: string | undefined = undefined;
+    let tableToken: string | undefined = undefined;
     let restaurantNotes: string | undefined = undefined;
     let deliveryFeeApplied = 0;
 
@@ -893,6 +965,8 @@ const location = useLocationSlice();
       customerPhone = details.customerPhone;
       deliveryAddress = details.deliveryAddress;
       tableNumber = details.tableNumber;
+      tableId = details.tableId;
+      tableToken = details.tableToken;
       restaurantNotes = details.restaurantNotes;
 
       if (fulfillment === 'pickup') {
@@ -900,7 +974,7 @@ const location = useLocationSlice();
         deliveryFeeApplied = 0;
       } else if (fulfillment === 'restaurant_delivery') {
         typeString = 'Domicilio';
-        deliveryFeeApplied = currentTenant.deliveryFee || 0;
+        deliveryFeeApplied = orderTenant.deliveryFee || 0;
       } else if (fulfillment === 'table_service') {
         typeString = tableNumber ? `Mesa #${tableNumber}` : 'Servicio en Mesa';
         deliveryFeeApplied = 0;
@@ -913,7 +987,7 @@ const location = useLocationSlice();
         if (match) tableNumber = match[0];
       } else if (typeString.toLowerCase().includes('domicilio')) {
         fulfillment = 'restaurant_delivery';
-        deliveryFeeApplied = currentTenant.deliveryFee || 0;
+        deliveryFeeApplied = orderTenant.deliveryFee || 0;
       } else {
         fulfillment = 'pickup';
       }
@@ -921,10 +995,10 @@ const location = useLocationSlice();
 
     const calculatedTotal = subtotal + deliveryFeeApplied;
     
-    // Preparar el pedido base sin dependencias de demo
+    // Preparar el pedido vinculado estrictamente al restaurante de los productos y al cliente actual
     const baseOrder: Order = {
       id: '',
-      tenantId: currentTenant.id,
+      tenantId: orderTenant.id,
       type: typeString,
       items: cart.map(c => ({ id: c.product.id, name: c.product.name, qty: c.quantity, price: c.product.price })),
       subtotal,
@@ -935,11 +1009,13 @@ const location = useLocationSlice();
       paymentMethod: method,
       transactionId: '',
       fulfillment,
-      customerId: currentUser?.email,
+      customerId: currentUser?.id || currentUser?.email,
       customerName,
       customerPhone,
       deliveryAddress,
       tableNumber,
+      tableId,
+      tableToken,
       restaurantNotes
     };
 
@@ -951,11 +1027,17 @@ const location = useLocationSlice();
         setOrderError('No fue posible confirmar el pedido. Revisa los datos e inténtalo nuevamente.');
         return { success: false };
       }
+
+      // Actualizar inmediatamente los pedidos del cliente autenticado
+      if (currentUser?.id) {
+        const updatedCustomerOrders = await fetchLiveOrdersForCustomer(currentUser.id);
+        setOrders(updatedCustomerOrders.filter(o => o.customerId === currentUser.id));
+      }
       
       if (method === 'cash') {
         clearCart();
         playChime();
-        showToast(`¡Pedido enviado a ${currentTenant.name}! Paga en efectivo al personal.`);
+        showToast(`¡Pedido enviado a ${orderTenant.name}! Paga en efectivo al personal.`);
         return { success: true, isRemote: true, orderId: res.orderId };
       }
 
@@ -969,7 +1051,7 @@ const location = useLocationSlice();
 
       clearCart();
       playChime();
-      showToast(`¡Pedido (${typeString}) enviado a ${currentTenant.name}! Completa el pago seguro en la URL provista.`);
+      showToast(`¡Pedido (${typeString}) enviado a ${orderTenant.name}! Completa el pago seguro en la URL provista.`);
       
       if (paymentRes.sandboxUrl) {
         console.log('Redirecting to sandbox UI:', paymentRes.sandboxUrl);
@@ -989,13 +1071,13 @@ const location = useLocationSlice();
         setIsSubmittingOrder(false);
         return { success: false };
       }
-      const platformFee = Math.round(calculatedTotal * currentTenant.commissionRate);
+      const platformFee = Math.round(calculatedTotal * orderTenant.commissionRate);
       const restaurantPayout = calculatedTotal - platformFee;
 
       const normalizedTransaction: Transaction = {
         ...transaction,
         amount: calculatedTotal,
-        tenantId: currentTenant.id,
+        tenantId: orderTenant.id,
         orderId: transaction.orderId,
         platformFee,
         restaurantPayout
@@ -1008,7 +1090,7 @@ const location = useLocationSlice();
       setTransactions(prev => [normalizedTransaction, ...prev]);
       clearCart();
       playChime();
-      showToast(`¡Pedido (${typeString}) de $${calculatedTotal.toLocaleString('es-CO')} enviado a ${currentTenant.name}!`);
+      showToast(`¡Pedido (${typeString}) de $${calculatedTotal.toLocaleString('es-CO')} enviado a ${orderTenant.name}!`);
       setIsSubmittingOrder(false);
       return { success: true, isRemote: false };
     }
@@ -1760,6 +1842,21 @@ const location = useLocationSlice();
   const activeTenants = authMode === 'remote' ? remoteTenants : tenants;
   const activeProducts = authMode === 'remote' ? remoteProducts : products;
   const activePosts = authMode === 'remote' ? remotePosts : posts;
+  const scopedOrders = !currentUser
+    ? []
+    : (currentUser.tenantId &&
+        (currentUser.businessRole === 'restaurant_owner' ||
+          currentUser.businessRole === 'restaurant_staff' ||
+          currentUser.role === 'admin' ||
+          currentUser.role === 'kitchen'))
+      ? orders.filter(o => o.tenantId === currentUser.tenantId)
+      : currentUser.businessRole === 'platform_admin'
+        ? orders
+        : orders.filter(
+            o =>
+              (Boolean(currentUser.id) && o.customerId === currentUser.id) ||
+              (Boolean(currentUser.email) && o.customerId === currentUser.email)
+          );
 
   return (
     <AppContext.Provider value={{
@@ -1780,7 +1877,7 @@ const location = useLocationSlice();
       tenants: activeTenants,
       currentTenant,
       products: activeProducts,
-      orders,
+      orders: scopedOrders,
       transactions,
       posts: activePosts,
       stories,

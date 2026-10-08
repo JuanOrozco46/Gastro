@@ -20,7 +20,8 @@ interface PaymentModalProps {
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'pickup', prefilledTableId, prefilledTableToken, entryPoint }) => {
-  const { cart, currentTenant, currentUser, submitOrderWithPayment, retryRemotePayment, updateUserProfile, authMode, isSubmittingOrder, orderError } = useApp();
+  const { cart, tenants, currentTenant: contextTenant, currentUser, submitOrderWithPayment, retryRemotePayment, updateUserProfile, authMode, isSubmittingOrder, orderError } = useApp();
+  const currentTenant = (cart[0]?.product?.tenantId ? tenants.find(t => t.id === cart[0].product.tenantId) : undefined) || contextTenant;
   const [method, setMethod] = useState<PaymentMethod>('wompi');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -197,6 +198,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
         }
         return; // Detenemos la ejecución para mostrar el modal de Wompi o el estatus
       }
+      successResult = res.success;
     } else {
       setLoading(true);
       const transaction = await PaymentSimulatorService.processPayment({

@@ -402,23 +402,31 @@ interface MyOrdersProps {
 }
 
 export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp }) => {
-  const { orders, tenants, authMode } = useApp();
+  const { orders, tenants, authMode, currentUser } = useApp();
 
   const clientOrders = orders
-    .filter(o => 
-      o.fulfillment !== undefined || 
-      o.type.toLowerCase().includes('domicilio') || 
-      o.type.toLowerCase().includes('red social') || 
-      o.type.toLowerCase().includes('mesa') ||
-      o.type.toLowerCase().includes('recoger') ||
-      o.type.toLowerCase().includes('local')
-    )
+    .filter(o => {
+      if (!o || !currentUser) return false;
+      const belongsToCurrentUser =
+        (Boolean(currentUser.id) && o.customerId === currentUser.id) ||
+        (Boolean(currentUser.email) && o.customerId === currentUser.email);
+      if (!belongsToCurrentUser) return false;
+
+      return (
+        o.fulfillment !== undefined ||
+        o.type.toLowerCase().includes('domicilio') ||
+        o.type.toLowerCase().includes('red social') ||
+        o.type.toLowerCase().includes('mesa') ||
+        o.type.toLowerCase().includes('recoger') ||
+        o.type.toLowerCase().includes('local')
+      );
+    })
     .sort((a, b) => b.createdAt - a.createdAt);
 
   const tenantMap = Object.fromEntries(tenants.map(t => [t.id, t]));
 
-  const activeOrders = clientOrders.filter(o => o.status !== 'delivered');
-  const pastOrders = clientOrders.filter(o => o.status === 'delivered');
+  const activeOrders = clientOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
+  const pastOrders = clientOrders.filter(o => o.status === 'delivered' || o.status === 'cancelled');
 
   if (clientOrders.length === 0) {
     return (

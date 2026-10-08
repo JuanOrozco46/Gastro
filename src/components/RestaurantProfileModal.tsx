@@ -7,6 +7,8 @@ interface RestaurantProfileModalProps {
   tenantId: string;
   onClose: () => void;
   onOrderProduct: (productId: string, tenantSlug: string) => void;
+  initialTab?: 'content' | 'menu' | 'info';
+  onOpenCart?: () => void;
 }
 
 interface DBHour {
@@ -22,21 +24,31 @@ const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', '
 export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
   tenantId,
   onClose,
-  onOrderProduct
+  onOrderProduct,
+  initialTab,
+  onOpenCart
 }) => {
-  const { tenants, products, posts } = useApp();
-  const [activeTab, setActiveTab] = useState<'content' | 'menu' | 'info'>('content');
+  const { tenants, products, posts, cart } = useApp();
 
-  const tenant = tenants.find(t => t.id === tenantId) || tenants[0];
-  const [liveIsOpen, setLiveIsOpen] = useState(tenant.isOpen);
-  const [liveAcceptingOrders, setLiveAcceptingOrders] = useState(tenant.acceptingOrders !== false);
+  const tenant = tenants.find(t => t.id === tenantId || t.slug === tenantId) || tenants[0];
+  const tenantProducts = products.filter(p => tenant && p.tenantId === tenant.id && !p.isArchived);
+  const tenantPosts = posts.filter(p => tenant && p.tenantId === tenant.id);
+
+  const [activeTab, setActiveTab] = useState<'content' | 'menu' | 'info'>(() => {
+    if (initialTab) return initialTab;
+    if (tenantPosts.length === 0 && tenantProducts.length > 0) return 'menu';
+    return 'menu';
+  });
+
+  const [liveIsOpen, setLiveIsOpen] = useState(tenant?.isOpen ?? false);
+  const [liveAcceptingOrders, setLiveAcceptingOrders] = useState(tenant?.acceptingOrders !== false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [hours, setHours] = useState<DBHour[]>([]);
   
   useEffect(() => {
     let mounted = true;
     const checkLiveStatus = async () => {
-      if (!isSupabaseConfigured || !supabase || !tenant.id) return;
+      if (!isSupabaseConfigured || !supabase || !tenant?.id) return;
       setIsCheckingStatus(true);
       try {
         const [{ data, error }, { data: hoursData, error: hoursError }] = await Promise.all([
@@ -47,7 +59,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
         if (mounted) {
           if (!error && data) {
             setLiveIsOpen(data.is_open);
-            setLiveAcceptingOrders(data.accepting_orders);
+            setLiveAcceptingOrders(data.accepting_orders !== false);
           }
           if (!hoursError && hoursData) {
             setHours(hoursData);
@@ -61,14 +73,16 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
     };
     checkLiveStatus();
     return () => { mounted = false; };
-  }, [tenant.id]);
+  }, [tenant?.id]);
 
-  const tenantProducts = products.filter(p => p.tenantId === tenant.id);
-  const tenantPosts = posts.filter(p => p.tenantId === tenant.id);
+  if (!tenant) return null;
 
   const totalViews = tenantPosts.reduce((acc, p) => acc + (p.viewCount || 0), 0);
 
   const isOpenNow = liveIsOpen && liveAcceptingOrders && tenant.status === 'active';
+
+  const cartQty = cart.reduce((sum, i) => sum + i.quantity, 0);
+  const cartTotal = cart.reduce((sum, i) => sum + (i.product?.price || 0) * i.quantity, 0);
 
   const renderHours = () => {
     if (hours.length === 0) return <p style={{ color: 'var(--text-muted)' }}>No hay horarios registrados.</p>;
@@ -76,8 +90,6 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.9rem' }}>
         {DAYS.map((dayName, idx) => {
-          // day_of_week in PG might be 0=Sunday or 1=Monday depending on setup. Let's assume 1=Monday, 7=Sunday
-          // Postgres extract(dow) returns 0=Sunday, 6=Saturday. We will match based on that.
           const dayHours = hours.filter(h => h.day_of_week === idx);
           return (
             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--neutral-border)' }}>
@@ -140,8 +152,8 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
           <p className="gf-profile-bio">{tenant.description || 'Sin descripción disponible.'}</p>
 
           <div className="gf-profile-meta-tags">
-            <span className="gf-meta-tag"><Star size={13} fill="#E6942B" strokeWidth={0} /> {tenant.rating}</span>
-            <span className="gf-meta-tag"><Clock size={13} /> {tenant.estimatedDeliveryMinutes ? `${tenant.estimatedDeliveryMinutes} min` : tenant.deliveryTime}</span>
+            <span className="gf-meta-tag"><Star size={13} fill="#E6942B" strokeWidth={0} /> {tenant.rating || 5.0}</span>
+            <span className="gf-meta-tag"><Clock size={13} /> {tenant.estimatedDeliveryMinutes ? `${tenant.estimatedDeliveryMinutes} min` : (tenant.deliveryTime || '20-30 min')}</span>
             <span className="gf-meta-tag"><MapPin size={13} /> {tenant.address}</span>
             <span className="gf-meta-tag gf-verified-tag"><ShieldCheck size={13} /> Verificado</span>
           </div>
@@ -149,18 +161,18 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
           {/* Key metrics bar */}
           <div className="gf-profile-stats-bar">
             <div className="gf-pstat">
+              <strong>{tenantProducts.length}</strong>
+              <span>Platos en Menú</span>
+            </div>
+            <div className="gf-pstat-divider" />
+            <div className="gf-pstat">
               <strong>{tenantPosts.length}</strong>
               <span>Publicaciones</span>
             </div>
             <div className="gf-pstat-divider" />
             <div className="gf-pstat">
-              <strong>{totalViews > 0 ? `${(totalViews/1000).toFixed(1)}k` : '1.2k'}</strong>
-              <span>Vistas Contenido</span>
-            </div>
-            <div className="gf-pstat-divider" />
-            <div className="gf-pstat">
-              <strong>{tenant.salesWeekly || '150+'}</strong>
-              <span>Ventas/semana</span>
+              <strong>{totalViews > 0 ? `${(totalViews / 1000).toFixed(1)}k` : 'Directo'}</strong>
+              <span>Comisión 3%</span>
             </div>
           </div>
         </div>
@@ -168,34 +180,82 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
         {/* Tabs */}
         <div className="gf-profile-tabs">
           <button
-            className={`gf-profile-tab ${activeTab === 'content' ? 'active' : ''}`}
-            onClick={() => setActiveTab('content')}
-          >
-            🎥 Feed ({tenantPosts.length})
-          </button>
-          <button
             className={`gf-profile-tab ${activeTab === 'menu' ? 'active' : ''}`}
             onClick={() => setActiveTab('menu')}
           >
             🍕 Menú ({tenantProducts.length})
           </button>
           <button
+            className={`gf-profile-tab ${activeTab === 'content' ? 'active' : ''}`}
+            onClick={() => setActiveTab('content')}
+          >
+            🎥 Publicaciones ({tenantPosts.length})
+          </button>
+          <button
             className={`gf-profile-tab ${activeTab === 'info' ? 'active' : ''}`}
             onClick={() => setActiveTab('info')}
           >
-            📍 Info
+            📍 Horarios e Info
           </button>
         </div>
 
         {/* Tab Contents */}
         <div className="gf-profile-tab-content">
           
-          {/* TAB 1: CONTENT GRID */}
+          {/* TAB 1: MENU */}
+          {activeTab === 'menu' && (
+            <div className="gf-profile-menu-list">
+              {tenantProducts.length === 0 ? (
+                <div className="gf-empty-grid" style={{ padding: '2.5rem 1.5rem', textAlign: 'center' }}>
+                  <p style={{ margin: 0, color: 'var(--text-muted)' }}>
+                    Este restaurante aún no ha registrado platos activos en su menú digital.
+                  </p>
+                </div>
+              ) : (
+                tenantProducts.map(p => (
+                  <div key={p.id} className="gf-menu-item-row" style={{ opacity: p.available ? 1 : 0.6 }}>
+                    {p.image ? (
+                      <img loading="lazy" decoding="async" src={p.image} alt={p.name} className="gf-menu-item-img" style={{ width: '52px', height: '52px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
+                    ) : (
+                      <div className="gf-menu-item-emoji">{p.emoji || '🍽️'}</div>
+                    )}
+                    <div className="gf-menu-item-info">
+                      <h4>{p.name}</h4>
+                      {p.desc && <p>{p.desc}</p>}
+                      <strong className="gf-menu-price">${p.price.toLocaleString('es-CO')} COP</strong>
+                    </div>
+                    <button
+                      className="gf-menu-add-btn"
+                      disabled={!isOpenNow || !p.available}
+                      style={{ opacity: (!isOpenNow || !p.available) ? 0.5 : 1, cursor: (!isOpenNow || !p.available) ? 'not-allowed' : 'pointer' }}
+                      onClick={() => {
+                        onOrderProduct(p.id, tenant.slug);
+                      }}
+                    >
+                      <ShoppingBag size={14} /> {!p.available ? 'Agotado' : !isOpenNow ? 'Cerrado' : 'Añadir'}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: CONTENT GRID */}
           {activeTab === 'content' && (
             <div className="gf-profile-grid">
               {tenantPosts.length === 0 ? (
-                <div className="gf-empty-grid">
-                  <p>Este restaurante aún no ha subido contenido visual.</p>
+                <div className="gf-empty-grid" style={{ gridColumn: '1 / -1', padding: '2.5rem 1.5rem', textAlign: 'center' }}>
+                  <p style={{ margin: '0 0 12px', color: 'var(--text-muted)' }}>
+                    Este restaurante aún no ha subido publicaciones al Feed, pero puedes pedir directamente desde su menú.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    style={{ borderRadius: '10px', fontWeight: 800 }}
+                    onClick={() => setActiveTab('menu')}
+                  >
+                    🍕 Ver Menú del Restaurante ({tenantProducts.length})
+                  </button>
                 </div>
               ) : (
                 tenantPosts.map(post => (
@@ -214,49 +274,22 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                         <span><Heart size={12} fill="white" /> {post.likes}</span>
                         <span><Eye size={12} /> {post.viewCount || 0}</span>
                       </div>
-                      <button
-                        className="gf-grid-order-btn"
-                        onClick={() => {
-                          onOrderProduct(post.productId, tenant.slug);
-                          onClose();
-                        }}
-                      >
-                        <ShoppingBag size={13} />
-                        ${post.price.toLocaleString('es-CO')}
-                      </button>
+                      {post.productId && (
+                        <button
+                          className="gf-grid-order-btn"
+                          disabled={!isOpenNow}
+                          onClick={() => {
+                            onOrderProduct(post.productId, tenant.slug);
+                          }}
+                        >
+                          <ShoppingBag size={13} />
+                          ${post.price.toLocaleString('es-CO')}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))
               )}
-            </div>
-          )}
-
-          {/* TAB 2: MENU */}
-          {activeTab === 'menu' && (
-            <div className="gf-profile-menu-list">
-              {tenantProducts.map(p => (
-                <div key={p.id} className="gf-menu-item-row">
-                  {p.image ? (
-                    <img loading="lazy" decoding="async" src={p.image} alt={p.name} className="gf-menu-item-img" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
-                  ) : (
-                    <div className="gf-menu-item-emoji">{p.emoji || '🍽️'}</div>
-                  )}
-                  <div className="gf-menu-item-info">
-                    <h4>{p.name}</h4>
-                    <p>{p.desc}</p>
-                    <strong className="gf-menu-price">${p.price.toLocaleString('es-CO')} COP</strong>
-                  </div>
-                  <button
-                    className="gf-menu-add-btn"
-                    onClick={() => {
-                      onOrderProduct(p.id, tenant.slug);
-                      onClose();
-                    }}
-                  >
-                    <ShoppingBag size={14} /> Añadir
-                  </button>
-                </div>
-              ))}
             </div>
           )}
 
@@ -267,8 +300,14 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                 <h4><MapPin size={16} /> Ubicación Principal</h4>
                 <p>{tenant.address}</p>
                 <div className="gf-info-actions">
-                  <button className="gf-info-btn"><Navigation size={14} /> Ver en Mapa</button>
-                  {tenant.phone && <button className="gf-info-btn"><Phone size={14} /> {tenant.phone}</button>}
+                  <button
+                    type="button"
+                    className="gf-info-btn"
+                    onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${tenant.name} ${tenant.address}`)}`, '_blank')}
+                  >
+                    <Navigation size={14} /> Ver en Mapa
+                  </button>
+                  {tenant.phone && <button type="button" className="gf-info-btn"><Phone size={14} /> {tenant.phone}</button>}
                 </div>
               </div>
 
@@ -299,6 +338,44 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
           )}
 
         </div>
+
+        {/* Sticky Cart Footer inside Modal when items are in cart */}
+        {cartQty > 0 && (
+          <div
+            style={{
+              padding: '12px 20px',
+              borderTop: '1px solid var(--neutral-border)',
+              background: 'var(--neutral-surface-alt)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}
+          >
+            <div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block' }}>
+                {cartQty} producto{cartQty !== 1 ? 's' : ''} en tu carrito
+              </span>
+              <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>
+                ${cartTotal.toLocaleString('es-CO')} COP
+              </strong>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ borderRadius: '12px', fontWeight: 800, padding: '10px 18px' }}
+              onClick={() => {
+                if (onOpenCart) {
+                  onOpenCart();
+                } else {
+                  onClose();
+                }
+              }}
+            >
+              <ShoppingBag size={16} /> Ver Carrito y Pagar
+            </button>
+          </div>
+        )}
 
       </div>
     </div>
