@@ -11,7 +11,7 @@ import {
   Heart, MessageCircle, Share2, ShoppingBag, Bike,
   TrendingUp, MapPin, Trash2, Plus, Minus,
   Package, Play, Eye, X, ExternalLink,
-  Bookmark, Zap, Search, SlidersHorizontal, CheckCircle2, Building2, Clock
+  Bookmark, Zap, Search, SlidersHorizontal, CheckCircle2, Building2, Clock, User
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { toggleRemoteSave, fetchRemoteSavedPosts } from '../services/supabaseDataService';
@@ -22,6 +22,7 @@ const SupportCenter = lazy(() => import('./SupportCenter').then(m => ({ default:
 const CartModal = lazy(() => import('./CartModal').then(m => ({ default: m.CartModal })));
 const RestaurantProfileModal = lazy(() => import('./RestaurantProfileModal').then(m => ({ default: m.RestaurantProfileModal })));
 const CommentsModal = lazy(() => import('./CommentsModal').then(m => ({ default: m.CommentsModal })));
+const UserProfileModal = lazy(() => import('./UserProfileModal').then(m => ({ default: m.UserProfileModal })));
 
 const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
   <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
@@ -342,6 +343,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   } = useApp();
 
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'feed' | 'directory' | 'orders' | 'support'>('feed');
   const [supportInitialOrder, setSupportInitialOrder] = useState<string | null>(null);
   const [supportInitialTicketId, setSupportInitialTicketId] = useState<string | null>(null);
@@ -600,11 +602,27 @@ export const CustomerDeliveryApp: React.FC = () => {
           <button className={`gf-tab-pill ${activeTab === 'support' ? 'active' : ''}`} onClick={() => setActiveTab('support')}>
             <MessageCircle size={15} /> Soporte
           </button>
+          <button
+            type="button"
+            className={`gf-tab-pill ${isProfileModalOpen ? 'active' : ''}`}
+            onClick={() => setIsProfileModalOpen(true)}
+            title="Editar mi perfil, @usuario, foto y dirección"
+          >
+            <User size={15} /> Mi Perfil
+          </button>
         </div>
-        <NotificationBell onOpenTicket={(ticketId) => {
-          setSupportInitialTicketId(ticketId);
-          setActiveTab('support');
-        }} />
+        <NotificationBell
+          variant="light"
+          onOpenTicket={ticketId => {
+            setSupportInitialTicketId(ticketId);
+            setActiveTab('support');
+          }}
+          onNavigate={dest => {
+            if (dest === 'orders' || dest === 'support' || dest === 'directory') {
+              setActiveTab(dest);
+            }
+          }}
+        />
       </div>
 
       {activeTab === 'feed' && (
@@ -1114,6 +1132,15 @@ export const CustomerDeliveryApp: React.FC = () => {
 
       <Suspense fallback={<FallbackLoader message="Cargando pago..." />}>
         {isPaymentOpen && <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} orderType="Domicilio" />}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {isProfileModalOpen && (
+          <UserProfileModal
+            isOpen={isProfileModalOpen}
+            onClose={() => setIsProfileModalOpen(false)}
+          />
+        )}
       </Suspense>
     </div>
   );

@@ -26,8 +26,11 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
   const [onlyOpen, setOnlyOpen] = useState(false);
+  const [minRating45, setMinRating45] = useState(false);
+  const [onlyFreeDelivery, setOnlyFreeDelivery] = useState(false);
+  const [onlyTableService, setOnlyTableService] = useState(false);
   const [priceRange, setPriceRange] = useState<'all' | '$' | '$$' | '$$$'>('all');
-  const [sortBy, setSortBy] = useState<'rating' | 'distance' | 'time'>('rating');
+  const [sortBy, setSortBy] = useState<'rating' | 'reviews' | 'distance' | 'time' | 'delivery_fee'>('rating');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedTenantForModal, setSelectedTenantForModal] = useState<Tenant | null>(null);
   const [brokenLogos, setBrokenLogos] = useState<Record<string, boolean>>({});
@@ -59,6 +62,15 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
         if (onlyOpen && !t.isOpen) {
           return false;
         }
+        if (minRating45 && Number(t.rating || 5) < 4.5) {
+          return false;
+        }
+        if (onlyFreeDelivery && Number(t.deliveryFee || 0) > 0) {
+          return false;
+        }
+        if (onlyTableService && (!t.tablesCount || t.tablesCount <= 0)) {
+          return false;
+        }
         if (priceRange !== 'all' && t.priceRange !== priceRange) {
           return false;
         }
@@ -86,8 +98,10 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
         return true;
       })
       .sort((a, b) => {
-        if (sortBy === 'rating') return b.rating - a.rating;
+        if (sortBy === 'rating') return (b.rating || 5) - (a.rating || 5);
+        if (sortBy === 'reviews') return (b.reviewsCount || 0) - (a.reviewsCount || 0);
         if (sortBy === 'distance') return a.distanceKm - b.distanceKm;
+        if (sortBy === 'delivery_fee') return Number(a.deliveryFee || 0) - Number(b.deliveryFee || 0);
         if (sortBy === 'time') {
           const getMinTime = (timeStr?: string) => {
             if (!timeStr) return 99;
@@ -98,7 +112,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
         }
         return 0;
       });
-  }, [tenants, products, selectedCategory, onlyOpen, priceRange, searchQuery, sortBy, selectedZone, selectedZoneId, activeCity, cities, zones]);
+  }, [tenants, products, selectedCategory, onlyOpen, minRating45, onlyFreeDelivery, onlyTableService, priceRange, searchQuery, sortBy, selectedZone, selectedZoneId, activeCity, cities, zones]);
 
   // Tenant featured hero
   const featuredTenant = useMemo(() => {
@@ -253,12 +267,14 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
               <span className="sort-label">Ordenar:</span>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'rating' | 'distance' | 'time')}
+                onChange={(e) => setSortBy(e.target.value as 'rating' | 'reviews' | 'distance' | 'time' | 'delivery_fee')}
                 className="sort-select"
               >
                 <option value="rating">⭐ Mejor Valorados</option>
-                <option value="distance">📍 Más Cercanos</option>
+                <option value="reviews">💬 Más Reseñas</option>
                 <option value="time">⚡ Más Rápidos</option>
+                <option value="delivery_fee">🛵 Menor Costo de Envío</option>
+                <option value="distance">📍 Más Cercanos</option>
               </select>
             </div>
 
@@ -316,13 +332,31 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
             ))}
           </div>
 
-          <div className="filter-switches">
+          <div className="filter-switches" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             <button
               className={`toggle-filter-btn ${onlyOpen ? 'active' : ''}`}
               onClick={() => setOnlyOpen(!onlyOpen)}
             >
               <span className={`status-dot ${onlyOpen ? 'dot-open' : ''}`} />
               Solo Abiertos
+            </button>
+            <button
+              className={`toggle-filter-btn ${minRating45 ? 'active' : ''}`}
+              onClick={() => setMinRating45(!minRating45)}
+            >
+              ⭐ 4.5+ Estrellas
+            </button>
+            <button
+              className={`toggle-filter-btn ${onlyFreeDelivery ? 'active' : ''}`}
+              onClick={() => setOnlyFreeDelivery(!onlyFreeDelivery)}
+            >
+              🛵 Envío Gratis
+            </button>
+            <button
+              className={`toggle-filter-btn ${onlyTableService ? 'active' : ''}`}
+              onClick={() => setOnlyTableService(!onlyTableService)}
+            >
+              🪑 Servicio en Mesa
             </button>
           </div>
         </div>
@@ -400,6 +434,9 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
               setSearchQuery('');
               setSelectedCategory('Todas');
               setOnlyOpen(false);
+              setMinRating45(false);
+              setOnlyFreeDelivery(false);
+              setOnlyTableService(false);
               setPriceRange('all');
             }}
           >
@@ -539,6 +576,18 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                   <div className="tenant-specs-row">
                     <span className="spec-item">
                       <Clock size={14} /> {tenant.deliveryTime || '20-30 min'}
+                    </span>
+                    <span className="spec-dot">•</span>
+                    <span
+                      className="spec-item"
+                      style={{
+                        color: !tenant.deliveryFee || tenant.deliveryFee === 0 ? '#10B981' : undefined,
+                        fontWeight: !tenant.deliveryFee || tenant.deliveryFee === 0 ? 800 : undefined
+                      }}
+                    >
+                      🛵 {!tenant.deliveryFee || tenant.deliveryFee === 0
+                        ? 'Envío Gratis'
+                        : `$${tenant.deliveryFee.toLocaleString('es-CO')}`}
                     </span>
                     <span className="spec-dot">•</span>
                     <span className="spec-item">

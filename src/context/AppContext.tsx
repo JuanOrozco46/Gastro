@@ -1236,7 +1236,17 @@ const location = useLocationSlice();
       }
     }
 
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+    setOrders(prev =>
+      prev.map(o =>
+        o.id === orderId
+          ? {
+              ...o,
+              status,
+              paymentStatus: status === 'delivered' ? 'approved' : o.paymentStatus
+            }
+          : o
+      )
+    );
     showToast(`Pedido #${orderId.slice(0, 8)} actualizado a ${status.toUpperCase()}`);
     return true;
   };

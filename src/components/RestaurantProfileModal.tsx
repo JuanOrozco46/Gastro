@@ -6,6 +6,7 @@ import {
   submitRestaurantReview,
   deleteRestaurantReview
 } from '../services/supabaseDataService';
+import { uploadMediaFile } from '../services/supabaseStorageService';
 import {
   resolveTenantBannerUrl,
   resolveTenantLogoUrl,
@@ -14,7 +15,8 @@ import {
 import type { RestaurantReview } from '../types';
 import {
   X, Star, MapPin, Clock, ShoppingBag, Eye, Heart, ShieldCheck,
-  Phone, Navigation, Play, Calendar, Truck, MessageSquare, Trash2, CheckCircle2, Send
+  Phone, Navigation, Play, Calendar, Truck, MessageSquare, Trash2, CheckCircle2, Send,
+  Camera, Store, CornerDownRight
 } from 'lucide-react';
 
 interface RestaurantProfileModalProps {
@@ -95,6 +97,9 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [commentInput, setCommentInput] = useState('');
+  const [reviewImageUrl, setReviewImageUrl] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
   const [customOrderId, setCustomOrderId] = useState<string | null>(null);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
@@ -191,6 +196,33 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
     );
   };
 
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
+    if (!rawFile.type.startsWith('image/')) {
+      showToast('⚠️ Selecciona una foto válida (JPG, PNG o WEBP).');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const { compressImage } = await import('../utils/imageCompression');
+      const compressed = await compressImage(rawFile, 1.5, 1280);
+      const uploaded = await uploadMediaFile(compressed.file, 'reviews');
+      if (uploaded.success && uploaded.publicUrl) {
+        setReviewImageUrl(uploaded.publicUrl);
+        showToast('📸 Foto lista para tu reseña.');
+      } else {
+        showToast(`⚠️ ${uploaded.error || 'No se pudo subir la foto.'}`);
+      }
+    } catch {
+      showToast('⚠️ Error procesando la foto seleccionada.');
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
   const canDeleteReview = (review: RestaurantReview): boolean => {
     if (!currentUser) return false;
     const isAuthor = Boolean(
@@ -214,14 +246,14 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
       showToast('⚠️ Inicia sesión para calificar este restaurante.');
       return;
     }
-    if (!commentInput.trim() && selectedTags.length === 0) {
-      showToast('⚠️ Escribe un comentario o selecciona al menos una etiqueta para tu reseña.');
+    if (!commentInput.trim() && selectedTags.length === 0 && !reviewImageUrl) {
+      showToast('⚠️ Escribe un comentario, selecciona una etiqueta o sube una foto para tu reseña.');
       return;
     }
 
     setIsSubmittingReview(true);
     try {
-      const finalComment = commentInput.trim() || selectedTags.join(' · ');
+      const finalComment = commentInput.trim() || selectedTags.join(' · ') || 'Reseña con foto';
 
       if (authMode === 'demo' || !isSupabaseConfigured) {
         const demoReview: RestaurantReview = {
@@ -235,6 +267,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
           rating: ratingInput,
           comment: finalComment,
           tags: selectedTags,
+          reviewImageUrl: reviewImageUrl || undefined,
           createdAt: new Date().toISOString(),
           timeAgo: 'Hace un momento'
         };
@@ -245,6 +278,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
         syncTenantRating(tenant.id, avg, next.length);
         setCommentInput('');
         setSelectedTags([]);
+        setReviewImageUrl('');
         showToast('⭐ ¡Gracias por calificar al restaurante!');
         return;
       }
@@ -256,6 +290,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
         rating: ratingInput,
         comment: finalComment,
         tags: selectedTags,
+        reviewImageUrl: reviewImageUrl || '',
         authorFallback: {
           name: currentUser.name,
           username: currentUser.username,
@@ -277,6 +312,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
       syncTenantRating(tenant.id, res.ratingAvg, res.ratingCount);
       setCommentInput('');
       setSelectedTags([]);
+      setReviewImageUrl('');
       showToast('⭐ ¡Tu calificación y reseña fueron publicadas!');
     } finally {
       setIsSubmittingReview(false);
@@ -772,8 +808,8 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                     })}
                   </div>
 
-                  {/* Comment Input */}
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                  {/* Comment Input & Photo Attachment */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <textarea
                       rows={2}
                       value={commentInput}
@@ -781,7 +817,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                       placeholder="Cuéntale a otros clientes qué tal estuvo la comida, el tiempo de entrega y el servicio..."
                       maxLength={600}
                       style={{
-                        flex: 1,
+                        width: '100%',
                         background: 'rgba(15, 23, 42, 0.7)',
                         border: '1px solid rgba(255,255,255,0.12)',
                         borderRadius: '12px',
@@ -791,23 +827,81 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                         resize: 'vertical'
                       }}
                     />
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      disabled={isSubmittingReview}
-                      style={{
-                        borderRadius: '12px',
-                        padding: '10px 16px',
-                        fontWeight: 800,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        flexShrink: 0
-                      }}
-                    >
-                      <Send size={15} />
-                      {isSubmittingReview ? 'Enviando...' : 'Publicar'}
-                    </button>
+
+                    {/* Optional Photo Preview */}
+                    {reviewImageUrl && (
+                      <div style={{ position: 'relative', width: '96px', height: '72px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(245, 158, 11, 0.45)' }}>
+                        <img src={reviewImageUrl} alt="Foto adjunta" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                          type="button"
+                          onClick={() => setReviewImageUrl('')}
+                          title="Quitar foto"
+                          style={{
+                            position: 'absolute',
+                            top: '4px',
+                            right: '4px',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            background: 'rgba(0,0,0,0.75)',
+                            color: 'white',
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <label
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '7px 12px',
+                          borderRadius: '10px',
+                          border: '1px dashed rgba(255,255,255,0.2)',
+                          background: 'rgba(255,255,255,0.03)',
+                          color: '#CBD5E1',
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          cursor: isUploadingPhoto ? 'wait' : 'pointer'
+                        }}
+                      >
+                        <Camera size={14} style={{ color: '#F59E0B' }} />
+                        {isUploadingPhoto ? 'Subiendo foto...' : reviewImageUrl ? 'Cambiar foto' : 'Añadir foto del plato (opcional)'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          disabled={isUploadingPhoto}
+                          onChange={handlePhotoSelect}
+                        />
+                      </label>
+
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={isSubmittingReview || isUploadingPhoto}
+                        style={{
+                          borderRadius: '12px',
+                          padding: '9px 16px',
+                          fontWeight: 800,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          flexShrink: 0
+                        }}
+                      >
+                        <Send size={15} />
+                        {isSubmittingReview ? 'Enviando...' : 'Publicar'}
+                      </button>
+                    </div>
                   </div>
                 </form>
               )}
@@ -970,6 +1064,52 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                           {review.comment}
                         </p>
                       )}
+
+                      {/* Attached Review Photo */}
+                      {review.reviewImageUrl && (
+                        <div>
+                          <img
+                            src={review.reviewImageUrl}
+                            alt="Foto del pedido"
+                            onClick={() => setLightboxImageUrl(review.reviewImageUrl || null)}
+                            style={{
+                              maxWidth: '175px',
+                              maxHeight: '130px',
+                              borderRadius: '10px',
+                              objectFit: 'cover',
+                              border: '1px solid rgba(255,255,255,0.14)',
+                              cursor: 'zoom-in'
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Official Restaurant Reply */}
+                      {review.ownerReply && (
+                        <div
+                          style={{
+                            marginTop: '4px',
+                            padding: '10px 12px',
+                            borderRadius: '12px',
+                            background: 'rgba(212, 163, 89, 0.08)',
+                            borderLeft: '3px solid #d4a359',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CornerDownRight size={13} style={{ color: '#f3d29c' }} />
+                            <Store size={13} style={{ color: '#f3d29c' }} />
+                            <strong style={{ fontSize: '0.76rem', color: '#f3d29c' }}>
+                              Respuesta oficial de {tenant.name}
+                            </strong>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#E2E8F0', lineHeight: 1.45 }}>
+                            {review.ownerReply}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1062,6 +1202,39 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
         )}
 
       </div>
+
+      {/* Lightbox for Review Photo */}
+      {lightboxImageUrl && (
+        <div
+          onClick={e => {
+            e.stopPropagation();
+            setLightboxImageUrl(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(4, 7, 15, 0.88)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+        >
+          <img
+            src={lightboxImageUrl}
+            alt="Vista ampliada"
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '85vh',
+              borderRadius: '16px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
+              border: '1px solid rgba(255,255,255,0.15)'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -3,10 +3,12 @@ import { useApp } from '../context/useApp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package, Clock, CheckCircle2, ChefHat, Bike, ShoppingBag, CreditCard,
-  RefreshCw, ChevronDown, ChevronUp, MapPin, Utensils, MessageSquare, Copy, Check, Star, Send
+  RefreshCw, ChevronDown, ChevronUp, MapPin, Utensils, MessageSquare, Copy, Check, Star, Send,
+  Camera, X, Store, CornerDownRight, Sparkles
 } from 'lucide-react';
 import type { Order, OrderStatus, CustomerDeliveryAddress, RestaurantReview } from '../types';
 import { fetchCustomerOrderReviews, submitRestaurantReview } from '../services/supabaseDataService';
+import { uploadMediaFile } from '../services/supabaseStorageService';
 import { resolveTenantLogoUrl } from '../utils/tenantHelpers';
 import { PaymentStatus } from './PaymentStatus';
 
@@ -159,6 +161,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [selectedTags, setSelectedTags] = useState<string[]>(existingReview?.tags || []);
   const [comment, setComment] = useState<string>(existingReview?.comment || '');
+  const [reviewImageUrl, setReviewImageUrl] = useState<string>(existingReview?.reviewImageUrl || '');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const handleCopyId = (e: React.MouseEvent) => {
@@ -174,20 +178,47 @@ const OrderCard: React.FC<OrderCardProps> = ({
     );
   };
 
+  const handleReviewPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
+    if (!rawFile.type.startsWith('image/')) {
+      showToast('⚠️ Selecciona una foto válida (JPG, PNG o WEBP).');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const { compressImage } = await import('../utils/imageCompression');
+      const compressed = await compressImage(rawFile, 1.5, 1280);
+      const uploaded = await uploadMediaFile(compressed.file, 'reviews');
+      if (uploaded.success && uploaded.publicUrl) {
+        setReviewImageUrl(uploaded.publicUrl);
+        showToast('📸 Foto lista para tu reseña.');
+      } else {
+        showToast(`⚠️ ${uploaded.error || 'No se pudo subir la foto.'}`);
+      }
+    } catch {
+      showToast('⚠️ Error procesando la foto seleccionada.');
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
   const handleSaveReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) {
       showToast('⚠️ Inicia sesión para calificar tu pedido.');
       return;
     }
-    if (!comment.trim() && selectedTags.length === 0) {
-      showToast('⚠️ Selecciona al menos una etiqueta o escribe un comentario sobre tu pedido.');
+    if (!comment.trim() && selectedTags.length === 0 && !reviewImageUrl) {
+      showToast('⚠️ Selecciona al menos una etiqueta, escribe un comentario o sube una foto de tu pedido.');
       return;
     }
 
     setIsSubmittingReview(true);
     try {
-      const finalComment = comment.trim() || selectedTags.join(' · ');
+      const finalComment = comment.trim() || selectedTags.join(' · ') || 'Pedido calificado';
 
       if (authMode === 'demo') {
         const demoRev: RestaurantReview = {
@@ -201,6 +232,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
           rating,
           comment: finalComment,
           tags: selectedTags,
+          reviewImageUrl: reviewImageUrl || undefined,
+          ownerReply: existingReview?.ownerReply,
+          ownerRepliedAt: existingReview?.ownerRepliedAt,
           createdAt: new Date().toISOString(),
           timeAgo: 'Hace un momento'
         };
@@ -225,6 +259,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
         rating,
         comment: finalComment,
         tags: selectedTags,
+        reviewImageUrl: reviewImageUrl || '',
         authorFallback: {
           name: currentUser.name,
           username: currentUser.username,
@@ -254,6 +289,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
 
   return (
     <motion.div 
+      id={`order-card-${order.id}`}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       className={`card ${order.status === 'delivered' ? 'order-delivered' : ''}`}
@@ -546,6 +582,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                       setRating(existingReview.rating);
                       setSelectedTags(existingReview.tags || []);
                       setComment(existingReview.comment || '');
+                      setReviewImageUrl(existingReview.reviewImageUrl || '');
                       setIsEditingReview(true);
                     }}
                     style={{
@@ -604,6 +641,44 @@ const OrderCard: React.FC<OrderCardProps> = ({
                 <p style={{ margin: 0, fontSize: '0.84rem', color: '#E2E8F0' }}>
                   "{existingReview.comment}"
                 </p>
+              )}
+              {existingReview.reviewImageUrl && (
+                <div style={{ marginTop: '2px' }}>
+                  <img
+                    src={existingReview.reviewImageUrl}
+                    alt="Foto de tu pedido"
+                    style={{
+                      width: '140px',
+                      height: '100px',
+                      objectFit: 'cover',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(255,255,255,0.14)'
+                    }}
+                  />
+                </div>
+              )}
+              {existingReview.ownerReply && (
+                <div
+                  style={{
+                    marginTop: '4px',
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    background: 'rgba(15, 23, 42, 0.72)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderLeft: '3px solid var(--primary)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                    <CornerDownRight size={13} style={{ color: 'var(--primary)' }} />
+                    <Store size={13} style={{ color: 'var(--primary)' }} />
+                    <strong style={{ fontSize: '0.76rem', color: '#FBBF24' }}>
+                      Respuesta oficial de {tenantName}:
+                    </strong>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#E2E8F0', lineHeight: 1.45 }}>
+                    {existingReview.ownerReply}
+                  </p>
+                </div>
               )}
             </div>
           ) : (
@@ -670,6 +745,73 @@ const OrderCard: React.FC<OrderCardProps> = ({
                 })}
               </div>
 
+              {/* Photo Attachment Preview / Button */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <label
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '10px',
+                    border: '1px dashed rgba(245, 158, 11, 0.4)',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    color: '#FBBF24',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    cursor: isUploadingPhoto ? 'wait' : 'pointer'
+                  }}
+                >
+                  <Camera size={14} />
+                  <span>{isUploadingPhoto ? 'Subiendo foto...' : reviewImageUrl ? 'Cambiar foto del pedido' : '📸 Subir foto de tu pedido (opcional)'}</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleReviewPhotoSelect}
+                    disabled={isUploadingPhoto}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+
+                {reviewImageUrl && (
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <img
+                      src={reviewImageUrl}
+                      alt="Vista previa"
+                      style={{
+                        width: '72px',
+                        height: '54px',
+                        objectFit: 'cover',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.2)'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setReviewImageUrl('')}
+                      title="Quitar foto"
+                      style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        right: '-6px',
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        border: 'none',
+                        background: '#EF4444',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <textarea
                   rows={2}
@@ -703,7 +845,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                   <button
                     type="submit"
                     className="btn btn-primary"
-                    disabled={isSubmittingReview}
+                    disabled={isSubmittingReview || isUploadingPhoto}
                     style={{
                       borderRadius: '10px',
                       padding: '8px 14px',
@@ -805,6 +947,9 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp, onOpenTenantRevi
 
   const activeOrders = clientOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
   const pastOrders = clientOrders.filter(o => o.status === 'delivered' || o.status === 'cancelled');
+  const unreviewedDeliveredOrders = pastOrders.filter(
+    o => o.status === 'delivered' && !orderReviewsMap[o.id]
+  );
 
   if (clientOrders.length === 0) {
     return (
@@ -838,6 +983,72 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp, onOpenTenantRevi
       transition={{ duration: 0.4 }}
       style={{ maxWidth: '900px', margin: '0 auto' }}
     >
+      {/* Banner de Recordatorio para Pedidos Entregados sin Calificar */}
+      {unreviewedDeliveredOrders.length > 0 && (
+        <div
+          style={{
+            marginBottom: '1.75rem',
+            padding: '16px 20px',
+            borderRadius: '22px',
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(217, 119, 6, 0.1) 100%)',
+            border: '1px solid rgba(245, 158, 11, 0.38)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '14px',
+                background: 'rgba(245, 158, 11, 0.25)',
+                color: '#FBBF24',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <Sparkles size={20} />
+            </div>
+            <div>
+              <strong style={{ color: 'white', fontSize: '0.96rem', display: 'block', fontWeight: 900 }}>
+                ¡Cuéntanos cómo estuvo tu pedido en {tenantMap[unreviewedDeliveredOrders[0].tenantId]?.name || 'el restaurante'}!
+              </strong>
+              <span style={{ color: '#FDE68A', fontSize: '0.8rem' }}>
+                Tienes {unreviewedDeliveredOrders.length}{' '}
+                {unreviewedDeliveredOrders.length === 1 ? 'pedido entregado' : 'pedidos entregados'} pendiente
+                {unreviewedDeliveredOrders.length === 1 ? '' : 's'} por calificar.
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{
+              borderRadius: '12px',
+              padding: '9px 16px',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            onClick={() => {
+              const target = document.getElementById(`order-card-${unreviewedDeliveredOrders[0].id}`);
+              target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+          >
+            <Star size={14} fill="currentColor" /> Calificar Ahora
+          </button>
+        </div>
+      )}
+
       {activeOrders.length > 0 && (
         <section style={{ marginBottom: '2.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.25rem' }}>

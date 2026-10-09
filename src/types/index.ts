@@ -209,6 +209,7 @@ export interface RestaurantReview {
   rating: number;
   comment: string;
   tags?: string[];
+  reviewImageUrl?: string;
   ownerReply?: string;
   ownerRepliedAt?: string;
   createdAt: string;

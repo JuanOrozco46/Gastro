@@ -2,11 +2,13 @@ import React, { Suspense, lazy } from 'react';
 import { AppProvider } from './context/AppContext';
 import { useApp } from './context/useApp';
 import { Header } from './components/Header';
-import { LoginScreen } from './components/LoginScreen';
-import { CustomerDeliveryApp } from './components/CustomerDeliveryApp';
 import { Toast } from './components/Toast';
+import { ForcePasswordModal } from './components/ForcePasswordModal';
 
-// Módulos pesados importados dinámicamente para Code-Splitting
+// Módulos importados dinámicamente para Code-Splitting óptimo
+const LoginScreen = lazy(() => import('./components/LoginScreen').then(m => ({ default: m.LoginScreen })));
+const EmailVerificationScreen = lazy(() => import('./components/EmailVerificationScreen').then(m => ({ default: m.EmailVerificationScreen })));
+const CustomerDeliveryApp = lazy(() => import('./components/CustomerDeliveryApp').then(m => ({ default: m.CustomerDeliveryApp })));
 const KitchenPanel = lazy(() => import('./components/KitchenPanel').then(m => ({ default: m.KitchenPanel })));
 const RestaurantAdmin = lazy(() => import('./components/RestaurantAdmin').then(m => ({ default: m.RestaurantAdmin })));
 const TablePublicView = lazy(() => import('./components/TablePublicView').then(m => ({ default: m.TablePublicView })));
@@ -33,9 +35,6 @@ const ViewLoader: React.FC = () => (
     <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Cargando módulo GastroSync...</span>
   </div>
 );
-
-import { ForcePasswordModal } from './components/ForcePasswordModal';
-import { EmailVerificationScreen } from './components/EmailVerificationScreen';
 
 const MainContent: React.FC = () => {
   const { userRole, isAuthLoading, emailVerificationState } = useApp();
@@ -68,11 +67,19 @@ const MainContent: React.FC = () => {
   }
 
   if (userRole === 'login') {
-    return <LoginScreen />;
+    return (
+      <Suspense fallback={<ViewLoader />}>
+        <LoginScreen />
+      </Suspense>
+    );
   }
 
   if (emailVerificationState === 'pending' || emailVerificationState === 'error') {
-    return <EmailVerificationScreen />;
+    return (
+      <Suspense fallback={<ViewLoader />}>
+        <EmailVerificationScreen />
+      </Suspense>
+    );
   }
 
   return (

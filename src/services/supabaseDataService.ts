@@ -1504,18 +1504,25 @@ interface DbRestaurantReviewRow {
   rating: number;
   comment: string;
   tags?: string[] | null;
+  review_image_url?: string | null;
+  author_name?: string | null;
+  author_username?: string | null;
+  author_avatar_url?: string | null;
   owner_reply?: string | null;
   owner_replied_at?: string | null;
   created_at: string;
   updated_at?: string | null;
 }
 
+const REVIEW_SELECT_COLS =
+  'id, restaurant_id, order_id, user_id, rating, comment, tags, review_image_url, author_name, author_username, author_avatar_url, owner_reply, owner_replied_at, created_at, updated_at';
+
 export async function fetchRestaurantReviews(restaurantId: string): Promise<RestaurantReview[]> {
   if (!isSupabaseConfigured || !supabase || !restaurantId) return [];
   try {
     const { data, error } = await supabase
       .from('restaurant_reviews')
-      .select('id, restaurant_id, order_id, user_id, rating, comment, tags, owner_reply, owner_replied_at, created_at, updated_at')
+      .select(REVIEW_SELECT_COLS)
       .eq('restaurant_id', restaurantId)
       .order('created_at', { ascending: false });
 
@@ -1535,12 +1542,13 @@ export async function fetchRestaurantReviews(restaurantId: string): Promise<Rest
         restaurantId: r.restaurant_id,
         orderId: r.order_id || undefined,
         userId: r.user_id,
-        userName: meta?.fullName || 'Cliente verificado',
-        userHandle: meta?.username,
-        userAvatarUrl: meta?.avatarUrl,
+        userName: meta?.fullName || r.author_name || 'Cliente verificado',
+        userHandle: meta?.username || r.author_username || undefined,
+        userAvatarUrl: meta?.avatarUrl || r.author_avatar_url || undefined,
         rating: Number(r.rating) || 5,
         comment: r.comment || '',
         tags: Array.isArray(r.tags) ? r.tags : [],
+        reviewImageUrl: r.review_image_url || undefined,
         ownerReply: r.owner_reply || undefined,
         ownerRepliedAt: r.owner_replied_at || undefined,
         createdAt: r.created_at,
@@ -1558,7 +1566,7 @@ export async function fetchCustomerOrderReviews(userId: string): Promise<Record<
   try {
     const { data, error } = await supabase
       .from('restaurant_reviews')
-      .select('id, restaurant_id, order_id, user_id, rating, comment, tags, owner_reply, owner_replied_at, created_at')
+      .select(REVIEW_SELECT_COLS)
       .eq('user_id', userId)
       .not('order_id', 'is', null);
 
@@ -1573,10 +1581,13 @@ export async function fetchCustomerOrderReviews(userId: string): Promise<Record<
         restaurantId: r.restaurant_id,
         orderId: r.order_id,
         userId: r.user_id,
-        userName: 'Tú',
+        userName: r.author_name || 'Tú',
+        userHandle: r.author_username || undefined,
+        userAvatarUrl: r.author_avatar_url || undefined,
         rating: Number(r.rating) || 5,
         comment: r.comment || '',
         tags: Array.isArray(r.tags) ? r.tags : [],
+        reviewImageUrl: r.review_image_url || undefined,
         ownerReply: r.owner_reply || undefined,
         ownerRepliedAt: r.owner_replied_at || undefined,
         createdAt: r.created_at,
@@ -1596,6 +1607,7 @@ export async function submitRestaurantReview(payload: {
   rating: number;
   comment: string;
   tags?: string[];
+  reviewImageUrl?: string;
   authorFallback?: { name?: string; username?: string; avatarUrl?: string };
 }): Promise<{
   success: boolean;
@@ -1611,6 +1623,7 @@ export async function submitRestaurantReview(payload: {
   const cleanRating = Math.min(5, Math.max(1, Math.round(Number(payload.rating) || 5)));
   const cleanComment = (payload.comment || '').trim();
   const cleanTags = Array.isArray(payload.tags) ? payload.tags.filter(Boolean) : [];
+  const cleanImageUrl = payload.reviewImageUrl ? payload.reviewImageUrl.trim() : null;
 
   try {
     let savedRow: DbRestaurantReviewRow | null = null;
@@ -1623,16 +1636,24 @@ export async function submitRestaurantReview(payload: {
         .maybeSingle();
 
       if (existing?.id) {
+        const updatePayload: Record<string, unknown> = {
+          rating: cleanRating,
+          comment: cleanComment,
+          tags: cleanTags,
+          author_name: payload.authorFallback?.name || null,
+          author_username: payload.authorFallback?.username || null,
+          author_avatar_url: payload.authorFallback?.avatarUrl || null,
+          updated_at: new Date().toISOString()
+        };
+        if (payload.reviewImageUrl !== undefined) {
+          updatePayload.review_image_url = cleanImageUrl;
+        }
+
         const { data: updated, error: updErr } = await supabase
           .from('restaurant_reviews')
-          .update({
-            rating: cleanRating,
-            comment: cleanComment,
-            tags: cleanTags,
-            updated_at: new Date().toISOString()
-          })
+          .update(updatePayload)
           .eq('id', existing.id)
-          .select('id, restaurant_id, order_id, user_id, rating, comment, tags, owner_reply, owner_replied_at, created_at, updated_at')
+          .select(REVIEW_SELECT_COLS)
           .single();
 
         if (updErr) return { success: false, error: updErr.message };
@@ -1649,9 +1670,13 @@ export async function submitRestaurantReview(payload: {
           user_id: payload.userId,
           rating: cleanRating,
           comment: cleanComment,
-          tags: cleanTags
+          tags: cleanTags,
+          review_image_url: cleanImageUrl,
+          author_name: payload.authorFallback?.name || null,
+          author_username: payload.authorFallback?.username || null,
+          author_avatar_url: payload.authorFallback?.avatarUrl || null
         })
-        .select('id, restaurant_id, order_id, user_id, rating, comment, tags, owner_reply, owner_replied_at, created_at, updated_at')
+        .select(REVIEW_SELECT_COLS)
         .single();
 
       if (insErr) return { success: false, error: insErr.message };
@@ -1672,12 +1697,13 @@ export async function submitRestaurantReview(payload: {
       restaurantId: savedRow.restaurant_id,
       orderId: savedRow.order_id || undefined,
       userId: savedRow.user_id,
-      userName: meta?.fullName || payload.authorFallback?.name || 'Cliente verificado',
-      userHandle: meta?.username || payload.authorFallback?.username,
-      userAvatarUrl: meta?.avatarUrl || payload.authorFallback?.avatarUrl,
+      userName: meta?.fullName || savedRow.author_name || payload.authorFallback?.name || 'Cliente verificado',
+      userHandle: meta?.username || savedRow.author_username || payload.authorFallback?.username,
+      userAvatarUrl: meta?.avatarUrl || savedRow.author_avatar_url || payload.authorFallback?.avatarUrl,
       rating: Number(savedRow.rating) || cleanRating,
       comment: savedRow.comment || '',
       tags: Array.isArray(savedRow.tags) ? savedRow.tags : [],
+      reviewImageUrl: savedRow.review_image_url || undefined,
       ownerReply: savedRow.owner_reply || undefined,
       ownerRepliedAt: savedRow.owner_replied_at || undefined,
       createdAt: savedRow.created_at,
@@ -1694,6 +1720,71 @@ export async function submitRestaurantReview(payload: {
     return {
       success: false,
       error: err instanceof Error ? err.message : 'No se pudo guardar la calificación.'
+    };
+  }
+}
+
+export async function replyToRestaurantReview(
+  reviewId: string,
+  replyText: string
+): Promise<{
+  success: boolean;
+  ownerReply?: string;
+  ownerRepliedAt?: string;
+  error?: string;
+}> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'Sin conexión a la base de datos.' };
+  }
+
+  const cleanReply = replyText.trim();
+  const repliedAt = cleanReply ? new Date().toISOString() : undefined;
+
+  try {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('reply_to_restaurant_review', {
+      p_review_id: reviewId,
+      p_reply: cleanReply
+    });
+
+    if (!rpcErr && rpcRes && typeof rpcRes === 'object') {
+      const parsed = rpcRes as {
+        success?: boolean;
+        owner_reply?: string | null;
+        owner_replied_at?: string | null;
+        error?: string;
+      };
+      if (parsed.success === false) {
+        return { success: false, error: parsed.error || 'No se pudo guardar la respuesta.' };
+      }
+      return {
+        success: true,
+        ownerReply: parsed.owner_reply || undefined,
+        ownerRepliedAt: parsed.owner_replied_at || undefined
+      };
+    }
+
+    const { error: updErr } = await supabase
+      .from('restaurant_reviews')
+      .update({
+        owner_reply: cleanReply || null,
+        owner_replied_at: repliedAt || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', reviewId);
+
+    if (updErr) {
+      return { success: false, error: updErr.message };
+    }
+
+    return {
+      success: true,
+      ownerReply: cleanReply || undefined,
+      ownerRepliedAt: repliedAt
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Error guardando la respuesta del restaurante.'
     };
   }
 }

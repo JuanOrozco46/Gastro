@@ -548,13 +548,40 @@ export async function updateSupabaseUserProfile(
       if (updates.defaultAddress !== undefined) dbPayload.default_address = updates.defaultAddress.trim() || null;
       if (updates.defaultDeliveryNotes !== undefined) dbPayload.default_delivery_notes = updates.defaultDeliveryNotes.trim() || null;
 
-      const { error } = await supabase
+      const { data: updatedRows, error } = await supabase
         .from('profiles')
         .update(dbPayload)
-        .eq('id', userId);
+        .eq('id', userId)
+        .select('id');
 
       if (error) {
         return { success: false, error: translateAuthError(error.message) };
+      }
+
+      if (!updatedRows || updatedRows.length === 0) {
+        const { error: upsertErr } = await supabase
+          .from('profiles')
+          .upsert({
+            id: userId,
+            full_name: updates.name?.trim() || email.split('@')[0],
+            platform_role: 'customer',
+            ...dbPayload
+          });
+        if (upsertErr) {
+          return { success: false, error: translateAuthError(upsertErr.message) };
+        }
+      }
+
+      // Sincronizar snapshot de autor en reseñas previas del usuario
+      const reviewAuthorPatch: Record<string, unknown> = {};
+      if (updates.name !== undefined) reviewAuthorPatch.author_name = updates.name.trim() || null;
+      if (cleanUsername !== undefined) reviewAuthorPatch.author_username = cleanUsername || null;
+      if (finalAvatarUrl !== undefined) reviewAuthorPatch.author_avatar_url = finalAvatarUrl || null;
+      if (Object.keys(reviewAuthorPatch).length > 0) {
+        await supabase
+          .from('restaurant_reviews')
+          .update(reviewAuthorPatch)
+          .eq('user_id', userId);
       }
 
       await supabase.auth.updateUser({

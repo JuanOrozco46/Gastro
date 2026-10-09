@@ -72,7 +72,7 @@ export const Header: React.FC = () => {
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
               {currentUser?.name || 'Usuario'}
             </span>
-            {currentUser?.username && (
+            {currentUser?.username ? (
               <span
                 style={{
                   fontSize: '0.72rem',
@@ -84,6 +84,20 @@ export const Header: React.FC = () => {
                 }}
               >
                 @{currentUser.username}
+              </span>
+            ) : (
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  color: '#f3d29c',
+                  background: 'rgba(212, 163, 89, 0.16)',
+                  padding: '2px 7px',
+                  borderRadius: '999px',
+                  border: '1px dashed rgba(212, 163, 89, 0.45)'
+                }}
+              >
+                Editar @perfil
               </span>
             )}
           </button>

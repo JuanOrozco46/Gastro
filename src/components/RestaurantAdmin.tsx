@@ -1,15 +1,12 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { useApp } from '../context/useApp';
-import {
-  getOperationalTenant,
-  getFulfillmentBadgeText,
-  getValidOrderTransitions
-} from '../utils/tenantHelpers';
+import { getOperationalTenant } from '../utils/tenantHelpers';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileUploadInput } from './FileUploadInput';
 import { ProfileTab } from './RestaurantAdmin/ProfileTab';
 import { NotificationBell } from './NotificationBell';
 import { RestaurantTablesAdmin } from './RestaurantTablesAdmin';
+import { KdsBoard } from './KdsBoard';
 import {
   QrCode,
   Utensils,
@@ -28,8 +25,6 @@ import {
   Users,
   AlertCircle,
   Package,
-  Clock,
-  CheckCircle,
   Loader2,
   Check,
   DollarSign,
@@ -41,7 +36,8 @@ import {
   Phone,
   X,
   Save,
-  Store
+  Store,
+  Star
 } from 'lucide-react';
 
 const FinancialAnalytics = lazy(() =>
@@ -55,6 +51,9 @@ const MenuTab = lazy(() =>
 );
 const TeamTab = lazy(() =>
   import('./RestaurantAdmin/TeamTab').then(m => ({ default: m.TeamTab }))
+);
+const ReviewsTab = lazy(() =>
+  import('./RestaurantAdmin/ReviewsTab').then(m => ({ default: m.ReviewsTab }))
 );
 
 const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
@@ -83,14 +82,13 @@ export const RestaurantAdmin: React.FC = () => {
     posts,
     createPost,
     deletePost,
-    orders,
-    updateOrderStatus
+    orders
   } = useApp();
 
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
   const [activeTab, setActiveTab] = useState<
-    'orders' | 'profile' | 'content' | 'menu' | 'analytics' | 'qr' | 'support' | 'team'
+    'orders' | 'profile' | 'content' | 'menu' | 'reviews' | 'analytics' | 'qr' | 'support' | 'team'
   >('orders');
   const [supportInitialTicketId, setSupportInitialTicketId] = useState<string | null>(null);
 
@@ -140,7 +138,6 @@ export const RestaurantAdmin: React.FC = () => {
     .sort((a, b) => b.createdAt - a.createdAt);
 
   const activeOrders = tenantOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
-  const pastOrders = tenantOrders.filter(o => o.status === 'delivered' || o.status === 'cancelled');
 
   const handleAddDriverSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,9 +295,17 @@ export const RestaurantAdmin: React.FC = () => {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <NotificationBell
+                variant="dark"
                 onOpenTicket={ticketId => {
                   setSupportInitialTicketId(ticketId);
                   setActiveTab('support');
+                }}
+                onNavigate={dest => {
+                  if (dest === 'directory') {
+                    setActiveTab('orders');
+                  } else {
+                    setActiveTab(dest);
+                  }
                 }}
               />
               <button
@@ -356,9 +361,11 @@ export const RestaurantAdmin: React.FC = () => {
               <strong className="rpa-kpi-val">{tenantPosts.length} en feed</strong>
             </div>
 
-            <div className="rpa-kpi" onClick={() => setActiveTab('qr')}>
-              <span className="rpa-kpi-label">Repartidores</span>
-              <strong className="rpa-kpi-val">{tenantDrivers.length} propios</strong>
+            <div className="rpa-kpi" onClick={() => setActiveTab('reviews')}>
+              <span className="rpa-kpi-label">Reputación</span>
+              <strong className="rpa-kpi-val" style={{ color: '#FBBF24' }}>
+                ⭐ {Number(operatingTenant.rating || 5).toFixed(1)} ({operatingTenant.reviewsCount || 0})
+              </strong>
             </div>
           </div>
         </div>
@@ -371,7 +378,7 @@ export const RestaurantAdmin: React.FC = () => {
           className={`nav-tab ${activeTab === 'orders' ? 'active' : ''}`}
           onClick={() => setActiveTab('orders')}
         >
-          <Package size={16} /> Pedidos ({activeOrders.length})
+          <Package size={16} /> Comandas KDS ({activeOrders.length})
         </button>
         <button
           type="button"
@@ -393,6 +400,13 @@ export const RestaurantAdmin: React.FC = () => {
           onClick={() => setActiveTab('content')}
         >
           <Share2 size={16} /> Publicar Contenido
+        </button>
+        <button
+          type="button"
+          className={`nav-tab ${activeTab === 'reviews' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reviews')}
+        >
+          <Star size={16} /> Reseñas ({operatingTenant.reviewsCount || 0})
         </button>
         <button
           type="button"
@@ -427,193 +441,15 @@ export const RestaurantAdmin: React.FC = () => {
       {/* ── TAB: PERFIL Y HORARIOS ── */}
       {activeTab === 'profile' && <ProfileTab tenant={operatingTenant} />}
 
-      {/* ── TAB: PEDIDOS ACTIVOS E HISTORIAL ── */}
-      {activeTab === 'orders' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div className="rpa-card">
-            <div className="rpa-card-header">
-              <div className="rpa-card-header-left">
-                <div className="rpa-card-icon">
-                  <Package size={22} />
-                </div>
-                <div>
-                  <span className="pam-eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>
-                    <Sparkles size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Despacho y Cocina en Tiempo Real
-                  </span>
-                  <h3 className="rpa-card-title">Operación de Pedidos Activos</h3>
-                  <p className="rpa-card-subtitle">
-                    Gestiona el estado de las órdenes de <strong>{operatingTenant.name}</strong>.
-                  </p>
-                </div>
-              </div>
-              <span className="rpa-badge primary">{activeOrders.length} activos</span>
-            </div>
-
-            <div className="rpa-card-body">
-              {activeOrders.length === 0 ? (
-                <div className="pam-section" style={{ alignItems: 'center', textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-                  <CheckCircle size={40} style={{ color: '#059669' }} />
-                  <h4 style={{ color: 'var(--text-main)', fontWeight: 800, margin: '6px 0 2px' }}>
-                    ¡Todo al día en cocina y despacho!
-                  </h4>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
-                    No tienes pedidos pendientes en este momento.
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {activeOrders.map(order => {
-                    const badgeText = getFulfillmentBadgeText(order.fulfillment, order.type);
-                    const transitions = getValidOrderTransitions(
-                      order.status,
-                      order.fulfillment,
-                      order.type,
-                      false
-                    );
-
-                    return (
-                      <section key={order.id} className="pam-section">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                            <strong style={{ fontSize: '1.08rem', fontWeight: 900, color: 'var(--text-main)' }}>
-                              #{order.id}
-                            </strong>
-                            <span className="rpa-badge primary">{badgeText}</span>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                              <Clock size={13} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                              {new Date(order.createdAt).toLocaleTimeString('es-CO', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span className="rpa-badge warning">
-                              Estado: {order.status.toUpperCase()}
-                            </span>
-                            <strong style={{ fontSize: '1.08rem', color: 'var(--primary)', fontWeight: 900 }}>
-                              ${order.total.toLocaleString('es-CO')} COP
-                            </strong>
-                          </div>
-                        </div>
-
-                        {/* Datos del cliente y entrega */}
-                        <div
-                          style={{
-                            background: 'var(--neutral-surface-alt)',
-                            border: '1px solid var(--neutral-border)',
-                            padding: '10px 14px',
-                            borderRadius: '12px',
-                            fontSize: '0.83rem',
-                            color: 'var(--text-main)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '3px'
-                          }}
-                        >
-                          {order.customerName && (
-                            <div>
-                              👤 Cliente: <strong>{order.customerName}</strong>
-                              {order.customerPhone && ` · 📞 ${order.customerPhone}`}
-                            </div>
-                          )}
-                          {order.deliveryAddress && (
-                            <div style={{ color: '#0369A1' }}>
-                              📍 Dirección:{' '}
-                              <strong>
-                                {typeof order.deliveryAddress === 'string'
-                                  ? order.deliveryAddress
-                                  : order.deliveryAddress.addressLine}
-                              </strong>
-                            </div>
-                          )}
-                          {order.tableNumber && (
-                            <div style={{ color: '#B45309' }}>
-                              🍽️ Servicio en Mesa: <strong>Mesa #{order.tableNumber}</strong>
-                            </div>
-                          )}
-                          {order.restaurantNotes && (
-                            <div style={{ fontStyle: 'italic', color: 'var(--primary)' }}>
-                              📝 Nota: "{order.restaurantNotes}"
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Platos del pedido */}
-                        <div className="pam-chips">
-                          {order.items.map((item, idx) => (
-                            <span key={idx} className="rpa-badge neutral" style={{ fontSize: '0.8rem', padding: '5px 11px' }}>
-                              <strong style={{ color: 'var(--primary)' }}>{item.qty}x</strong> {item.name}
-                            </span>
-                          ))}
-                        </div>
-
-                        {/* Acciones de transición */}
-                        {transitions.length > 0 && (
-                          <div
-                            style={{
-                              display: 'flex',
-                              gap: '8px',
-                              justifyContent: 'flex-end',
-                              flexWrap: 'wrap',
-                              paddingTop: '10px',
-                              borderTop: '1px solid var(--neutral-border)'
-                            }}
-                          >
-                            {transitions.map(t => (
-                              <button
-                                key={t.status}
-                                type="button"
-                                className={t.variant === 'primary' ? 'pam-btn-primary' : 'pam-btn-ghost'}
-                                style={{
-                                  minWidth: 'auto',
-                                  padding: '8px 16px',
-                                  fontSize: '0.82rem',
-                                  color: t.variant === 'danger' ? '#DC2626' : undefined,
-                                  borderColor: t.variant === 'danger' ? '#FCA5A5' : undefined
-                                }}
-                                onClick={() => updateOrderStatus(order.id, t.status)}
-                              >
-                                {t.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </section>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Historial de Pedidos */}
-              {pastOrders.length > 0 && (
-                <section className="pam-section" style={{ marginTop: '0.5rem' }}>
-                  <div className="pam-section-head">
-                    <div>
-                      <h4>Historial de Pedidos Completados / Cancelados ({pastOrders.length})</h4>
-                      <p>Registro reciente de órdenes cerradas</p>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {pastOrders.map(order => (
-                      <div key={order.id} className="rpa-item-card" style={{ padding: '10px 14px' }}>
-                        <span style={{ fontSize: '0.84rem', color: 'var(--text-main)' }}>
-                          <strong>#{order.id}</strong> · {getFulfillmentBadgeText(order.fulfillment, order.type)}
-                          {order.customerName ? ` · ${order.customerName}` : ''}
-                        </span>
-                        <span className={`rpa-badge ${order.status === 'delivered' ? 'success' : 'danger'}`}>
-                          {order.status === 'delivered' ? '✓ ENTREGADO' : '✗ CANCELADO'} (${order.total.toLocaleString('es-CO')} COP)
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
-          </div>
-        </div>
+      {/* ── TAB: RESEÑAS Y REPUTACIÓN ── */}
+      {activeTab === 'reviews' && (
+        <Suspense fallback={<FallbackLoader message="Cargando reseñas del restaurante..." />}>
+          <ReviewsTab tenant={operatingTenant} />
+        </Suspense>
       )}
+
+      {/* ── TAB: COMANDAS KDS & PEDIDOS EN TIEMPO REAL ── */}
+      {activeTab === 'orders' && <KdsBoard tenant={operatingTenant} showMenuSidebar={false} />}
 
       {/* ── TAB: PUBLICADOR DE CONTENIDO (FOTOS Y REELS) ── */}
       {activeTab === 'content' && (
