@@ -1087,24 +1087,26 @@ export async function createLivePost(tenantId: string, title: string, desc: stri
     // para que sobrevivan a la recarga y sigan siendo buscables en el feed.
     const tags = (hashtags || []).filter(t => t.trim().length > 0);
     const fullDesc = tags.length > 0 ? `${desc || ''} ${tags.join(' ')}`.trim() : (desc || null);
+    const isUuid = Boolean(productId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId));
+    const safeWidth = width && Number.isFinite(width) && width > 0 ? Math.round(width) : null;
+    const safeHeight = height && Number.isFinite(height) && height > 0 ? Math.round(height) : null;
 
     const { data, error } = await supabase.from('posts').insert({
       restaurant_id: tenantId,
-      title,
+      title: title.trim(),
       description: fullDesc,
-      price_cop: Math.round(price),
+      price_cop: Math.max(0, Math.round(price)),
       media_url: mediaUrl,
       media_type: mediaType,
       is_published: true,
-      product_id: productId || null,
-      media_width: width || null,
-      media_height: height || null,
-      aspect_ratio: (width && height) ? Number((width / height).toFixed(4)) : null
+      product_id: isUuid ? productId : null,
+      media_width: safeWidth,
+      media_height: safeHeight,
+      aspect_ratio: (safeWidth && safeHeight) ? Number((safeWidth / safeHeight).toFixed(4)) : null
     }).select().single();
 
     if (error || !data) throw error;
     const post = mapDbPostToPost(data as unknown as DbPost);
-    // Tenant info is needed in Post but mapDbPostToPost sets placeholders.
     return post;
   } catch (err) {
     console.warn('⚠️ Error creating live post:', err);

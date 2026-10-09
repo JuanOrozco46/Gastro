@@ -1510,23 +1510,54 @@ const location = useLocationSlice();
   };
 
   const createPost = async (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>): Promise<boolean> => {
-    if (!isRestaurantOwner(currentUser) || !currentUser?.tenantId) {
+    const targetTenantId = postData.tenantId || currentUser?.tenantId;
+    if ((!isRestaurantOwner(currentUser) && !isRestaurantStaff(currentUser) && !isPlatformAdmin(currentUser)) || !targetTenantId) {
       showToast('⚠️ No tienes autorización para publicar contenido.');
       return false;
     }
-    const targetTenantId = currentUser.tenantId;
     const targetTenant = tenants.find(t => t.id === targetTenantId);
     if (!targetTenant) {
       showToast('⚠️ Restaurante no encontrado.');
       return false;
     }
 
+    const mediaUrlToSave = postData.mediaUrl || postData.image || '';
+
     if (authMode === 'remote') {
-      const savedPost = await createLivePost(targetTenantId, postData.dishName, postData.desc, postData.price, postData.image || '', postData.mediaType || 'photo', postData.productId, postData.width, postData.height, postData.hashtags);
+      const savedPost = await createLivePost(
+        targetTenantId,
+        postData.dishName,
+        postData.desc,
+        postData.price,
+        mediaUrlToSave,
+        postData.mediaType || 'photo',
+        postData.productId,
+        postData.width,
+        postData.height,
+        postData.hashtags
+      );
       if (!savedPost) {
         showToast('⚠️ Error al crear publicación en el servidor.');
         return false;
       }
+
+      // Si el trigger de base de datos vinculó o creó automáticamente el producto en el menú, sincronizarlo en el estado local
+      if (savedPost.productId && !products.some(p => p.id === savedPost.productId)) {
+        const autoProduct: Product = {
+          id: savedPost.productId,
+          tenantId: targetTenant.id,
+          name: postData.dishName,
+          desc: postData.desc,
+          price: postData.price,
+          category: 'Platos Principales',
+          emoji: postData.dishEmoji || '🍽️',
+          available: true,
+          image: postData.mediaType === 'photo' ? mediaUrlToSave : postData.image || undefined
+        };
+        setRemoteProducts(prev => [autoProduct, ...prev]);
+        setProducts(prev => [autoProduct, ...prev]);
+      }
+
       const fullPost: Post = {
         ...savedPost,
         tenantName: targetTenant.name,
@@ -1535,7 +1566,8 @@ const location = useLocationSlice();
         tenantAddress: targetTenant.address,
         dishName: postData.dishName,
         dishEmoji: postData.dishEmoji || '🍽️',
-        // mapDbPostToPost devuelve timeAgo ISO y sin comments: se corrigen para el render inmediato.
+        image: postData.mediaType === 'photo' ? mediaUrlToSave : (postData.image || targetTenant.bannerUrl || mediaUrlToSave),
+        mediaUrl: mediaUrlToSave,
         timeAgo: 'Hace un momento',
         comments: []
       };

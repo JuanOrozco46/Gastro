@@ -498,9 +498,9 @@ export const RestaurantAdmin: React.FC = () => {
                       <label>
                         Vincular / Nombre del Plato <em>*</em>
                       </label>
-                      <div className="pam-input-wrap">
-                        <Utensils size={16} className="pam-icon" />
-                        {tenantProducts.length > 0 ? (
+                      {tenantProducts.length > 0 && (
+                        <div className="pam-input-wrap" style={{ marginBottom: '6px' }}>
+                          <Utensils size={16} className="pam-icon" />
                           <select
                             className="pam-input"
                             value={postProductId}
@@ -511,29 +511,28 @@ export const RestaurantAdmin: React.FC = () => {
                                 setPostDishName(selected.name);
                                 setPostPrice(selected.price.toString());
                                 setPostDishEmoji(selected.emoji);
-                              } else {
-                                setPostDishName('');
                               }
                             }}
-                            required
                           >
-                            <option value="">-- Selecciona un plato del menú --</option>
+                            <option value="">✨ Escribir plato nuevo o seleccionar del menú...</option>
                             {tenantProducts.map(p => (
                               <option key={p.id} value={p.id}>
                                 {p.emoji} {p.name} - ${p.price.toLocaleString('es-CO')}
                               </option>
                             ))}
                           </select>
-                        ) : (
-                          <input
-                            type="text"
-                            className="pam-input"
-                            placeholder="Ej. Pizza Napolitana Trufada"
-                            value={postDishName}
-                            onChange={e => setPostDishName(e.target.value)}
-                            required
-                          />
-                        )}
+                        </div>
+                      )}
+                      <div className="pam-input-wrap">
+                        <Utensils size={16} className="pam-icon" />
+                        <input
+                          type="text"
+                          className="pam-input"
+                          placeholder="Nombre del plato (ej. Pizza Napolitana Trufada)"
+                          value={postDishName}
+                          onChange={e => setPostDishName(e.target.value)}
+                          required
+                        />
                       </div>
                     </div>
 
