@@ -69,7 +69,12 @@ export const resolveTenantLogoUrl = (
 
 export const getOperationalTenant = (currentUser: UserAccount | null, tenants: Tenant[]): Tenant | null => {
   if (!currentUser || !currentUser.tenantId) return null;
-  return tenants.find(t => t.id === currentUser.tenantId) || null;
+  const exactMatch = tenants.find(t => t.id === currentUser.tenantId);
+  if (exactMatch) return exactMatch;
+  if (currentUser.id?.startsWith('demo_') && tenants.length > 0) {
+    return tenants.find(t => t.status === 'active') || tenants[0];
+  }
+  return null;
 };
 
 export const getFulfillmentBadgeText = (fulfillment?: OrderFulfillment, typeStr: string = ''): string => {

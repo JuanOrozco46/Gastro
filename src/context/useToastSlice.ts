@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { subscribeToDataErrors } from '../services/dataErrors';
 
 /**
@@ -7,11 +7,26 @@ import { subscribeToDataErrors } from '../services/dataErrors';
  */
 export function useToastSlice(isRemoteMode: boolean) {
   const [toast, setToast] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((message: string) => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+    }
     setToast(message);
-    setTimeout(() => setToast(null), 3200);
-  }, [setToast]);
+    timerRef.current = setTimeout(() => {
+      setToast(null);
+      timerRef.current = null;
+    }, 3200);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   // Los servicios de datos reportan fallos de red/RLS aquí para no dejar al
   // usuario ante una app vacía sin explicación.

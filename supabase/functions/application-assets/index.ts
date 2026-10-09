@@ -18,15 +18,63 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-const ALLOWED_ORIGINS = ['http://localhost:5173', 'https://gastrosync.app']; // Añade aquí el dominio de producción
+const DEFAULT_ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://gastrosync.app',
+  'https://www.gastrosync.app',
+  'https://gastrosync.co',
+  'https://www.gastrosync.co',
+];
 
-function getCorsHeaders(req: Request) {
+function getAllowedOrigins(): string[] {
+  const envList = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+  const singleUrls = [
+    Deno.env.get('PUBLIC_APP_URL'),
+    Deno.env.get('SITE_URL'),
+  ]
+    .map((o) => (o ?? '').trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+
+  return Array.from(new Set([...DEFAULT_ALLOWED_ORIGINS, ...envList, ...singleUrls]));
+}
+
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return true; // Peticiones server-to-server sin cabecera Origin
+  const normalized = origin.trim().replace(/\/+$/, '');
+  const allowedList = getAllowedOrigins();
+  if (allowedList.includes('*') || allowedList.includes(normalized)) {
+    return true;
+  }
+  try {
+    const url = new URL(normalized);
+    if (
+      url.protocol === 'https:' &&
+      (url.hostname.endsWith('.gastrosync.app') || url.hostname.endsWith('.gastrosync.co'))
+    ) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get('Origin');
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  
+  const allowedOrigins = getAllowedOrigins();
+  const resolvedOrigin = origin && isOriginAllowed(origin)
+    ? origin.trim().replace(/\/+$/, '')
+    : (allowedOrigins.find((o) => o.startsWith('https://')) ?? allowedOrigins[0]);
+
   return {
-    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Origin': resolvedOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
   };
 }
 
@@ -76,6 +124,12 @@ function matchesMagic(ext: string, b: Uint8Array): boolean {
 }
 
 serve(async (req) => {
+  if (!isOriginAllowed(req.headers.get('Origin'))) {
+    return new Response(JSON.stringify({ error: 'Origen CORS no autorizado' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json', 'Vary': 'Origin' },
+    })
+  }
   if (req.method === 'OPTIONS') return new Response('ok', { headers: getCorsHeaders(req) })
   if (req.method !== 'POST') return json(405, { error: 'Método no permitido' }, req)
 

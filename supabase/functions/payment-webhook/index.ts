@@ -1,9 +1,24 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Helper: Constant-time string comparison to prevent timing attacks on signatures (P3 #6)
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  if (aBytes.length !== bBytes.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) {
+    diff |= aBytes[i] ^ bBytes[i];
+  }
+  return diff === 0;
+}
+
 // Helper: Calculate Wompi Event Checksum to validate webhook authenticity
 async function verifyWompiChecksum(payload: any, eventsSecret: string): Promise<boolean> {
-  if (!payload.signature || !payload.signature.properties || !payload.signature.checksum) {
+  if (!payload.signature || !payload.signature.properties || typeof payload.signature.checksum !== 'string') {
     return false;
   }
   try {
@@ -28,7 +43,10 @@ async function verifyWompiChecksum(payload: any, eventsSecret: string): Promise<
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const calculatedChecksum = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-    return calculatedChecksum.toLowerCase() === payload.signature.checksum.toLowerCase();
+    return timingSafeEqualStrings(
+      calculatedChecksum.toLowerCase(),
+      payload.signature.checksum.toLowerCase()
+    );
   } catch (err) {
     console.error('Error calculando checksum del webhook:', err);
     return false;
@@ -50,8 +68,8 @@ serve(async (req) => {
     if (payload.signature && wompiEventsSecret) {
       isValid = await verifyWompiChecksum(payload, wompiEventsSecret);
     } 
-    // B. Fallback a firma simulada para testing interno local
-    else if (sandboxSignature && webhookSecret && sandboxSignature === webhookSecret) {
+    // B. Fallback a firma simulada para testing interno local (comparación timing-safe)
+    else if (sandboxSignature && webhookSecret && timingSafeEqualStrings(sandboxSignature, webhookSecret)) {
       isValid = true;
     }
 
@@ -64,7 +82,7 @@ serve(async (req) => {
     const transaction = payload.data?.transaction || payload;
     const providerReference = transaction.reference || payload.reference;
     const incomingStatus = transaction.status || payload.status;
-    const amountInCents = transaction.amount_in_cents || payload.amount_in_cents;
+    const amountInCents = transaction.amount_in_cents ?? payload.amount_in_cents;
     const currency = transaction.currency || payload.currency || 'COP';
     const externalTransactionId = transaction.id ? String(transaction.id) : null;
     const providerPaymentMethod = transaction.payment_method_type
@@ -73,6 +91,13 @@ serve(async (req) => {
 
     if (!providerReference || !incomingStatus) {
       return new Response(JSON.stringify({ error: 'Payload malformado' }), { status: 400 });
+    }
+
+    // Exigir siempre amount_in_cents válido en el webhook (P3 #7)
+    const parsedAmountInCents = Number(amountInCents);
+    if (amountInCents === undefined || amountInCents === null || !Number.isFinite(parsedAmountInCents) || parsedAmountInCents <= 0) {
+      console.error('Webhook rechazado: amount_in_cents ausente o inválido:', amountInCents);
+      return new Response(JSON.stringify({ error: 'Monto ausente o inválido en el evento' }), { status: 400 });
     }
 
     // 2. Setup Admin Client
@@ -92,13 +117,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Referencia no encontrada' }), { status: 404 });
     }
 
-    // 4. Validar monto y moneda contra el registro seguro
-    if (amountInCents) {
-      const dbAmountInCents = Math.round(payment.amount_cop * 100);
-      if (dbAmountInCents !== Number(amountInCents) || currency !== 'COP') {
-        console.error('Monto o moneda alterados en el webhook:', { dbAmountInCents, amountInCents, currency });
-        return new Response(JSON.stringify({ error: 'Monto o moneda no coinciden' }), { status: 400 });
-      }
+    // 4. Validar monto y moneda contra el registro seguro de forma incondicional (P3 #7)
+    const dbAmountInCents = Math.round(Number(payment.amount_cop) * 100);
+    if (dbAmountInCents !== parsedAmountInCents || currency !== 'COP') {
+      console.error('Monto o moneda alterados en el webhook:', { dbAmountInCents, parsedAmountInCents, currency });
+      return new Response(JSON.stringify({ error: 'Monto o moneda no coinciden' }), { status: 400 });
     }
 
     // 5. Idempotencia: No procesar si ya estaba finalizado
@@ -129,13 +152,31 @@ serve(async (req) => {
       .eq('id', payment.id);
 
     if (updateError) {
+      // Si el índice único parcial idx_payments_one_approved_per_order rechazó un segundo cobro aprobado para el mismo pedido (P1 #1)
+      if ((updateError as { code?: string }).code === '23505') {
+        console.warn('Intento de doble aprobación detectado por índice único para order_id:', payment.order_id);
+        await supabaseAdmin
+          .from('payments')
+          .update({ status: 'voided' })
+          .eq('id', payment.id);
+        return new Response(
+          JSON.stringify({ success: true, note: 'Duplicate approved payment prevented and voided' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
       console.error('Error actualizando estado de pago:', updateError);
       return new Response(JSON.stringify({ error: 'Fallo al actualizar base de datos' }), { status: 500 });
     }
 
-    // 8. Si el pago fue aprobado, el trigger trg_payment_status_settlement_sync ya reevalúa el cupo,
-    // pero además verificamos explícitamente el restaurante para auditoría en logs del webhook
+    // 8. Si el pago fue aprobado, anular cualquier otro intento pendiente del mismo pedido y reevaluar el cupo
     if (finalStatus === 'approved' && payment.order_id) {
+      await supabaseAdmin
+        .from('payments')
+        .update({ status: 'voided' })
+        .eq('order_id', payment.order_id)
+        .eq('status', 'pending')
+        .neq('id', payment.id);
+
       const { data: orderData } = await supabaseAdmin
         .from('orders')
         .select('restaurant_id')

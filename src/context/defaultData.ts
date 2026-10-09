@@ -109,10 +109,110 @@ export const EMPTY_TENANT: Tenant = {
   deliveryModes: []
 };
 
-export const DEFAULT_TENANTS: Tenant[] = [];
-export const DEFAULT_PRODUCTS: Product[] = [];
-export const DEFAULT_POSTS: Post[] = [];
+export const DEFAULT_TENANTS: Tenant[] = [
+  {
+    id: 't1',
+    slug: 'la-trattoria-artesanal',
+    name: 'La Trattoria Artesanal',
+    category: 'Italiana & Pizzería',
+    logoEmoji: '🍕',
+    logoUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80',
+    bannerUrl: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&w=1200&q=80',
+    description: 'Pizzas napolitanas de masa madre horneadas a la leña y pastas frescas artesanales.',
+    address: 'Cra. 14 #19N-42, Zona Norte',
+    deliveryTime: '25-35 min',
+    priceRange: '$$',
+    minOrder: 22000,
+    deliveryFee: 5000,
+    specialties: ['Pizza Napolitana', 'Pasta Fresca', 'Horno de Leña'],
+    salesWeekly: 42,
+    rating: 4.9,
+    distanceKm: 1.4,
+    isNew: false,
+    commissionRate: 0.03,
+    tablesCount: 12,
+    isOpen: true,
+    acceptsCash: true,
+    cityId: '00000000-0000-0000-0000-000000000001',
+    zoneId: '00000000-0000-0000-0000-000000000012',
+    status: 'active',
+    deliveryModes: ['restaurant_delivery', 'pickup', 'table_service']
+  }
+];
+
+export const DEFAULT_PRODUCTS: Product[] = [
+  {
+    id: 'p_demo_1',
+    tenantId: 't1',
+    name: 'Pizza Margherita D.O.P.',
+    desc: 'Salsa San Marzano, mozzarella fior di latte fresca, albahaca orgánica y aceite de oliva extra virgen.',
+    price: 34000,
+    category: 'Platos Principales',
+    emoji: '🍕',
+    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&w=800&q=80',
+    preparationTimeMinutes: 18,
+    available: true
+  },
+  {
+    id: 'p_demo_2',
+    tenantId: 't1',
+    name: 'Tagliatelle al Tartufo & Funghi',
+    desc: 'Pasta fresca artesanal salteada con portobellos, crema de trufa negra y parmesano reggiano.',
+    price: 42000,
+    category: 'Platos Principales',
+    emoji: '🍝',
+    image: 'https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?auto=format&fit=crop&w=800&q=80',
+    preparationTimeMinutes: 20,
+    available: true
+  },
+  {
+    id: 'p_demo_3',
+    tenantId: 't1',
+    name: 'Tiramisú Clásico de la Nonna',
+    desc: 'Bizcochos savoiardi bañados en espresso de origen Quindío y crema de mascarpone.',
+    price: 18500,
+    category: 'Postres',
+    emoji: '🍰',
+    image: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?auto=format&fit=crop&w=800&q=80',
+    preparationTimeMinutes: 8,
+    available: true
+  }
+];
+
+export const DEFAULT_POSTS: Post[] = [
+  {
+    id: 'post_demo_1',
+    tenantId: 't1',
+    tenantName: 'La Trattoria Artesanal',
+    tenantCategory: 'Italiana & Pizzería',
+    tenantLogoEmoji: '🍕',
+    tenantAddress: 'Cra. 14 #19N-42, Zona Norte',
+    productId: 'p_demo_1',
+    dishName: 'Pizza Margherita D.O.P.',
+    dishEmoji: '🍕',
+    desc: 'Masa fermentada 48 horas e ingredientes frescos locales. Pide directo sin recargos ocultos.',
+    price: 34000,
+    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&w=900&q=80',
+    mediaType: 'photo',
+    likes: 28,
+    isLiked: false,
+    commentsCount: 0,
+    timeAgo: 'Hace 2 horas',
+    comments: [],
+    hasValidProduct: true
+  }
+];
+
 export const DEFAULT_STORIES: Story[] = [];
 export const DEFAULT_ORDERS: Order[] = [];
 export const DEFAULT_TRANSACTIONS: Transaction[] = [];
-export const DEFAULT_DRIVERS: Driver[] = [];
+export const DEFAULT_DRIVERS: Driver[] = [
+  {
+    id: 'drv_demo_1',
+    tenantId: 't1',
+    name: 'Santiago Mejía',
+    phone: '3115550199',
+    vehicle: 'Moto Yamaha FZ 150',
+    status: 'available'
+  }
+];

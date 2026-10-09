@@ -5,6 +5,7 @@ import { AlertTriangle, RefreshCcw } from 'lucide-react';
 interface Props {
   children?: ReactNode;
   fallbackMessage?: string;
+  moduleName?: string;
 }
 
 interface State {
@@ -45,7 +46,9 @@ export class ErrorBoundary extends Component<Props, State> {
         }}>
           <AlertTriangle size={48} />
           <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '8px' }}>Ha ocurrido un error al cargar este módulo</h3>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '8px' }}>
+              Ha ocurrido un error al cargar {this.props.moduleName ? `«${this.props.moduleName}»` : 'este módulo'}
+            </h3>
             <p style={{ color: '#E2E8F0', fontSize: '0.9rem', maxWidth: '400px' }}>
               {this.props.fallbackMessage || 'Hubo un problema técnico al renderizar esta vista. Nuestro equipo técnico ha sido notificado.'}
             </p>

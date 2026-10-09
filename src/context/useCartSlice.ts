@@ -31,7 +31,11 @@ export function useCartSlice(
   const [cartConflict, setCartConflict] = useState<CartConflict | null>(null);
 
   useEffect(() => {
-    localStorage.setItem('gs_cart_v5', JSON.stringify(cart));
+    try {
+      localStorage.setItem('gs_cart_v5', JSON.stringify(cart));
+    } catch {
+      // Ignorar QuotaExceededError o restricciones de almacenamiento privado
+    }
   }, [cart]);
 
   const addToCart = (product: Product): AddToCartResult => {

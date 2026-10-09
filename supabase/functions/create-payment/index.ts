@@ -77,7 +77,7 @@ serve(async (req) => {
     // Retrieve order and validate ownership & status
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
-      .select('id, customer_id, total_cop, status, delivery_fee_cop, subtotal_cop')
+      .select('id, restaurant_id, customer_id, total_cop, status, delivery_fee_cop, subtotal_cop')
       .eq('id', orderId)
       .single();
 
@@ -115,6 +115,35 @@ serve(async (req) => {
       );
     }
 
+    // Void any previous pending payment intents for this order to prevent double-charge (P1 #1)
+    if (existingPayments && existingPayments.some(p => p.status === 'pending')) {
+      const { error: voidError } = await supabaseAdmin
+        .from('payments')
+        .update({ status: 'voided' })
+        .eq('order_id', orderId)
+        .eq('status', 'pending');
+
+      if (voidError) {
+        console.error('Error anulando intentos de pago previos:', voidError);
+        return new Response(
+          JSON.stringify({ error: 'No se pudo anular el intento de pago pendiente anterior.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        );
+      }
+    }
+
+    // Require Wompi credentials from environment — never fall back to hardcoded keys (P2 #3)
+    const publicKey = Deno.env.get('WOMPI_PUBLIC_KEY')?.trim();
+    const integritySecret = Deno.env.get('WOMPI_INTEGRITY_SECRET')?.trim();
+
+    if (!publicKey || !integritySecret) {
+      console.error('Faltan variables de entorno WOMPI_PUBLIC_KEY o WOMPI_INTEGRITY_SECRET');
+      return new Response(
+        JSON.stringify({ error: 'Pasarela de pagos no configurada en el servidor (faltan credenciales de Wompi).' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+
     // Canonical calculations from PostgreSQL order data
     const canonicalTotal = Number(order.total_cop);
     const amountInCents = Math.round(canonicalTotal * 100);
@@ -124,10 +153,6 @@ serve(async (req) => {
     const cleanOrderId = orderId.replace(/-/g, '').slice(0, 8);
     const providerReference = `GS_PAY_${cleanOrderId}_${Date.now()}`;
 
-    // Wompi keys & integrity secret
-    const publicKey = Deno.env.get('WOMPI_PUBLIC_KEY') || 'pub_test_Q5y1F3WwWLu1G2A1z0y3Z5';
-    const integritySecret = Deno.env.get('WOMPI_INTEGRITY_SECRET') || 'test_integrity_secret_placeholder';
-
     // Compute Wompi Integrity Signature on server
     const signature = await calculateWompiIntegrity(
       providerReference,
@@ -136,8 +161,16 @@ serve(async (req) => {
       integritySecret
     );
 
-    // 1. Comisión libre para GastroSync (3% exacto)
-    const platformFee = Math.round(canonicalTotal * 0.03);
+    const { data: restaurantRow } = await supabaseAdmin
+      .from('restaurants')
+      .select('commission_rate')
+      .eq('id', order.restaurant_id)
+      .single();
+
+    const commissionRate = restaurantRow?.commission_rate ? Number(restaurantRow.commission_rate) : 0.03;
+
+    // 1. Comisión libre para GastroSync (3% exacto por defecto)
+    const platformFee = Math.round(canonicalTotal * commissionRate);
     // 2. Costo de pasarela Wompi (2.65% + $700 COP + 19% IVA sobre la comisión de Wompi)
     const isCashProvider = String(provider).toLowerCase().trim() === 'cash';
     const rawWompiBase = isCashProvider ? 0 : canonicalTotal * 0.0265 + 700;
@@ -171,6 +204,8 @@ serve(async (req) => {
       );
     }
 
+    const allowSandboxSimulation = Deno.env.get('ALLOW_SANDBOX_SIMULATION') === 'true';
+
     // Return ONLY public parameters to frontend
     return new Response(
       JSON.stringify({ 
@@ -182,7 +217,7 @@ serve(async (req) => {
         currency: currency,
         publicKey: publicKey,
         signature: signature,
-        sandboxUrl: `/sandbox-payment?ref=${providerReference}` 
+        ...(allowSandboxSimulation ? { sandboxUrl: `#sandbox-simulate:${providerReference}` } : {})
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );

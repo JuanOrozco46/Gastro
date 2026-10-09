@@ -96,16 +96,15 @@ export const PaymentStatus: React.FC<PaymentStatusProps> = ({
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
               El restaurante ha recibido tu pedido. Estamos a la espera de la confirmación de la pasarela de pagos.
             </p>
-            {sandboxUrl && (
-              <a 
-                href={sandboxUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
+            {import.meta.env.DEV && sandboxUrl && (
+              <button
+                type="button"
+                onClick={() => setStatus('approved')}
                 className="btn btn-outline"
                 style={{ width: '100%', marginBottom: '1rem', borderColor: '#F59E0B', color: '#F59E0B' }}
               >
-                Simular Pago Sandbox <ExternalLink size={16} />
-              </a>
+                Simular Aprobación Local (Dev) <ExternalLink size={16} />
+              </button>
             )}
           </>
         );

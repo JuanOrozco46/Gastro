@@ -210,13 +210,20 @@ export async function updateLiveOrderStatus(
   }
 }
 
+export interface RealtimeOrderChangePayload {
+  eventType?: string;
+  orderId?: string;
+  newStatus?: string;
+  oldStatus?: string;
+}
+
 /**
  * Abre un canal WebSockets (Supabase Realtime) para escuchar comandas entrantes
  * y cambios de estado en el tablero KDS del restaurante.
  */
 export function subscribeToRestaurantOrders(
   tenantId: string,
-  onOrderChange: () => void
+  onOrderChange: (payload?: RealtimeOrderChangePayload) => void
 ) {
   if (!isSupabaseConfigured || !supabase || !tenantId) return () => {};
 
@@ -231,8 +238,13 @@ export function subscribeToRestaurantOrders(
         table: 'orders',
         filter: `restaurant_id=eq.${tenantId}`
       },
-      () => {
-        onOrderChange();
+      (payload: { eventType?: string; new?: { id?: string; status?: string }; old?: { id?: string; status?: string } }) => {
+        onOrderChange({
+          eventType: payload?.eventType,
+          orderId: payload?.new?.id || payload?.old?.id,
+          newStatus: payload?.new?.status,
+          oldStatus: payload?.old?.status
+        });
       }
     )
     .subscribe();

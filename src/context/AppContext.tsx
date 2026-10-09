@@ -50,13 +50,18 @@ const location = useLocationSlice();
   const [remoteTenants, setRemoteTenants] = useState<Tenant[]>([]);
   const remoteTenantsRef = React.useRef<Tenant[]>([]);
   const likingPostsRef = React.useRef<Set<string>>(new Set());
+  const recentLocalOrderUpdatesRef = React.useRef<Map<string, number>>(new Map());
   const [remoteProducts, setRemoteProducts] = useState<Product[]>([]);
   const [remotePosts, setRemotePosts] = useState<Post[]>([]);
 
   const [tenants, setTenants] = useState<Tenant[]>(() => {
     try {
       const saved = localStorage.getItem('gs_tenants_v5');
-      return saved ? JSON.parse(saved) : DEFAULT_TENANTS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return DEFAULT_TENANTS;
     } catch {
       return DEFAULT_TENANTS;
     }
@@ -79,15 +84,17 @@ const location = useLocationSlice();
       const found = tenants.find(t => t.id === initialSession.tenantId);
       if (found) return found;
     }
-    return tenants[0] || EMPTY_TENANT;
+    return tenants[0] || DEFAULT_TENANTS[0] || EMPTY_TENANT;
   });
-
-
 
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('gs_products_v5');
-      return saved ? JSON.parse(saved) : DEFAULT_PRODUCTS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return DEFAULT_PRODUCTS;
     } catch {
       return DEFAULT_PRODUCTS;
     }
@@ -96,7 +103,11 @@ const location = useLocationSlice();
   const [posts, setPosts] = useState<Post[]>(() => {
     try {
       const saved = localStorage.getItem('gs_posts_v5');
-      return saved ? JSON.parse(saved) : DEFAULT_POSTS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return DEFAULT_POSTS;
     } catch {
       return DEFAULT_POSTS;
     }
@@ -117,30 +128,35 @@ const location = useLocationSlice();
     validateAndGetProvisionedAccounts()
   );
 
-  // Sync state to localStorage
+  // Sync state to localStorage only in demo mode with safe quota caps (P3 #9)
   useEffect(() => {
-    try { localStorage.setItem('gs_tenants_v5', JSON.stringify(tenants)); } catch {}
-  }, [tenants]);
+    if (authMode !== 'demo') return;
+    try { localStorage.setItem('gs_tenants_v5', JSON.stringify(tenants.slice(0, 50))); } catch {}
+  }, [tenants, authMode]);
 
   useEffect(() => {
-    try { localStorage.setItem('gs_products_v5', JSON.stringify(products)); } catch {}
-  }, [products]);
+    if (authMode !== 'demo') return;
+    try { localStorage.setItem('gs_products_v5', JSON.stringify(products.slice(0, 150))); } catch {}
+  }, [products, authMode]);
 
   useEffect(() => {
-    try { localStorage.setItem('gs_posts_v5', JSON.stringify(posts)); } catch {}
-  }, [posts]);
+    if (authMode !== 'demo') return;
+    try { localStorage.setItem('gs_posts_v5', JSON.stringify(posts.slice(0, 100))); } catch {}
+  }, [posts, authMode]);
 
   useEffect(() => {
+    if (authMode !== 'demo') return;
     try {
-      localStorage.setItem('gs_restaurant_applications_v1', JSON.stringify(restaurantApplications));
+      localStorage.setItem('gs_restaurant_applications_v1', JSON.stringify(restaurantApplications.slice(0, 50)));
     } catch {}
-  }, [restaurantApplications]);
+  }, [restaurantApplications, authMode]);
 
   useEffect(() => {
+    if (authMode !== 'demo') return;
     try {
-      localStorage.setItem('gs_provisioned_owner_accounts_v1', JSON.stringify(provisionedOwnerAccounts));
+      localStorage.setItem('gs_provisioned_owner_accounts_v1', JSON.stringify(provisionedOwnerAccounts.slice(0, 50)));
     } catch {}
-  }, [provisionedOwnerAccounts]);
+  }, [provisionedOwnerAccounts, authMode]);
 
   const [orders, setOrders] = useState<Order[]>(() => {
     if (isSupabaseConfigured) {
@@ -439,12 +455,23 @@ const location = useLocationSlice();
           if (!cancelled) {
             setOrders(liveOrders.filter(o => o.tenantId === tenantId));
           }
-          activeUnsub = subscribeToRestaurantOrders(tenantId, async () => {
+          activeUnsub = subscribeToRestaurantOrders(tenantId, async (payload) => {
             const updated = await fetchLiveOrdersForRestaurant(tenantId);
             if (!cancelled) {
               setOrders(updated.filter(o => o.tenantId === tenantId));
-              playChime();
-              showToast('🔔 ¡Nueva comanda o actualización recibida en tiempo real!');
+              const changedOrderId = payload?.orderId;
+              const localTimestamp = changedOrderId ? recentLocalOrderUpdatesRef.current.get(changedOrderId) : undefined;
+              const isSelfUpdate = Boolean(localTimestamp && Date.now() - localTimestamp < 8000);
+              if (changedOrderId && isSelfUpdate) {
+                recentLocalOrderUpdatesRef.current.delete(changedOrderId);
+                return;
+              }
+              if (payload?.eventType === 'INSERT') {
+                playChime();
+                showToast('🔔 ¡Nueva comanda recibida en tiempo real!');
+              } else {
+                showToast('🔄 Pedido actualizado en tiempo real.');
+              }
             }
           });
         } else if (currentUser.id) {
@@ -484,6 +511,7 @@ const location = useLocationSlice();
       const account = DEMO_ACCOUNTS.find(a => a.email === email.trim().toLowerCase() && a.demoPassword === pass);
       if (account) {
         const userAccount: UserAccount = {
+          id: account.id,
           email: account.email,
           name: account.name,
           role: account.userRole,
@@ -493,7 +521,16 @@ const location = useLocationSlice();
         setCurrentUser(userAccount);
         setUserRole(userAccount.role);
         if (userAccount.tenantId) {
-          const tenantMatch = tenants.find(t => t.id === userAccount.tenantId);
+          let tenantMatch = tenants.find(t => t.id === userAccount.tenantId);
+          if (!tenantMatch) {
+            const fallbackTenant = DEFAULT_TENANTS.find(t => t.id === userAccount.tenantId);
+            if (fallbackTenant) {
+              tenantMatch = fallbackTenant;
+              setTenants(prev => prev.some(t => t.id === fallbackTenant.id) ? prev : [fallbackTenant, ...prev]);
+              setProducts(prev => prev.length > 0 ? prev : DEFAULT_PRODUCTS);
+              setPosts(prev => prev.length > 0 ? prev : DEFAULT_POSTS);
+            }
+          }
           if (tenantMatch) setCurrentTenant(tenantMatch);
         }
         try { localStorage.setItem('gs_demo_session_v1', JSON.stringify(userAccount)); } catch {}
@@ -825,6 +862,33 @@ const location = useLocationSlice();
     return await inviteRemoteStaff(restaurantId, email);
   };
 
+  const updateDemoMemberStatus = (memberId: string, nextStatus: 'active' | 'suspended' | 'revoked'): { success: boolean; error?: string } => {
+    try {
+      const targetTenantIds = Array.from(new Set([
+        currentUser?.tenantId,
+        currentTenant?.id,
+        ...tenants.map(t => t.id)
+      ].filter(Boolean) as string[]));
+
+      for (const restId of targetTenantIds) {
+        const key = `gs_demo_members_${restId}`;
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) continue;
+        const idx = parsed.findIndex((m: { id?: string }) => m.id === memberId);
+        if (idx !== -1) {
+          parsed[idx] = { ...parsed[idx], status: nextStatus, updatedAt: new Date().toISOString() };
+          localStorage.setItem(key, JSON.stringify(parsed));
+          return { success: true };
+        }
+      }
+      return { success: false, error: 'Miembro no encontrado en modo Demo.' };
+    } catch {
+      return { success: false, error: 'No se pudo actualizar el estado del miembro en modo Demo.' };
+    }
+  };
+
   const resendStaffInvitation = async (memberId: string) => {
     if (authMode === 'demo') return { success: true };
     return await resendRemoteInvitation(memberId);
@@ -832,24 +896,29 @@ const location = useLocationSlice();
 
   const suspendRestaurantMember = async (memberId: string) => {
     if (authMode === 'demo') {
-      // Find in localStorage and update (simplified for demo)
-      return { success: true };
+      return updateDemoMemberStatus(memberId, 'suspended');
     }
     return await suspendRemoteMember(memberId);
   };
 
   const reactivateRestaurantMember = async (memberId: string) => {
-    if (authMode === 'demo') return { success: true };
+    if (authMode === 'demo') {
+      return updateDemoMemberStatus(memberId, 'active');
+    }
     return await reactivateRemoteMember(memberId);
   };
 
   const revokeRestaurantMember = async (memberId: string) => {
-    if (authMode === 'demo') return { success: true };
+    if (authMode === 'demo') {
+      return updateDemoMemberStatus(memberId, 'revoked');
+    }
     return await revokeRemoteMember(memberId);
   };
 
   const acceptRestaurantInvitation = async (memberId: string) => {
-    if (authMode === 'demo') return { success: true };
+    if (authMode === 'demo') {
+      return updateDemoMemberStatus(memberId, 'active');
+    }
     return await acceptRemoteInvitation(memberId);
   };
 
@@ -1020,6 +1089,7 @@ const location = useLocationSlice();
   };
 
   const submitOrderWithPayment = async (typeOrDetails: string | CheckoutDetails, method: PaymentMethod, transaction?: Transaction): Promise<{ success: boolean; isRemote?: boolean; orderId?: string; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }> => {
+    if (isSubmittingOrder) return { success: false };
     if (cart.length === 0) return { success: false };
 
     if (authMode === 'remote' && !currentUser?.email) {
@@ -1230,9 +1300,12 @@ const location = useLocationSlice();
       }
     }
 
+    recentLocalOrderUpdatesRef.current.set(orderId, Date.now());
+
     if (authMode === 'remote') {
       const res = await updateLiveOrderStatus(orderId, status, targetOrder.tableId);
       if (!res.success) {
+        recentLocalOrderUpdatesRef.current.delete(orderId);
         showToast(res.error || 'No fue posible actualizar el pedido.');
         return false;
       }
@@ -1244,7 +1317,12 @@ const location = useLocationSlice();
           ? {
               ...o,
               status,
-              paymentStatus: status === 'delivered' ? 'approved' : o.paymentStatus
+              paymentStatus:
+                status === 'delivered' && (o.paymentMethod || 'cash') === 'cash'
+                  ? 'approved'
+                  : status === 'cancelled'
+                    ? (o.paymentStatus === 'approved' ? 'refunded' : o.paymentStatus === 'pending' ? 'voided' : o.paymentStatus)
+                    : o.paymentStatus
             }
           : o
       )
@@ -1254,6 +1332,7 @@ const location = useLocationSlice();
   };
 
   const confirmCashPayment = async (paymentId: string, orderId: string): Promise<{ success: boolean; error?: string }> => {
+    recentLocalOrderUpdatesRef.current.set(orderId, Date.now());
     if (authMode === 'remote') {
       const res = await confirmCashPaymentRemote(paymentId, orderId);
       if (res.success) {
@@ -1269,12 +1348,20 @@ const location = useLocationSlice();
         }));
         showToast('Pago en efectivo confirmado.');
       } else {
+        recentLocalOrderUpdatesRef.current.delete(orderId);
         showToast(res.error || 'Error al confirmar pago.');
       }
       return res;
     }
-    showToast('El modo local no soporta esta acción.');
-    return { success: false, error: 'Local mode not supported' };
+    setOrders(prev =>
+      prev.map(o =>
+        o.id === orderId
+          ? { ...o, paymentStatus: 'approved' }
+          : o
+      )
+    );
+    showToast('Pago en efectivo confirmado en modo Demo.');
+    return { success: true };
   };
 
   const toggleProductAvailability = async (productId: string) => {
@@ -2019,63 +2106,77 @@ const location = useLocationSlice();
   const activeTenants = authMode === 'remote' ? remoteTenants : tenants;
   const activeProducts = authMode === 'remote' ? remoteProducts : products;
   const activePosts = authMode === 'remote' ? remotePosts : posts;
-  const scopedOrders = !currentUser
-    ? []
-    : (currentUser.tenantId &&
-        (currentUser.businessRole === 'restaurant_owner' ||
-          currentUser.businessRole === 'restaurant_staff' ||
-          currentUser.role === 'admin' ||
-          currentUser.role === 'kitchen'))
-      ? orders.filter(o => o.tenantId === currentUser.tenantId)
-      : currentUser.businessRole === 'platform_admin'
-        ? orders
-        : orders.filter(
-            o =>
-              (Boolean(currentUser.id) && o.customerId === currentUser.id) ||
-              (Boolean(currentUser.email) && o.customerId === currentUser.email)
-          );
+  const scopedOrders = React.useMemo(() => {
+    if (!currentUser) return [];
+    if (
+      currentUser.tenantId &&
+      (currentUser.businessRole === 'restaurant_owner' ||
+        currentUser.businessRole === 'restaurant_staff' ||
+        currentUser.role === 'admin' ||
+        currentUser.role === 'kitchen')
+    ) {
+      return orders.filter(o => o.tenantId === currentUser.tenantId);
+    }
+    if (currentUser.businessRole === 'platform_admin') {
+      return orders;
+    }
+    return orders.filter(
+      o =>
+        (Boolean(currentUser.id) && o.customerId === currentUser.id) ||
+        (Boolean(currentUser.email) && o.customerId === currentUser.email)
+    );
+  }, [currentUser, orders]);
 
-  return (
-    <AppContext.Provider value={{
-      cities,
-      zones,
-      selectedCityId,
-      selectedZoneId,
-      userLocationState,
-      locationPreference,
-      setSelectedCity,
-      setSelectedZone,
-      refreshCities,
-      refreshZones,
-      requestUserLocation,
-      clearUserLocation,
-      resolveCityFromCoordinates,
-      switchToManualLocation,
-      tenants: activeTenants,
-      currentTenant,
-      products: activeProducts,
-      orders: scopedOrders,
-      transactions,
-      posts: activePosts,
-      stories,
-      cart,
-      drivers,
-      equityWeight,
-      authMode,
-      emailVerificationState,
-      pendingVerificationEmail,
-      isAuthLoading,
-      isCatalogLoading,
-      catalogError,
-      isSubmittingOrder,
-      orderError,
-      remoteTenants,
-      remoteProducts,
-      remotePosts,
-      userRole,
-      currentUser,
-      toast,
-      restaurantApplications,
+  const handlersRef = React.useRef({
+    loginWithCredentials,
+    loginWithGoogle,
+    registerAccount,
+    updateUserProfile,
+    resendVerificationEmail,
+    refreshEmailVerification,
+    signOutUnverifiedUser,
+    sendPasswordReset,
+    setCurrentTenantBySlug,
+    toggleTenantOpenStatus,
+    addTenant,
+    updateTenant,
+    syncTenantRating,
+    toggleLikePost,
+    addComment,
+    createPost,
+    deletePost,
+    addDriver,
+    deleteProduct,
+    updateEquityWeight,
+    addToCart,
+    clearCartAndAdd,
+    removeFromCart,
+    clearCart,
+    submitOrderWithPayment,
+    retryRemotePayment,
+    updateOrderStatus,
+    confirmCashPayment,
+    toggleProductAvailability,
+    addProduct,
+    updateProduct,
+    assignDriverToOrder,
+    submitRestaurantApplication,
+    reviewRestaurantApplication,
+    activateApprovedRestaurant,
+    deleteComment,
+    triggerTestOrder,
+    fetchRestaurantMembers,
+    inviteRestaurantStaff,
+    resendStaffInvitation,
+    suspendRestaurantMember,
+    reactivateRestaurantMember,
+    revokeRestaurantMember,
+    acceptRestaurantInvitation,
+    logout
+  });
+
+  useEffect(() => {
+    handlersRef.current = {
       loginWithCredentials,
       loginWithGoogle,
       registerAccount,
@@ -2095,7 +2196,7 @@ const location = useLocationSlice();
       deletePost,
       addDriver,
       deleteProduct,
-      setEquityWeight: updateEquityWeight,
+      updateEquityWeight,
       addToCart,
       clearCartAndAdd,
       removeFromCart,
@@ -2112,7 +2213,6 @@ const location = useLocationSlice();
       reviewRestaurantApplication,
       activateApprovedRestaurant,
       deleteComment,
-      showToast,
       triggerTestOrder,
       fetchRestaurantMembers,
       inviteRestaurantStaff,
@@ -2122,7 +2222,145 @@ const location = useLocationSlice();
       revokeRestaurantMember,
       acceptRestaurantInvitation,
       logout
-    }}>
+    };
+  });
+
+  const stableHandlers = React.useMemo(() => ({
+    loginWithCredentials: ((...args) => handlersRef.current.loginWithCredentials(...args)) as typeof loginWithCredentials,
+    loginWithGoogle: ((...args) => handlersRef.current.loginWithGoogle(...args)) as typeof loginWithGoogle,
+    registerAccount: ((...args) => handlersRef.current.registerAccount(...args)) as typeof registerAccount,
+    updateUserProfile: ((...args) => handlersRef.current.updateUserProfile(...args)) as typeof updateUserProfile,
+    resendVerificationEmail: ((...args) => handlersRef.current.resendVerificationEmail(...args)) as typeof resendVerificationEmail,
+    refreshEmailVerification: ((...args) => handlersRef.current.refreshEmailVerification(...args)) as typeof refreshEmailVerification,
+    signOutUnverifiedUser: ((...args) => handlersRef.current.signOutUnverifiedUser(...args)) as typeof signOutUnverifiedUser,
+    sendPasswordReset: ((...args) => handlersRef.current.sendPasswordReset(...args)) as typeof sendPasswordReset,
+    setCurrentTenantBySlug: ((...args) => handlersRef.current.setCurrentTenantBySlug(...args)) as typeof setCurrentTenantBySlug,
+    toggleTenantOpenStatus: ((...args) => handlersRef.current.toggleTenantOpenStatus(...args)) as typeof toggleTenantOpenStatus,
+    addTenant: ((...args) => handlersRef.current.addTenant(...args)) as typeof addTenant,
+    updateTenant: ((...args) => handlersRef.current.updateTenant(...args)) as typeof updateTenant,
+    syncTenantRating: ((...args) => handlersRef.current.syncTenantRating(...args)) as typeof syncTenantRating,
+    toggleLikePost: ((...args) => handlersRef.current.toggleLikePost(...args)) as typeof toggleLikePost,
+    addComment: ((...args) => handlersRef.current.addComment(...args)) as typeof addComment,
+    createPost: ((...args) => handlersRef.current.createPost(...args)) as typeof createPost,
+    deletePost: ((...args) => handlersRef.current.deletePost(...args)) as typeof deletePost,
+    addDriver: ((...args) => handlersRef.current.addDriver(...args)) as typeof addDriver,
+    deleteProduct: ((...args) => handlersRef.current.deleteProduct(...args)) as typeof deleteProduct,
+    setEquityWeight: ((...args) => handlersRef.current.updateEquityWeight(...args)) as typeof updateEquityWeight,
+    addToCart: ((...args) => handlersRef.current.addToCart(...args)) as typeof addToCart,
+    clearCartAndAdd: ((...args) => handlersRef.current.clearCartAndAdd(...args)) as typeof clearCartAndAdd,
+    removeFromCart: ((...args) => handlersRef.current.removeFromCart(...args)) as typeof removeFromCart,
+    clearCart: ((...args) => handlersRef.current.clearCart(...args)) as typeof clearCart,
+    submitOrderWithPayment: ((...args) => handlersRef.current.submitOrderWithPayment(...args)) as typeof submitOrderWithPayment,
+    retryRemotePayment: ((...args) => handlersRef.current.retryRemotePayment(...args)) as typeof retryRemotePayment,
+    updateOrderStatus: ((...args) => handlersRef.current.updateOrderStatus(...args)) as typeof updateOrderStatus,
+    confirmCashPayment: ((...args) => handlersRef.current.confirmCashPayment(...args)) as typeof confirmCashPayment,
+    toggleProductAvailability: ((...args) => handlersRef.current.toggleProductAvailability(...args)) as typeof toggleProductAvailability,
+    addProduct: ((...args) => handlersRef.current.addProduct(...args)) as typeof addProduct,
+    updateProduct: ((...args) => handlersRef.current.updateProduct(...args)) as typeof updateProduct,
+    assignDriverToOrder: ((...args) => handlersRef.current.assignDriverToOrder(...args)) as typeof assignDriverToOrder,
+    submitRestaurantApplication: ((...args) => handlersRef.current.submitRestaurantApplication(...args)) as typeof submitRestaurantApplication,
+    reviewRestaurantApplication: ((...args) => handlersRef.current.reviewRestaurantApplication(...args)) as typeof reviewRestaurantApplication,
+    activateApprovedRestaurant: ((...args) => handlersRef.current.activateApprovedRestaurant(...args)) as typeof activateApprovedRestaurant,
+    deleteComment: ((...args) => handlersRef.current.deleteComment(...args)) as typeof deleteComment,
+    triggerTestOrder: ((...args) => handlersRef.current.triggerTestOrder(...args)) as typeof triggerTestOrder,
+    fetchRestaurantMembers: ((...args) => handlersRef.current.fetchRestaurantMembers(...args)) as typeof fetchRestaurantMembers,
+    inviteRestaurantStaff: ((...args) => handlersRef.current.inviteRestaurantStaff(...args)) as typeof inviteRestaurantStaff,
+    resendStaffInvitation: ((...args) => handlersRef.current.resendStaffInvitation(...args)) as typeof resendStaffInvitation,
+    suspendRestaurantMember: ((...args) => handlersRef.current.suspendRestaurantMember(...args)) as typeof suspendRestaurantMember,
+    reactivateRestaurantMember: ((...args) => handlersRef.current.reactivateRestaurantMember(...args)) as typeof reactivateRestaurantMember,
+    revokeRestaurantMember: ((...args) => handlersRef.current.revokeRestaurantMember(...args)) as typeof revokeRestaurantMember,
+    acceptRestaurantInvitation: ((...args) => handlersRef.current.acceptRestaurantInvitation(...args)) as typeof acceptRestaurantInvitation,
+    logout: ((...args) => handlersRef.current.logout(...args)) as typeof logout
+  }), []);
+
+  const contextValue = React.useMemo(() => ({
+    cities,
+    zones,
+    selectedCityId,
+    selectedZoneId,
+    userLocationState,
+    locationPreference,
+    setSelectedCity,
+    setSelectedZone,
+    refreshCities,
+    refreshZones,
+    requestUserLocation,
+    clearUserLocation,
+    resolveCityFromCoordinates,
+    switchToManualLocation,
+    tenants: activeTenants,
+    currentTenant,
+    products: activeProducts,
+    orders: scopedOrders,
+    transactions,
+    posts: activePosts,
+    stories,
+    cart,
+    drivers,
+    equityWeight,
+    authMode,
+    emailVerificationState,
+    pendingVerificationEmail,
+    isAuthLoading,
+    isCatalogLoading,
+    catalogError,
+    isSubmittingOrder,
+    orderError,
+    remoteTenants,
+    remoteProducts,
+    remotePosts,
+    userRole,
+    currentUser,
+    toast,
+    restaurantApplications,
+    showToast,
+    ...stableHandlers
+  }), [
+    cities,
+    zones,
+    selectedCityId,
+    selectedZoneId,
+    userLocationState,
+    locationPreference,
+    setSelectedCity,
+    setSelectedZone,
+    refreshCities,
+    refreshZones,
+    requestUserLocation,
+    clearUserLocation,
+    resolveCityFromCoordinates,
+    switchToManualLocation,
+    activeTenants,
+    currentTenant,
+    activeProducts,
+    scopedOrders,
+    transactions,
+    activePosts,
+    stories,
+    cart,
+    drivers,
+    equityWeight,
+    authMode,
+    emailVerificationState,
+    pendingVerificationEmail,
+    isAuthLoading,
+    isCatalogLoading,
+    catalogError,
+    isSubmittingOrder,
+    orderError,
+    remoteTenants,
+    remoteProducts,
+    remotePosts,
+    userRole,
+    currentUser,
+    toast,
+    restaurantApplications,
+    showToast,
+    stableHandlers
+  ]);
+
+  return (
+    <AppContext.Provider value={contextValue}>
       {children}
 
       {cartConflict && (

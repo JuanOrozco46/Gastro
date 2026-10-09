@@ -4,6 +4,7 @@ import { useApp } from './context/useApp';
 import { Header } from './components/Header';
 import { Toast } from './components/Toast';
 import { ForcePasswordModal } from './components/ForcePasswordModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Módulos importados dinámicamente para Code-Splitting óptimo
 const LoginScreen = lazy(() => import('./components/LoginScreen').then(m => ({ default: m.LoginScreen })));
@@ -59,39 +60,47 @@ const MainContent: React.FC = () => {
   if (path.startsWith('/mesa/')) {
     return (
       <main>
-        <Suspense fallback={<ViewLoader />}>
-          <TablePublicView />
-        </Suspense>
+        <ErrorBoundary moduleName="Servicio en Mesa QR">
+          <Suspense fallback={<ViewLoader />}>
+            <TablePublicView />
+          </Suspense>
+        </ErrorBoundary>
       </main>
     );
   }
 
   if (userRole === 'login') {
     return (
-      <Suspense fallback={<ViewLoader />}>
-        <LoginScreen />
-      </Suspense>
+      <ErrorBoundary moduleName="Inicio de Sesión">
+        <Suspense fallback={<ViewLoader />}>
+          <LoginScreen />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
   if (emailVerificationState === 'pending' || emailVerificationState === 'error') {
     return (
-      <Suspense fallback={<ViewLoader />}>
-        <EmailVerificationScreen />
-      </Suspense>
+      <ErrorBoundary moduleName="Verificación de Correo">
+        <Suspense fallback={<ViewLoader />}>
+          <EmailVerificationScreen />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
   return (
     <main>
       <ForcePasswordModal />
-      <Suspense fallback={<ViewLoader />}>
-        {userRole === 'client_delivery' && <CustomerDeliveryApp />}
-        {userRole === 'kitchen' && <KitchenPanel />}
-        {userRole === 'admin' && <RestaurantAdmin />}
-        {userRole === 'table_qr' && <TablePublicView />}
-        {userRole === 'platform_admin' && <SuperAdminView />}
-      </Suspense>
+      <ErrorBoundary moduleName="Aplicación Principal">
+        <Suspense fallback={<ViewLoader />}>
+          {userRole === 'client_delivery' && <CustomerDeliveryApp />}
+          {userRole === 'kitchen' && <KitchenPanel />}
+          {userRole === 'admin' && <RestaurantAdmin />}
+          {userRole === 'table_qr' && <TablePublicView />}
+          {userRole === 'platform_admin' && <SuperAdminView />}
+        </Suspense>
+      </ErrorBoundary>
     </main>
   );
 };

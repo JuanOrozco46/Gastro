@@ -392,12 +392,14 @@ export async function toggleRemoteSave(postId: string, userId: string): Promise<
   }
 }
 
-export async function fetchLivePosts(): Promise<Post[]> {
+export async function fetchLivePosts(limit: number = 40, offset: number = 0): Promise<Post[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+    const safeOffset = Math.max(0, offset);
     const currentUserId = (await supabase.auth.getUser()).data.user?.id;
 
-    // Fetch posts with aggregated counts and user's like status
+    // Fetch paginated posts with aggregated counts and user's like status (P2 #2)
     const { data, error } = await supabase
       .from('posts')
       .select(`
@@ -417,7 +419,8 @@ export async function fetchLivePosts(): Promise<Post[]> {
       `)
       .eq('is_archived', false)
       .eq('restaurants.status', 'active')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(safeOffset, safeOffset + safeLimit - 1);
 
     if (error) {
       reportDataError('publicaciones', 'No se pudieron cargar las publicaciones.');
@@ -426,24 +429,23 @@ export async function fetchLivePosts(): Promise<Post[]> {
     }
     if (!data || data.length === 0) return [];
 
-    // Fetch all likes count and user's likes in parallel
+    // Fetch likes and bounded comment previews for the current page of posts in parallel
     const postIds = data.map((p: { id: string }) => p.id);
     
     const [likesData, commentsData, userLikesData] = await Promise.all([
-      // Get likes count per post
       supabase
         .from('post_likes')
-        .select('post_id', { count: 'exact', head: false })
-        .in('post_id', postIds),
+        .select('post_id')
+        .in('post_id', postIds)
+        .limit(2000),
       
-      // Get full comments per post
       supabase
         .from('post_comments')
         .select('id, post_id, user_id, content, created_at')
         .in('post_id', postIds)
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(250),
       
-      // Get current user's likes (if authenticated)
       currentUserId
         ? supabase
             .from('post_likes')
@@ -967,13 +969,32 @@ export async function uploadMediaFile(
 ): Promise<string | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
-    const ext = file.name.split('.').pop() || '';
+    const safeMimeToExt: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'video/mp4': 'mp4',
+      'video/webm': 'webm'
+    };
+    const safeExt = safeMimeToExt[file.type];
+    if (!safeExt) {
+      throw new Error('Formato de archivo no permitido (solo JPG, PNG, WebP, MP4 o WebM).');
+    }
+    const maxBytes = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size <= 0 || file.size > maxBytes) {
+      throw new Error('El tamaño del archivo supera el límite permitido.');
+    }
+
     const uuid = crypto.randomUUID();
-    const filePath = `${tenantId}/${folder}/${uuid}.${ext}`;
+    const filePath = `restaurants/${tenantId}/${folder}/${uuid}.${safeExt}`;
 
     const { error } = await supabase.storage
       .from('gastro-media')
-      .upload(filePath, file, { upsert: false });
+      .upload(filePath, file, {
+        upsert: false,
+        contentType: file.type === 'image/jpg' ? 'image/jpeg' : file.type
+      });
 
     if (error) throw error;
 

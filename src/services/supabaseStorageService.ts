@@ -31,29 +31,57 @@ export async function uploadMediaFile(
     });
   }
 
-  // 2. Validación de archivo (Tamaño máximo 50MB y tipo MIME permitido)
-  const MAX_SIZE_BYTES = 50 * 1024 * 1024;
-  if (file.size > MAX_SIZE_BYTES) {
-    return { success: false, error: 'El archivo excede el tamaño máximo permitido de 50MB.' };
-  }
-  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'];
-  if (!allowedMimeTypes.includes(file.type)) {
-    return { success: false, error: 'El formato del archivo no está permitido.' };
+  // 2. Validación estricta de tipo MIME y límites diferenciados (10MB imágenes / 50MB videos)
+  const MIME_TO_SAFE_EXT: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'video/quicktime': 'mov'
+  };
+
+  const safeExt = MIME_TO_SAFE_EXT[file.type];
+  if (!safeExt) {
+    return { success: false, error: 'El formato del archivo no está permitido (solo JPG, PNG, WEBP, GIF, MP4, WEBM o MOV).' };
   }
 
+  const isVideo = file.type.startsWith('video/');
+  const maxBytes = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+  if (file.size <= 0 || file.size > maxBytes) {
+    return {
+      success: false,
+      error: isVideo
+        ? 'El video excede el tamaño máximo permitido de 50MB.'
+        : 'La imagen excede el tamaño máximo permitido de 10MB.'
+    };
+  }
 
   try {
-    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'png';
-    const cleanFolder = folder.replace(/[^a-zA-Z0-9_-]/g, '');
+    const cleanFolder = folder.replace(/[^a-zA-Z0-9_-]/g, '') || 'general';
     const randomHash = Math.random().toString(36).substring(2, 8);
-    const fileName = `${Date.now()}_${randomHash}.${fileExt}`;
-    const filePath = tenantId ? `restaurants/${tenantId}/${cleanFolder}/${fileName}` : `${cleanFolder}/${fileName}`;
+    const fileName = `${Date.now()}_${randomHash}.${safeExt}`;
+
+    let filePath: string;
+    if (tenantId) {
+      filePath = `restaurants/${tenantId}/${cleanFolder}/${fileName}`;
+    } else {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id;
+      if (!uid) {
+        return { success: false, error: 'Debes iniciar sesión para subir archivos multimedia.' };
+      }
+      const allowedUserFolder = ['avatars', 'reviews', 'general'].includes(cleanFolder) ? cleanFolder : 'general';
+      filePath = `${allowedUserFolder}/${uid}/${fileName}`;
+    }
 
     const { error: uploadError } = await supabase.storage
       .from('gastro-media')
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: true
+        upsert: true,
+        contentType: file.type
       });
 
     if (uploadError) {

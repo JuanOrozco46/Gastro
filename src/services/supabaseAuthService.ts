@@ -24,7 +24,17 @@ interface CachedProfileExtras {
   phone?: string;
   defaultAddress?: string;
   defaultDeliveryNotes?: string;
+  role?: UserAccount['role'];
+  businessRole?: UserAccount['businessRole'];
+  tenantId?: string;
 }
+
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_AVATAR_MIMES: Record<string, 'jpg' | 'png' | 'webp'> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp'
+};
 
 export function getLocalProfileCache(key: string): CachedProfileExtras | null {
   if (!key) return null;
@@ -54,13 +64,25 @@ export function saveLocalProfileCache(keys: string[], extras: CachedProfileExtra
 }
 
 export async function uploadUserAvatarToStorage(userId: string, file: File): Promise<string | null> {
-  if (!isSupabaseConfigured || !supabase || !userId) return null;
+  if (!isSupabaseConfigured || !supabase || !userId || !file) return null;
+
+  const safeExt = ALLOWED_AVATAR_MIMES[file.type];
+  if (!safeExt) {
+    console.warn('⚠️ Tipo MIME de avatar no permitido (solo JPEG, PNG o WEBP):', file.type);
+    return null;
+  }
+
+  if (file.size <= 0 || file.size > AVATAR_MAX_BYTES) {
+    console.warn('⚠️ Tamaño de avatar inválido o superior a 5 MB:', file.size);
+    return null;
+  }
+
   try {
-    const ext = file.name.split('.').pop() || 'webp';
-    const path = `avatars/${userId}/avatar_${Date.now()}.${ext}`;
+    const cleanUserId = userId.replace(/[^a-zA-Z0-9-]/g, '');
+    const path = `avatars/${cleanUserId}/avatar_${Date.now()}.${safeExt}`;
     const { error: uploadError } = await supabase.storage
       .from('gastro-media')
-      .upload(path, file, { upsert: true, contentType: file.type || 'image/webp' });
+      .upload(path, file, { upsert: true, contentType: file.type });
     if (uploadError) {
       console.warn('⚠️ No se pudo subir el avatar al bucket gastro-media:', uploadError.message);
       return null;
@@ -188,11 +210,15 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
     if (!extErr) {
       profile = extProfile;
     } else {
-      const { data: basicProfile } = await supabase
+      const { data: basicProfile, error: basicErr } = await supabase
         .from('profiles')
         .select('full_name, platform_role, business_role, tenant_id')
         .eq('id', userId)
         .maybeSingle();
+
+      if (basicErr && !rpcMemberInfo) {
+        throw new Error(`Error de red o base de datos al consultar el perfil: ${basicErr.message}`);
+      }
       profile = basicProfile;
     }
 
@@ -220,23 +246,31 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
       defaultDeliveryNotes: defaultDeliveryNotes || undefined
     };
 
-    saveLocalProfileCache([userId, email], commonExtras);
+    const persistAndReturn = (resolved: UserAccount): UserAccount => {
+      saveLocalProfileCache([userId, email], {
+        ...commonExtras,
+        role: resolved.role,
+        businessRole: resolved.businessRole,
+        tenantId: resolved.tenantId
+      });
+      return resolved;
+    };
 
     if (platformRole === 'platform_admin') {
-      return {
+      return persistAndReturn({
         id: userId,
         email,
         ...commonExtras,
         role: 'platform_admin',
         businessRole: 'platform_admin',
         needsPasswordSet
-      };
+      });
     }
 
     // 2. Verificar si es miembro de algún restaurante (Dueño / Staff)
     if (rpcMemberInfo?.is_member && rpcMemberInfo.tenant_id) {
       const isOwner = rpcMemberInfo.member_role === 'owner' || rpcMemberInfo.business_role === 'restaurant_owner';
-      return {
+      return persistAndReturn({
         id: userId,
         email,
         ...commonExtras,
@@ -244,7 +278,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
         businessRole: isOwner ? 'restaurant_owner' : 'restaurant_staff',
         tenantId: rpcMemberInfo.tenant_id,
         needsPasswordSet
-      };
+      });
     }
 
     const { data: members } = await supabase
@@ -259,7 +293,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
 
     if (member && member.restaurant_id) {
       if (member.role === 'owner') {
-        return {
+        return persistAndReturn({
           id: userId,
           email,
           ...commonExtras,
@@ -267,9 +301,9 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
           businessRole: 'restaurant_owner',
           tenantId: member.restaurant_id,
           needsPasswordSet
-        };
+        });
       } else {
-        return {
+        return persistAndReturn({
           id: userId,
           email,
           ...commonExtras,
@@ -277,7 +311,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
           businessRole: 'restaurant_staff',
           tenantId: member.restaurant_id,
           needsPasswordSet
-        };
+        });
       }
     }
 
@@ -291,7 +325,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
 
     const ownedTenantId = ownedRestaurants?.[0]?.id || (profile?.business_role === 'restaurant_owner' ? profile.tenant_id : null);
     if (ownedTenantId) {
-      return {
+      return persistAndReturn({
         id: userId,
         email,
         ...commonExtras,
@@ -299,11 +333,11 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
         businessRole: 'restaurant_owner',
         tenantId: ownedTenantId,
         needsPasswordSet
-      };
+      });
     }
 
     if (profile?.business_role === 'restaurant_staff' && profile.tenant_id) {
-      return {
+      return persistAndReturn({
         id: userId,
         email,
         ...commonExtras,
@@ -311,33 +345,40 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
         businessRole: 'restaurant_staff',
         tenantId: profile.tenant_id,
         needsPasswordSet
-      };
+      });
     }
 
-    // Default: Cliente final de entregas
-    return {
+    // Default: Cliente final de entregas (sin fila en restaurant_members ni rol especial)
+    return persistAndReturn({
       id: userId,
       email,
       ...commonExtras,
       role: 'client_delivery',
       businessRole: 'customer',
       needsPasswordSet
-    };
+    });
   } catch (err: unknown) {
-    console.warn('⚠️ Error al resolver perfil de Supabase:', err);
-    return {
-      id: userId,
-      email,
-      name: cached?.name || email.split('@')[0],
-      username: cached?.username,
-      avatarUrl: cached?.avatarUrl,
-      phone: cached?.phone,
-      defaultAddress: cached?.defaultAddress,
-      defaultDeliveryNotes: cached?.defaultDeliveryNotes,
-      role: 'client_delivery',
-      businessRole: 'customer',
-      needsPasswordSet
-    };
+    console.warn('⚠️ Error transitorio al resolver perfil de Supabase:', err);
+    // Si ya teníamos un rol verificado en caché para este usuario, preservarlo en vez de degradarlo a cliente (P2 #3)
+    if (cached?.role) {
+      return {
+        id: userId,
+        email,
+        name: cached.name || email.split('@')[0],
+        username: cached.username,
+        avatarUrl: cached.avatarUrl,
+        phone: cached.phone,
+        defaultAddress: cached.defaultAddress,
+        defaultDeliveryNotes: cached.defaultDeliveryNotes,
+        role: cached.role,
+        businessRole: cached.businessRole || 'customer',
+        tenantId: cached.tenantId,
+        needsPasswordSet
+      };
+    }
+    throw err instanceof Error
+      ? err
+      : new Error('No fue posible verificar tu perfil en el servidor. Revisa tu conexión e inténtalo nuevamente.');
   }
 }
 
@@ -450,12 +491,18 @@ export async function signUpWithSupabase(
     });
 
     if (upsertErr) {
-      // Fallback en caso de que la tabla no acepte algún campo opcional
-      await supabase.from('profiles').upsert({
+      console.warn('⚠️ Error en upsert extendido de profiles durante registro:', upsertErr.message);
+      if (upsertErr.message.toLowerCase().includes('idx_profiles_username_lower_unique') || upsertErr.message.toLowerCase().includes('profiles_username')) {
+        return { success: false, error: translateAuthError(upsertErr.message) };
+      }
+      const { error: fallbackErr } = await supabase.from('profiles').upsert({
         id: data.user.id,
         full_name: cleanName,
         platform_role: 'customer'
       });
+      if (fallbackErr) {
+        console.warn('⚠️ Error también en upsert base de profiles:', fallbackErr.message);
+      }
     }
 
     saveLocalProfileCache([data.user.id, normalizedEmail], {
