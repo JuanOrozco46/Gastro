@@ -25,6 +25,7 @@ import {
   Upload
 } from 'lucide-react';
 import { uploadMediaFile } from '../../services/supabaseStorageService';
+import { ensureColombiaCityAndZone } from '../../services/supabaseDataService';
 
 const DAYS_OF_WEEK = [
   'Domingo',
@@ -50,9 +51,44 @@ const CATEGORY_PRESETS = [
 ];
 
 export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
-  const { updateTenant, showToast } = useApp();
+  const { cities, zones, refreshCities, refreshZones, updateTenant, showToast } = useApp();
+  const activeCities = cities.filter(c => c.isActive);
 
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'basic' | 'delivery' | 'hours'>('all');
+
+  const [cityId, setCityId] = useState<string>(() => {
+    return tenant.cityId || (activeCities[0]?.id ?? '');
+  });
+  const [customCityName, setCustomCityName] = useState('');
+  const [customZoneName, setCustomZoneName] = useState('');
+
+  const isCustomCity = cityId === '__custom__';
+  const effectiveCityId = isCustomCity
+    ? '__custom__'
+    : activeCities.some(c => c.id === cityId)
+      ? cityId
+      : (activeCities[0]?.id || cityId);
+  const cityZones = isCustomCity ? [] : zones.filter(z => z.cityId === effectiveCityId && z.isActive);
+
+  const [zoneId, setZoneId] = useState<string>(() => {
+    return tenant.zoneId || (cityZones[0]?.id ?? '');
+  });
+  const isCustomZone = isCustomCity || zoneId === '__custom__';
+  const effectiveZoneId = isCustomZone
+    ? '__custom__'
+    : cityZones.some(z => z.id === zoneId)
+      ? zoneId
+      : (cityZones[0]?.id || '');
+
+  const handleCitySelectChange = (newCityId: string) => {
+    setCityId(newCityId);
+    if (newCityId === '__custom__') {
+      setZoneId('__custom__');
+    } else {
+      const nextZones = zones.filter(z => z.cityId === newCityId && z.isActive);
+      setZoneId(nextZones[0]?.id || '__custom__');
+    }
+  };
 
   const [formData, setFormData] = useState({
     name: tenant.name || '',
@@ -249,8 +285,43 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
       return;
     }
 
+    if (isCustomCity && !customCityName.trim()) {
+      setErrorMsg('Ingresa el nombre de tu ciudad o municipio.');
+      return;
+    }
+
+    if (isCustomZone && !customZoneName.trim()) {
+      setErrorMsg('Ingresa el nombre de tu zona o barrio.');
+      return;
+    }
+
     setIsSaving(true);
     try {
+      let resolvedCityId = effectiveCityId;
+      let resolvedZoneId = effectiveZoneId;
+
+      if (isCustomCity || isCustomZone) {
+        const cityNameForRpc = isCustomCity
+          ? customCityName.trim()
+          : (activeCities.find(c => c.id === effectiveCityId)?.name || '');
+        const zoneNameForRpc = isCustomZone
+          ? (customZoneName.trim() || 'Centro')
+          : (cityZones.find(z => z.id === effectiveZoneId)?.name || 'Centro');
+
+        const ensureRes = await ensureColombiaCityAndZone(cityNameForRpc, zoneNameForRpc);
+        if (!ensureRes.success || !ensureRes.cityId || !ensureRes.zoneId) {
+          setErrorMsg(ensureRes.error || 'No se pudo registrar la nueva ciudad o zona.');
+          return;
+        }
+        resolvedCityId = ensureRes.cityId;
+        resolvedZoneId = ensureRes.zoneId;
+        await Promise.all([refreshCities(), refreshZones(ensureRes.cityId)]);
+        setCityId(resolvedCityId);
+        setZoneId(resolvedZoneId);
+        setCustomCityName('');
+        setCustomZoneName('');
+      }
+
       await updateTenant(tenant.id, {
         name: formData.name.trim(),
         description: formData.description.trim(),
@@ -258,6 +329,8 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
         phone: formData.phone.trim(),
         whatsapp: formData.whatsapp.trim(),
         address: formData.address.trim(),
+        cityId: resolvedCityId,
+        zoneId: resolvedZoneId,
         logoEmoji: formData.logoEmoji || '🍽️',
         logoUrl: formData.logoUrl,
         bannerUrl: formData.bannerUrl,
@@ -275,7 +348,7 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
         deliveryModes,
         hours
       });
-      setSuccessMsg('¡Perfil, configuración operativa y horarios actualizados exitosamente!');
+      setSuccessMsg('¡Perfil, ubicación comercial, configuración operativa y horarios actualizados exitosamente!');
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Error guardando el perfil.');
@@ -776,8 +849,76 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                 </div>
               </div>
 
-              {/* Dirección y Parámetros de Envío */}
+              {/* Ciudad, Zona, Dirección y Parámetros de Envío */}
               <div className="pam-grid">
+                <div className="pam-field">
+                  <label>
+                    Ciudad / Municipio en Colombia <em>*</em>
+                  </label>
+                  <div className="pam-input-wrap">
+                    <MapPin size={16} className="pam-icon" />
+                    <select
+                      value={effectiveCityId}
+                      onChange={e => handleCitySelectChange(e.target.value)}
+                      className="pam-input"
+                    >
+                      {activeCities.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                      <option value="__custom__">➕ Otra ciudad / municipio de Colombia...</option>
+                    </select>
+                  </div>
+                  {isCustomCity && (
+                    <div className="pam-input-wrap" style={{ marginTop: '8px' }}>
+                      <MapPin size={16} className="pam-icon" />
+                      <input
+                        type="text"
+                        value={customCityName}
+                        onChange={e => setCustomCityName(e.target.value)}
+                        className="pam-input"
+                        placeholder="Escribe tu ciudad o municipio (ej: Rionegro, Chía, Tunja...)"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="pam-field">
+                  <label>
+                    Zona / Sector Urbano <em>*</em>
+                  </label>
+                  {!isCustomCity && (
+                    <div className="pam-input-wrap">
+                      <MapPin size={16} className="pam-icon" />
+                      <select
+                        value={effectiveZoneId}
+                        onChange={e => setZoneId(e.target.value)}
+                        className="pam-input"
+                      >
+                        {cityZones.map(z => (
+                          <option key={z.id} value={z.id}>
+                            Zona {z.name}
+                          </option>
+                        ))}
+                        <option value="__custom__">➕ Otro sector / barrio...</option>
+                      </select>
+                    </div>
+                  )}
+                  {isCustomZone && (
+                    <div className="pam-input-wrap" style={{ marginTop: isCustomCity ? '0px' : '8px' }}>
+                      <MapPin size={16} className="pam-icon" />
+                      <input
+                        type="text"
+                        value={customZoneName}
+                        onChange={e => setCustomZoneName(e.target.value)}
+                        className="pam-input"
+                        placeholder="Escribe tu zona o barrio (ej: Centro, Parque Principal, Norte...)"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <div className="pam-field pam-span-2">
                   <label>
                     Dirección Física del Local <em>*</em>
@@ -790,7 +931,7 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                       value={formData.address}
                       onChange={handleChange}
                       className="pam-input"
-                      placeholder="Ej. Cra 14 # 19-20, Barrio Norte, Armenia"
+                      placeholder="Ej. Cra 14 # 19-20, Local 102"
                       required
                     />
                   </div>

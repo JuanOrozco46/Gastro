@@ -310,7 +310,7 @@ const UserProfileModalInner: React.FC<{
                         className="auth-input"
                         value={defaultAddress}
                         onChange={e => setDefaultAddress(e.target.value)}
-                        placeholder="Ej. Cra 14 # 19-20, Barrio Norte, Armenia"
+                        placeholder="Ej. Cra 14 # 19-20, Apto 302, Barrio..."
                       />
                     </div>
                   </div>

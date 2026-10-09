@@ -3,7 +3,7 @@ import { useApp } from '../context/useApp';
 import { motion } from 'framer-motion';
 import { X, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck, Upload, Image, Clock, FileText, AlertCircle, Lock, Eye, EyeOff, Store, Sparkles, Check, ShoppingBag, Bike, QrCode } from 'lucide-react';
 import type { OrderFulfillment } from '../types';
-import { PLATFORM_COMMISSION_RATE } from '../services/supabaseDataService';
+import { PLATFORM_COMMISSION_RATE, ensureColombiaCityAndZone } from '../services/supabaseDataService';
 import {
   validateEmail,
   validateName,
@@ -20,32 +20,46 @@ interface PartnerApplicationModalProps {
 }
 
 export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = ({ isOpen, onClose }) => {
-  const { cities, zones, selectedCityId, authMode, registerAccount, submitRestaurantApplication } = useApp();
+  const { cities, zones, selectedCityId, authMode, registerAccount, submitRestaurantApplication, refreshCities, refreshZones } = useApp();
 
   const activeCities = cities.filter(c => c.isActive);
 
   const [cityId, setCityId] = useState<string>(() => {
     return selectedCityId || (activeCities.length > 0 ? activeCities[0].id : '');
   });
+  const [customCityName, setCustomCityName] = useState('');
+  const [customZoneName, setCustomZoneName] = useState('');
 
-  const effectiveCityId = activeCities.some(c => c.id === cityId)
-    ? cityId
-    : (activeCities.some(c => c.id === selectedCityId) ? selectedCityId : (activeCities[0]?.id || cityId));
+  const isCustomCity = cityId === '__custom__';
+  const effectiveCityId = isCustomCity
+    ? '__custom__'
+    : activeCities.some(c => c.id === cityId)
+      ? cityId
+      : (activeCities.some(c => c.id === selectedCityId) ? selectedCityId : (activeCities[0]?.id || cityId));
 
-  const selectedCityName = activeCities.find(c => c.id === effectiveCityId)?.name || 'Tu ciudad';
+  const selectedCityName = isCustomCity
+    ? (customCityName.trim() || 'Tu municipio en Colombia')
+    : (activeCities.find(c => c.id === effectiveCityId)?.name || 'Tu ciudad');
 
-  const cityZones = zones.filter(z => z.cityId === effectiveCityId && z.isActive);
+  const cityZones = isCustomCity ? [] : zones.filter(z => z.cityId === effectiveCityId && z.isActive);
 
   const [zoneId, setZoneId] = useState<string>(() => (cityZones.length > 0 ? cityZones[0].id : ''));
 
-  const effectiveZoneId = cityZones.some(z => z.id === zoneId)
-    ? zoneId
-    : (cityZones[0]?.id || '');
+  const isCustomZone = isCustomCity || zoneId === '__custom__';
+  const effectiveZoneId = isCustomZone
+    ? '__custom__'
+    : cityZones.some(z => z.id === zoneId)
+      ? zoneId
+      : (cityZones[0]?.id || '');
 
   const handleCityChange = (newCityId: string) => {
     setCityId(newCityId);
-    const nextCityZones = zones.filter(z => z.cityId === newCityId && z.isActive);
-    setZoneId(nextCityZones.length > 0 ? nextCityZones[0].id : '');
+    if (newCityId === '__custom__') {
+      setZoneId('__custom__');
+    } else {
+      const nextCityZones = zones.filter(z => z.cityId === newCityId && z.isActive);
+      setZoneId(nextCityZones.length > 0 ? nextCityZones[0].id : '__custom__');
+    }
     clearFieldError('cityId');
     clearFieldError('zoneId');
   };
@@ -119,9 +133,13 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
       case 'category':
         return validateRequired(category, 'La categoría gastronómica');
       case 'cityId':
-        return validateRequired(effectiveCityId, 'La ciudad de operación');
+        return isCustomCity
+          ? validateRequired(customCityName, 'El nombre de tu ciudad o municipio')
+          : validateRequired(effectiveCityId, 'La ciudad de operación');
       case 'zoneId':
-        return validateRequired(effectiveZoneId, 'La zona urbana');
+        return isCustomZone
+          ? validateRequired(customZoneName, 'El nombre de tu zona o barrio')
+          : validateRequired(effectiveZoneId, 'La zona urbana');
       case 'address':
         return validateRequired(address, 'La dirección o referencia comercial');
       case 'estimatedDeliveryMinutes':
@@ -260,6 +278,27 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
 
     setIsSubmitting(true);
     try {
+      let resolvedCityId = effectiveCityId;
+      let resolvedZoneId = effectiveZoneId;
+
+      if (isCustomCity || isCustomZone) {
+        const cityNameForRpc = isCustomCity
+          ? customCityName.trim()
+          : (activeCities.find(c => c.id === effectiveCityId)?.name || '');
+        const zoneNameForRpc = isCustomZone
+          ? (customZoneName.trim() || 'Centro')
+          : (cityZones.find(z => z.id === effectiveZoneId)?.name || 'Centro');
+
+        const ensureRes = await ensureColombiaCityAndZone(cityNameForRpc, zoneNameForRpc);
+        if (!ensureRes.success || !ensureRes.cityId || !ensureRes.zoneId) {
+          setSubmitError(ensureRes.error || 'No se pudo habilitar la nueva ciudad o zona seleccionada.');
+          return;
+        }
+        resolvedCityId = ensureRes.cityId;
+        resolvedZoneId = ensureRes.zoneId;
+        await Promise.all([refreshCities(), refreshZones(ensureRes.cityId)]);
+      }
+
       // 1) Enviar primero la solicitud del restaurante para que cuando se registre/inicie sesión la cuenta,
       // resolve_or_provision_restaurant_owner encuentre la solicitud y asigne inmediatamente el rol de restaurante.
       const ok = await submitRestaurantApplication({
@@ -268,8 +307,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
         ownerPhone: ownerPhone.trim(),
         restaurantName: restaurantName.trim(),
         category: category.trim(),
-        cityId: effectiveCityId,
-        zoneId: effectiveZoneId,
+        cityId: resolvedCityId,
+        zoneId: resolvedZoneId,
         address: address.trim(),
         description: description.trim() || undefined,
         scheduleHours: scheduleHours.trim() || undefined,
@@ -327,6 +366,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     setShowOwnerPassword(false);
     setRestaurantName('');
     setCategory('Hamburguesas');
+    setCustomCityName('');
+    setCustomZoneName('');
     setAddress('');
     setDescription('');
     setScheduleHours('');
@@ -362,6 +403,8 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
       ? [!validateRegisterPassword(ownerPassword), !validatePasswordConfirm(ownerPassword, ownerPasswordConfirm)]
       : []),
     !!restaurantName.trim(),
+    isCustomCity ? !!customCityName.trim() : !!effectiveCityId,
+    isCustomZone ? !!customZoneName.trim() : !!effectiveZoneId,
     !!address.trim(),
     deliveryModes.length > 0,
     termsAccepted,
@@ -372,7 +415,10 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
   const ownerDone = !validateName(ownerName) && !validatePhone(ownerPhone) && !validateEmail(ownerEmail);
   const accountDone = !validateRegisterPassword(ownerPassword) && !validatePasswordConfirm(ownerPassword, ownerPasswordConfirm);
   const restaurantDone = !!restaurantName.trim() && !!category;
-  const locationDone = !!effectiveCityId && !!effectiveZoneId && !!address.trim();
+  const locationDone =
+    (isCustomCity ? !!customCityName.trim() : !!effectiveCityId) &&
+    (isCustomZone ? !!customZoneName.trim() : !!effectiveZoneId) &&
+    !!address.trim();
 
   const stepOffset = authMode === 'remote' ? 1 : 0;
 
@@ -421,7 +467,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
             <>
               <div className="pam-benefits">
                 <span><Sparkles size={13} /> Sin mensualidad</span>
-                <span><ShieldCheck size={13} /> Comisión del 3%</span>
+                <span><ShieldCheck size={13} /> 3% GastroSync (+ pasarela en digital)</span>
                 <span><Clock size={13} /> Revisión en 24–48 h</span>
               </div>
               <div className="pam-progress">
@@ -645,26 +691,57 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                 <SectionHead step={3 + stepOffset} title="Ubicación y operación" desc="Dónde estás y cómo trabajas." done={locationDone} />
                 <div className="pam-grid">
                   <div className="pam-field">
-                    <label htmlFor="cityId">Ciudad <em>*</em></label>
+                    <label htmlFor="cityId">Ciudad / Municipio en Colombia <em>*</em></label>
                     <div className="pam-input-wrap">
                       <MapPin size={16} className="pam-icon" />
                       <select id="cityId" value={effectiveCityId} onChange={e => handleCityChange(e.target.value)}
                         onBlur={() => handleFieldBlur('cityId')} className={inputCls('cityId')}>
                         {activeCities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        <option value="__custom__">➕ Otra ciudad / municipio de Colombia...</option>
                       </select>
                     </div>
+                    {isCustomCity && (
+                      <div className="pam-input-wrap" style={{ marginTop: '8px' }}>
+                        <MapPin size={16} className="pam-icon" />
+                        <input
+                          id="customCityName"
+                          type="text"
+                          placeholder="Escribe tu ciudad o municipio (ej: Rionegro, Chía, Tunja...)"
+                          value={customCityName}
+                          onChange={e => { setCustomCityName(e.target.value); clearFieldError('cityId'); }}
+                          onBlur={() => handleFieldBlur('cityId')}
+                          className={inputCls('cityId')}
+                        />
+                      </div>
+                    )}
                     <FieldError name="cityId" error={errors.cityId} />
                   </div>
                   <div className="pam-field">
-                    <label htmlFor="zoneId">Zona <em>*</em></label>
-                    <div className="pam-input-wrap">
-                      <MapPin size={16} className="pam-icon" />
-                      <select id="zoneId" value={effectiveZoneId} onChange={e => { setZoneId(e.target.value); clearFieldError('zoneId'); }}
-                        onBlur={() => handleFieldBlur('zoneId')} className={inputCls('zoneId')}>
-                        {cityZones.length === 0 && <option value="">Sin zonas disponibles</option>}
-                        {cityZones.map(z => <option key={z.id} value={z.id}>Zona {z.name}</option>)}
-                      </select>
-                    </div>
+                    <label htmlFor="zoneId">Zona / Sector <em>*</em></label>
+                    {!isCustomCity && (
+                      <div className="pam-input-wrap">
+                        <MapPin size={16} className="pam-icon" />
+                        <select id="zoneId" value={effectiveZoneId} onChange={e => { setZoneId(e.target.value); clearFieldError('zoneId'); }}
+                          onBlur={() => handleFieldBlur('zoneId')} className={inputCls('zoneId')}>
+                          {cityZones.map(z => <option key={z.id} value={z.id}>Zona {z.name}</option>)}
+                          <option value="__custom__">➕ Otro sector / barrio...</option>
+                        </select>
+                      </div>
+                    )}
+                    {isCustomZone && (
+                      <div className="pam-input-wrap" style={{ marginTop: isCustomCity ? '0px' : '8px' }}>
+                        <MapPin size={16} className="pam-icon" />
+                        <input
+                          id="customZoneName"
+                          type="text"
+                          placeholder="Escribe tu zona o barrio (ej: Centro, Parque Principal, Norte...)"
+                          value={customZoneName}
+                          onChange={e => { setCustomZoneName(e.target.value); clearFieldError('zoneId'); }}
+                          onBlur={() => handleFieldBlur('zoneId')}
+                          className={inputCls('zoneId')}
+                        />
+                      </div>
+                    )}
                     <FieldError name="zoneId" error={errors.zoneId} />
                   </div>
                   <div className="pam-field pam-span-2">
@@ -818,13 +895,20 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                 </div>
               </section>
 
-              {/* Términos */}
+              {/* Transparencia Comercial y Términos */}
+              <div className="pam-callout info" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px', fontSize: '0.78rem', lineHeight: 1.45 }}>
+                <strong>💡 Esquema Transparente de Comisiones y Liquidación:</strong>
+                <div>• <strong>Pedidos en Efectivo:</strong> solo <strong>3.0%</strong> de comisión tecnológica GastroSync (tú recibes el 97% libre en caja).</div>
+                <div>• <strong>Pedidos Digitales (PSE / Nequi / Tarjetas):</strong> <strong>3.0%</strong> de comisión GastroSync + costo de pasarela Wompi (<strong>2.65% + $700 COP + IVA 19%</strong>).</div>
+                <div>• <strong>Cruce Automático:</strong> el 3% de tus ventas en efectivo se descuenta automáticamente de tus ventas digitales antes de dispersar a tu banco.</div>
+              </div>
+
               <label className={`pam-terms ${termsAccepted ? 'checked' : ''} ${errors.terms ? 'has-error' : ''}`}>
                 <input type="checkbox" checked={termsAccepted}
                   onChange={e => { setTermsAccepted(e.target.checked); if (e.target.checked) clearFieldError('terms'); }} />
                 <span className="pam-terms-box">{termsAccepted && <Check size={13} strokeWidth={3} />}</span>
                 <span>
-                  Acepto los <strong>Términos del Servicio</strong> y la comisión transparente del <strong>3% por pedido procesado</strong> en GastroSync.
+                  Acepto los <strong>Términos del Servicio</strong>, la comisión del <strong>3% para GastroSync</strong> (más tarifa de pasarela Wompi 2.65% + $700 + IVA en pagos digitales) y el sistema de <strong>cruce automático de saldos</strong>.
                 </span>
               </label>
               <FieldError name="terms" error={errors.terms} />

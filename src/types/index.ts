@@ -195,6 +195,35 @@ export interface Tenant {
   googlePlaceId?: string;
   tableServiceEnabled?: boolean;
   acceptsCash?: boolean;
+  payoutBankName?: string;
+  payoutAccountType?: string;
+  payoutAccountNumber?: string;
+  payoutAccountHolder?: string;
+  payoutDocumentType?: string;
+  payoutDocumentNumber?: string;
+  wompiMerchantId?: string;
+  cashCommissionLimitCop?: number;
+  autoLockCashOnLimit?: boolean;
+}
+
+export interface RestaurantSettlementRecord {
+  id: string;
+  restaurantId: string;
+  settlementType: 'platform_payout_to_restaurant' | 'restaurant_payment_to_platform' | 'auto_netted_zero_cut';
+  grossSalesCop: number;
+  cashSalesCop: number;
+  digitalSalesCop: number;
+  cashCommissionCop: number;
+  digitalCommissionCop: number;
+  wompiGatewayFeeCop?: number;
+  autoOffsetCop: number;
+  netAmountCop: number;
+  paymentChannel: string;
+  referenceCode: string;
+  notes?: string;
+  status: 'pending_review' | 'completed' | 'rejected';
+  createdAt: string;
+  confirmedAt?: string;
 }
 
 export interface RestaurantReview {
@@ -320,6 +349,7 @@ export interface Transaction {
   amount: number;
   restaurantPayout: number;
   platformFee: number;
+  gatewayFee?: number;
   paymentMethod: PaymentMethod;
   status: 'approved' | 'pending' | 'rejected';
   authorizationCode: string;

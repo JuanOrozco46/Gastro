@@ -1,4 +1,5 @@
 import type { PaymentMethod, Transaction } from '../types';
+import { calculateOrderFinancialBreakdown } from '../utils/wompiFees';
 
 export interface ProcessPaymentParams {
   orderId: string;
@@ -24,8 +25,11 @@ export class PaymentSimulatorService {
   public static processPayment(params: ProcessPaymentParams): Promise<Transaction> {
     return new Promise((resolve) => {
       setTimeout(() => {
-        const platformFee = Math.round(params.totalAmount * params.commissionRate);
-        const restaurantPayout = params.totalAmount - platformFee;
+        const breakdown = calculateOrderFinancialBreakdown(
+          params.totalAmount,
+          params.paymentMethod,
+          params.commissionRate
+        );
         const authCode = `WOMPI_${Math.floor(100000 + Math.random() * 900000)}`;
 
         const transaction: Transaction = {
@@ -33,8 +37,9 @@ export class PaymentSimulatorService {
           orderId: params.orderId,
           tenantId: params.tenantId,
           amount: params.totalAmount,
-          restaurantPayout,
-          platformFee,
+          restaurantPayout: breakdown.restaurantNetCop,
+          platformFee: breakdown.gastroSyncFeeCop,
+          gatewayFee: breakdown.wompiTotalFeeCop,
           paymentMethod: params.paymentMethod,
           status: 'approved',
           authorizationCode: authCode,

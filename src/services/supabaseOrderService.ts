@@ -94,7 +94,7 @@ export async function fetchLiveOrdersForRestaurant(tenantId: string): Promise<Or
     const { data: dbOrders, error } = await supabase
       .from('orders')
       .select(`
-        id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
+        id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, payment_method, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
         order_items (
           id, order_id, product_id, product_name, unit_price_cop, quantity
         ),
@@ -126,7 +126,7 @@ export async function fetchLiveOrdersForCustomer(customerId: string): Promise<Or
     const { data: dbOrders, error } = await supabase
       .from('orders')
       .select(`
-        id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
+        id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, payment_method, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
         order_items (
           id, order_id, product_id, product_name, unit_price_cop, quantity
         ),

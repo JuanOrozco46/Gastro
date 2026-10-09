@@ -22,15 +22,16 @@ export const FloatingCartButton: React.FC<FloatingCartButtonProps> = ({ onOpen, 
       {shouldShow && (
         <motion.button
           onClick={onOpen}
+          className="floating-cart-btn"
           initial={{ y: 50, opacity: 0, scale: 0.9 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 50, opacity: 0, scale: 0.9 }}
           whileTap={{ scale: 0.95 }}
           style={{
             position: 'fixed',
-            bottom: 'env(safe-area-inset-bottom, 80px)', 
-            right: '20px',
-            zIndex: 999,
+            bottom: 'calc(78px + env(safe-area-inset-bottom, 0px))',
+            right: '16px',
+            zIndex: 998,
             backgroundColor: 'var(--primary)',
             color: 'white',
             border: 'none',
@@ -39,10 +40,10 @@ export const FloatingCartButton: React.FC<FloatingCartButtonProps> = ({ onOpen, 
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            boxShadow: '0 8px 24px rgba(230, 148, 43, 0.4)',
+            boxShadow: '0 8px 24px rgba(216, 90, 56, 0.45)',
             cursor: 'pointer',
             fontWeight: 800,
-            fontSize: '1rem',
+            fontSize: '0.96rem',
             minHeight: '48px',
             minWidth: '48px', // Touch target
             transition: 'background-color 0.2s ease',

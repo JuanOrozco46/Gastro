@@ -18,7 +18,7 @@ export const COMMON_DEMO_PASSWORD = import.meta.env.DEV ? 'GastroSyncDemo2026!' 
 export const DEMO_ACCOUNTS: DemoAccount[] = [
   {
     id: 'demo_customer',
-    name: 'Cliente Demo (Armenia)',
+    name: 'Cliente Demo (Colombia)',
     email: 'cliente@demo.gastrosync.co',
     demoPassword: COMMON_DEMO_PASSWORD,
     businessRole: 'customer',

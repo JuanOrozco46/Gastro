@@ -23,7 +23,7 @@ import {
 const FEATURES = [
   { icon: '📸', title: 'Descubre sabores locales', desc: 'Fotos reales de platos que puedes pedir con un solo clic' },
   { icon: '🛵', title: 'Pide directo al restaurante', desc: 'Tu pedido va directamente a la cocina, sin intermediarios' },
-  { icon: '🍽️', title: 'Restaurantes de Armenia', desc: 'Apoya el comercio local del Quindío con cada pedido' },
+  { icon: '🍽️', title: 'Restaurantes en toda Colombia', desc: 'Apoya la gastronomía local de tu ciudad con cada pedido' },
 ];
 
 type AuthTab = 'login' | 'register';
@@ -442,7 +442,7 @@ export const LoginScreen: React.FC = () => {
                 fontWeight: 800,
                 letterSpacing: '0.5px'
               }}>
-                ARMENIA MVP
+                COLOMBIA MVP
               </span>
             </div>
           </div>
@@ -454,11 +454,11 @@ export const LoginScreen: React.FC = () => {
               <span style={{
                 color: 'var(--primary)'
               }}>
-                Armenia, Quindío.
+                tu ciudad hoy.
               </span>
             </h1>
             <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.95rem', lineHeight: 1.6 }}>
-              Antojos, restaurantes y pedidos directos en tu zona. Explora los sabores del Eje Cafetero.
+              Antojos, restaurantes y pedidos directos en tu zona. Explora los mejores sabores locales en toda Colombia.
             </p>
           </div>
 
@@ -525,7 +525,7 @@ export const LoginScreen: React.FC = () => {
           }}>
             <span style={{ fontSize: '1.5rem' }}>🇨🇴</span>
             <div>
-              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'white', display: 'block' }}>Armenia, Quindío</span>
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'white', display: 'block' }}>Cobertura Nacional · Colombia</span>
               <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Restaurantes locales · Pedidos directos</span>
             </div>
           </div>
@@ -935,7 +935,7 @@ export const LoginScreen: React.FC = () => {
                     <input
                       id="auth-address"
                       type="text"
-                      placeholder="Ej. Cra 14 # 19-20, Barrio Norte, Armenia"
+                      placeholder="Ej. Cra 14 # 19-20, Apto 302, Barrio..."
                       value={defaultAddress}
                       onChange={handleAddressChange}
                       onBlur={handleAddressBlur}
@@ -1180,7 +1180,7 @@ export const LoginScreen: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '1.1rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-          🍽️ GastroSync · Armenia, Quindío
+          🍽️ GastroSync · Colombia
         </div>
 
         <PartnerApplicationModal

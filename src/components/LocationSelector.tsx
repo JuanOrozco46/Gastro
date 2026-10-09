@@ -21,6 +21,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   const {
     cities,
     zones,
+    tenants,
     selectedCityId,
     selectedZoneId,
     userLocationState,
@@ -239,11 +240,14 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
                 outline: 'none'
               }}
             >
-              {cities.map(city => (
-                <option key={city.id} value={city.id}>
-                  {city.name}
-                </option>
-              ))}
+              {cities.map(city => {
+                const cityCount = tenants.filter(t => t.status === 'active' && t.cityId === city.id).length;
+                return (
+                  <option key={city.id} value={city.id}>
+                    {city.name}{cityCount > 0 ? ` (${cityCount} ${cityCount === 1 ? 'local' : 'locales'})` : ''}
+                  </option>
+                );
+              })}
             </select>
             <ChevronDown
               size={14}

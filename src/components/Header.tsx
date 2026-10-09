@@ -13,12 +13,17 @@ const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color:
 };
 
 export const Header: React.FC = () => {
-  const { userRole, currentUser, currentTenant, logout } = useApp();
+  const { userRole, currentUser, currentTenant, cities, selectedCityId, logout } = useApp();
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   if (userRole === 'login') return null;
 
   const roleInfo = ROLE_CONFIG[userRole] || ROLE_CONFIG.client_delivery;
+  const activeCityId =
+    userRole === 'admin' || userRole === 'kitchen'
+      ? currentTenant?.cityId || selectedCityId
+      : selectedCityId;
+  const activeCityName = cities.find(c => c.id === activeCityId)?.name;
 
   return (
     <>
@@ -28,7 +33,7 @@ export const Header: React.FC = () => {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.3 }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+        <div className="header-left-group" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', minWidth: 0 }}>
           
           {/* Brand Logo */}
           <div className="logo-container" style={{ cursor: 'default' }}>
@@ -38,7 +43,7 @@ export const Header: React.FC = () => {
             </div>
             <div className="logo-text">
               <h1 style={{ fontFamily: 'Outfit, sans-serif' }}>GastroSync</h1>
-              <p>Armenia, Quindío</p>
+              <p>{activeCityName ? `${activeCityName}, Colombia` : 'Colombia'}</p>
             </div>
           </div>
 
@@ -46,7 +51,7 @@ export const Header: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowProfileModal(true)}
-            className="gf-glass-pill"
+            className="gf-glass-pill header-user-pill"
             title="Editar mi perfil, @usuario, foto y dirección de entrega"
             style={{
               cursor: 'pointer',
@@ -69,11 +74,12 @@ export const Header: React.FC = () => {
             ) : (
               <User size={15} style={{ color: 'var(--primary)' }} />
             )}
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
+            <span className="header-user-name" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
               {currentUser?.name || 'Usuario'}
             </span>
             {currentUser?.username ? (
               <span
+                className="header-user-handle"
                 style={{
                   fontSize: '0.72rem',
                   fontWeight: 700,
@@ -87,6 +93,7 @@ export const Header: React.FC = () => {
               </span>
             ) : (
               <span
+                className="header-user-handle"
                 style={{
                   fontSize: '0.68rem',
                   fontWeight: 800,
@@ -103,11 +110,11 @@ export const Header: React.FC = () => {
           </button>
 
           {/* Role Badge (read-only) */}
-          <div className="gf-glass-pill" style={{ gap: '6px' }}>
+          <div className="gf-glass-pill header-role-pill" style={{ gap: '6px' }}>
             <span style={{ color: roleInfo.color, display: 'flex', alignItems: 'center' }}>
               {roleInfo.icon}
             </span>
-            <span style={{
+            <span className="header-role-label" style={{
               fontSize: '0.75rem',
               fontWeight: 800,
               color: roleInfo.color,
@@ -119,9 +126,9 @@ export const Header: React.FC = () => {
 
           {/* Tenant Name (if restaurant staff/owner) */}
           {currentUser?.tenantId && currentTenant && (
-            <div className="gf-glass-pill" style={{ gap: '6px' }}>
+            <div className="gf-glass-pill header-tenant-pill" style={{ gap: '6px' }}>
               <span style={{ fontSize: '0.85rem' }}>{currentTenant.logoEmoji || '🍽️'}</span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'white' }}>
+              <span className="header-tenant-name" style={{ fontSize: '0.78rem', fontWeight: 700, color: 'white' }}>
                 {currentTenant.name}
               </span>
             </div>
@@ -133,8 +140,9 @@ export const Header: React.FC = () => {
           onClick={logout}
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.96 }}
+          title="Cerrar Sesión"
         >
-          <LogOut size={15} /> Cerrar Sesión
+          <LogOut size={15} /> <span className="logout-text">Cerrar Sesión</span>
         </motion.button>
       </motion.header>
 

@@ -66,6 +66,10 @@ serve(async (req) => {
     const incomingStatus = transaction.status || payload.status;
     const amountInCents = transaction.amount_in_cents || payload.amount_in_cents;
     const currency = transaction.currency || payload.currency || 'COP';
+    const externalTransactionId = transaction.id ? String(transaction.id) : null;
+    const providerPaymentMethod = transaction.payment_method_type
+      ? String(transaction.payment_method_type).toUpperCase()
+      : null;
 
     if (!providerReference || !incomingStatus) {
       return new Response(JSON.stringify({ error: 'Payload malformado' }), { status: 400 });
@@ -79,7 +83,7 @@ serve(async (req) => {
     // 3. Buscar el pago existente
     const { data: payment, error: fetchError } = await supabaseAdmin
       .from('payments')
-      .select('id, status, order_id, amount_cop')
+      .select('id, status, order_id, amount_cop, provider')
       .eq('provider_reference', providerReference)
       .single();
 
@@ -112,10 +116,16 @@ serve(async (req) => {
     else if (upperStatus === 'FAILED' || upperStatus === 'ERROR') finalStatus = 'failed';
     else if (upperStatus === 'VOIDED') finalStatus = 'voided';
     
-    // 7. Actualizar el pago
+    // 7. Actualizar el pago con auditoría de transacción Wompi
+    const updatePatch: Record<string, unknown> = {
+      status: finalStatus
+    };
+    if (externalTransactionId) updatePatch.external_transaction_id = externalTransactionId;
+    if (providerPaymentMethod) updatePatch.provider_payment_method = providerPaymentMethod;
+
     const { error: updateError } = await supabaseAdmin
       .from('payments')
-      .update({ status: finalStatus })
+      .update(updatePatch)
       .eq('id', payment.id);
 
     if (updateError) {
@@ -123,8 +133,29 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Fallo al actualizar base de datos' }), { status: 500 });
     }
 
+    // 8. Si el pago fue aprobado, el trigger trg_payment_status_settlement_sync ya reevalúa el cupo,
+    // pero además verificamos explícitamente el restaurante para auditoría en logs del webhook
+    if (finalStatus === 'approved' && payment.order_id) {
+      const { data: orderData } = await supabaseAdmin
+        .from('orders')
+        .select('restaurant_id')
+        .eq('id', payment.order_id)
+        .single();
+
+      if (orderData?.restaurant_id) {
+        await supabaseAdmin.rpc('evaluate_restaurant_cash_limit_lock', {
+          p_restaurant_id: orderData.restaurant_id
+        });
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: true, newStatus: finalStatus }), 
+      JSON.stringify({
+        success: true,
+        newStatus: finalStatus,
+        externalTransactionId,
+        providerPaymentMethod
+      }), 
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
 

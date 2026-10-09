@@ -61,6 +61,7 @@ const playKitchenChime = () => {
 
 export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = false }) => {
   const {
+    cities,
     orders,
     products,
     currentUser,
@@ -69,10 +70,12 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
     toggleProductAvailability,
     triggerTestOrder
   } = useApp();
+  const tenantCityName = cities.find(c => c.id === tenant.cityId)?.name || 'Colombia';
 
   const [now, setNow] = useState(() => Date.now());
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const [viewMode, setViewMode] = useState<KdsViewMode>('kanban');
+  const [kdsStageFilter, setKdsStageFilter] = useState<'all' | 'incoming' | 'kitchen' | 'ready'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
@@ -609,7 +612,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
                 </span>
                 <a
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                    `${addressText}, Armenia, Quindío`
+                    `${addressText}, ${tenantCityName}, Colombia`
                   )}`}
                   target="_blank"
                   rel="noreferrer"
@@ -886,9 +889,9 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="kds-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             {/* Buscador rápido */}
-            <div className="pam-input-wrap" style={{ minWidth: '210px' }}>
+            <div className="pam-input-wrap kds-search-wrap" style={{ minWidth: '210px', flex: '1 1 210px' }}>
               <Search size={14} className="pam-icon" />
               <input
                 type="text"
@@ -928,6 +931,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
 
         {/* Filtros por Canal y Selector de Modo de Vista */}
         <div
+          className="kds-toolbar-row"
           style={{
             padding: '0 1.5rem 1.15rem',
             display: 'flex',
@@ -939,7 +943,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
           }}
         >
           {/* Filtros de Canal */}
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <div className="kds-scroll-chips" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {(
               [
                 { id: 'all', label: 'Todos los Canales' },
@@ -953,7 +957,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
                 type="button"
                 onClick={() => setChannelFilter(ch.id)}
                 className={channelFilter === ch.id ? 'pam-btn-primary' : 'pam-btn-ghost'}
-                style={{ padding: '6px 13px', fontSize: '0.78rem', minWidth: 'auto', borderRadius: '999px' }}
+                style={{ padding: '6px 13px', fontSize: '0.78rem', minWidth: 'auto', borderRadius: '999px', whiteSpace: 'nowrap' }}
               >
                 {ch.label}
               </button>
@@ -961,12 +965,12 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
           </div>
 
           {/* Selector de Vista: Kanban / Batching de Platos / Historial */}
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <div className="kds-scroll-chips" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={() => setViewMode('kanban')}
               className={viewMode === 'kanban' ? 'pam-btn-primary' : 'pam-btn-ghost'}
-              style={{ padding: '7px 13px', fontSize: '0.78rem', minWidth: 'auto' }}
+              style={{ padding: '7px 13px', fontSize: '0.78rem', minWidth: 'auto', whiteSpace: 'nowrap' }}
             >
               <LayoutGrid size={14} /> Tablero Kanban ({incomingOrders.length + kitchenOrders.length + readyAndDispatchOrders.length})
             </button>
@@ -974,7 +978,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
               type="button"
               onClick={() => setViewMode('batch')}
               className={viewMode === 'batch' ? 'pam-btn-primary' : 'pam-btn-ghost'}
-              style={{ padding: '7px 13px', fontSize: '0.78rem', minWidth: 'auto' }}
+              style={{ padding: '7px 13px', fontSize: '0.78rem', minWidth: 'auto', whiteSpace: 'nowrap' }}
             >
               <Layers size={14} /> Producción por Plato ({batchProductionList.length})
             </button>
@@ -982,7 +986,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
               type="button"
               onClick={() => setViewMode('history')}
               className={viewMode === 'history' ? 'pam-btn-primary' : 'pam-btn-ghost'}
-              style={{ padding: '7px 13px', fontSize: '0.78rem', minWidth: 'auto' }}
+              style={{ padding: '7px 13px', fontSize: '0.78rem', minWidth: 'auto', whiteSpace: 'nowrap' }}
             >
               <History size={14} /> Cerradas ({completedOrders.length})
             </button>
@@ -992,236 +996,283 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
         {/* ── CONTENIDO PRINCIPAL DEL KDS ── */}
         <div className="rpa-card-body">
           {viewMode === 'kanban' && (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: showMenuSidebar
-                  ? 'repeat(auto-fit, minmax(280px, 1fr))'
-                  : 'repeat(auto-fit, minmax(305px, 1fr))',
-                gap: '16px',
-                alignItems: 'start'
-              }}
-            >
-              {/* COLUMNA 1: NUEVAS / POR ACEPTAR */}
-              <div
-                style={{
-                  background: '#FFF7F5',
-                  border: '1px solid rgba(255, 85, 51, 0.25)',
-                  borderRadius: '20px',
-                  padding: '14px',
-                  minHeight: '420px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '4px 6px'
-                  }}
+            <>
+              {/* Selector rápido de columna para móviles y tablets en orientación vertical */}
+              <div className="kds-stage-tabs">
+                <button
+                  type="button"
+                  onClick={() => setKdsStageFilter('all')}
+                  className={`kds-stage-tab ${kdsStageFilter === 'all' ? 'active' : ''}`}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span
-                      style={{
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        background: '#FF5533',
-                        boxShadow: incomingOrders.length > 0 ? '0 0 10px #FF5533' : 'none'
-                      }}
-                    />
-                    <strong style={{ fontSize: '0.88rem', fontWeight: 900, color: '#9A3412', letterSpacing: '0.3px' }}>
-                      1. NUEVAS COMANDAS
-                    </strong>
-                  </div>
-                  <span
-                    style={{
-                      background: '#FF5533',
-                      color: '#FFFFFF',
-                      fontWeight: 900,
-                      fontSize: '0.78rem',
-                      padding: '2px 10px',
-                      borderRadius: '999px'
-                    }}
-                  >
-                    {incomingOrders.length}
-                  </span>
-                </div>
-
-                {incomingOrders.length === 0 ? (
-                  <div
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      textAlign: 'center',
-                      padding: '2.5rem 1rem',
-                      color: '#9A3412',
-                      opacity: 0.65
-                    }}
-                  >
-                    <Flame size={28} style={{ marginBottom: '6px' }} />
-                    <strong style={{ fontSize: '0.85rem' }}>Sin comandas nuevas</strong>
-                    <span style={{ fontSize: '0.75rem' }}>Las nuevas órdenes aparecerán aquí al instante.</span>
-                  </div>
-                ) : (
-                  <AnimatePresence>
-                    {incomingOrders.map(order => renderOrderTicket(order, 'incoming'))}
-                  </AnimatePresence>
-                )}
+                  📋 Todas ({incomingOrders.length + kitchenOrders.length + readyAndDispatchOrders.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setKdsStageFilter('incoming')}
+                  className={`kds-stage-tab incoming ${kdsStageFilter === 'incoming' ? 'active' : ''}`}
+                >
+                  🔥 1. Nuevas ({incomingOrders.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setKdsStageFilter('kitchen')}
+                  className={`kds-stage-tab kitchen ${kdsStageFilter === 'kitchen' ? 'active' : ''}`}
+                >
+                  🍳 2. Cocina ({kitchenOrders.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setKdsStageFilter('ready')}
+                  className={`kds-stage-tab ready ${kdsStageFilter === 'ready' ? 'active' : ''}`}
+                >
+                  🛵 3. Listos ({readyAndDispatchOrders.length})
+                </button>
               </div>
 
-              {/* COLUMNA 2: EN COCINA / PREPARACIÓN */}
               <div
+                className="kds-kanban-grid"
                 style={{
-                  background: '#FFFBEB',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  borderRadius: '20px',
-                  padding: '14px',
-                  minHeight: '420px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
+                  display: 'grid',
+                  gridTemplateColumns:
+                    kdsStageFilter !== 'all'
+                      ? '1fr'
+                      : showMenuSidebar
+                      ? 'repeat(auto-fit, minmax(265px, 1fr))'
+                      : 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: '16px',
+                  alignItems: 'start'
                 }}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '4px 6px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span
-                      style={{
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        background: '#F59E0B'
-                      }}
-                    />
-                    <strong style={{ fontSize: '0.88rem', fontWeight: 900, color: '#92400E', letterSpacing: '0.3px' }}>
-                      2. EN PREPARACIÓN (COCINA)
-                    </strong>
-                  </div>
-                  <span
-                    style={{
-                      background: '#F59E0B',
-                      color: '#FFFFFF',
-                      fontWeight: 900,
-                      fontSize: '0.78rem',
-                      padding: '2px 10px',
-                      borderRadius: '999px'
-                    }}
-                  >
-                    {kitchenOrders.length}
-                  </span>
-                </div>
-
-                {kitchenOrders.length === 0 ? (
+                {/* COLUMNA 1: NUEVAS / POR ACEPTAR */}
+                {(kdsStageFilter === 'all' || kdsStageFilter === 'incoming') && (
                   <div
+                    className="kds-kanban-col"
                     style={{
-                      flex: 1,
+                      background: '#FFF7F5',
+                      border: '1px solid rgba(255, 85, 51, 0.25)',
+                      borderRadius: '20px',
+                      padding: '14px',
+                      minHeight: incomingOrders.length === 0 ? '200px' : '360px',
                       display: 'flex',
                       flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      textAlign: 'center',
-                      padding: '2.5rem 1rem',
-                      color: '#92400E',
-                      opacity: 0.65
+                      gap: '12px'
                     }}
                   >
-                    <ChefHat size={28} style={{ marginBottom: '6px' }} />
-                    <strong style={{ fontSize: '0.85rem' }}>Estufa despejada</strong>
-                    <span style={{ fontSize: '0.75rem' }}>Acepta una comanda entrante para iniciar su cocción.</span>
-                  </div>
-                ) : (
-                  <AnimatePresence>
-                    {kitchenOrders.map(order => renderOrderTicket(order, 'kitchen'))}
-                  </AnimatePresence>
-                )}
-              </div>
-
-              {/* COLUMNA 3: LISTOS Y EN ENTREGA */}
-              <div
-                style={{
-                  background: '#ECFDF5',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  borderRadius: '20px',
-                  padding: '14px',
-                  minHeight: '420px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '4px 6px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span
+                    <div
                       style={{
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        background: '#10B981'
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '4px 6px'
                       }}
-                    />
-                    <strong style={{ fontSize: '0.88rem', fontWeight: 900, color: '#065F46', letterSpacing: '0.3px' }}>
-                      3. LISTOS / EN RUTA
-                    </strong>
-                  </div>
-                  <span
-                    style={{
-                      background: '#10B981',
-                      color: '#FFFFFF',
-                      fontWeight: 900,
-                      fontSize: '0.78rem',
-                      padding: '2px 10px',
-                      borderRadius: '999px'
-                    }}
-                  >
-                    {readyAndDispatchOrders.length}
-                  </span>
-                </div>
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
+                          style={{
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            background: '#FF5533',
+                            boxShadow: incomingOrders.length > 0 ? '0 0 10px #FF5533' : 'none'
+                          }}
+                        />
+                        <strong style={{ fontSize: '0.88rem', fontWeight: 900, color: '#9A3412', letterSpacing: '0.3px' }}>
+                          1. NUEVAS COMANDAS
+                        </strong>
+                      </div>
+                      <span
+                        style={{
+                          background: '#FF5533',
+                          color: '#FFFFFF',
+                          fontWeight: 900,
+                          fontSize: '0.78rem',
+                          padding: '2px 10px',
+                          borderRadius: '999px'
+                        }}
+                      >
+                        {incomingOrders.length}
+                      </span>
+                    </div>
 
-                {readyAndDispatchOrders.length === 0 ? (
+                    {incomingOrders.length === 0 ? (
+                      <div
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textAlign: 'center',
+                          padding: '1.75rem 1rem',
+                          color: '#9A3412',
+                          opacity: 0.65
+                        }}
+                      >
+                        <Flame size={28} style={{ marginBottom: '6px' }} />
+                        <strong style={{ fontSize: '0.85rem' }}>Sin comandas nuevas</strong>
+                        <span style={{ fontSize: '0.75rem' }}>Las nuevas órdenes aparecerán aquí al instante.</span>
+                      </div>
+                    ) : (
+                      <AnimatePresence>
+                        {incomingOrders.map(order => renderOrderTicket(order, 'incoming'))}
+                      </AnimatePresence>
+                    )}
+                  </div>
+                )}
+
+                {/* COLUMNA 2: EN COCINA / PREPARACIÓN */}
+                {(kdsStageFilter === 'all' || kdsStageFilter === 'kitchen') && (
                   <div
+                    className="kds-kanban-col"
                     style={{
-                      flex: 1,
+                      background: '#FFFBEB',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      borderRadius: '20px',
+                      padding: '14px',
+                      minHeight: kitchenOrders.length === 0 ? '200px' : '360px',
                       display: 'flex',
                       flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      textAlign: 'center',
-                      padding: '2.5rem 1rem',
-                      color: '#065F46',
-                      opacity: 0.65
+                      gap: '12px'
                     }}
                   >
-                    <PackageCheck size={28} style={{ marginBottom: '6px' }} />
-                    <strong style={{ fontSize: '0.85rem' }}>Sin pedidos por retirar</strong>
-                    <span style={{ fontSize: '0.75rem' }}>Los platos terminados pasan aquí para entrega o ruta.</span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '4px 6px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
+                          style={{
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            background: '#F59E0B'
+                          }}
+                        />
+                        <strong style={{ fontSize: '0.88rem', fontWeight: 900, color: '#92400E', letterSpacing: '0.3px' }}>
+                          2. EN PREPARACIÓN (COCINA)
+                        </strong>
+                      </div>
+                      <span
+                        style={{
+                          background: '#F59E0B',
+                          color: '#FFFFFF',
+                          fontWeight: 900,
+                          fontSize: '0.78rem',
+                          padding: '2px 10px',
+                          borderRadius: '999px'
+                        }}
+                      >
+                        {kitchenOrders.length}
+                      </span>
+                    </div>
+
+                    {kitchenOrders.length === 0 ? (
+                      <div
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textAlign: 'center',
+                          padding: '1.75rem 1rem',
+                          color: '#92400E',
+                          opacity: 0.65
+                        }}
+                      >
+                        <ChefHat size={28} style={{ marginBottom: '6px' }} />
+                        <strong style={{ fontSize: '0.85rem' }}>Estufa despejada</strong>
+                        <span style={{ fontSize: '0.75rem' }}>Acepta una comanda entrante para iniciar su cocción.</span>
+                      </div>
+                    ) : (
+                      <AnimatePresence>
+                        {kitchenOrders.map(order => renderOrderTicket(order, 'kitchen'))}
+                      </AnimatePresence>
+                    )}
                   </div>
-                ) : (
-                  <AnimatePresence>
-                    {readyAndDispatchOrders.map(order => renderOrderTicket(order, 'ready'))}
-                  </AnimatePresence>
+                )}
+
+                {/* COLUMNA 3: LISTOS Y EN ENTREGA */}
+                {(kdsStageFilter === 'all' || kdsStageFilter === 'ready') && (
+                  <div
+                    className="kds-kanban-col"
+                    style={{
+                      background: '#ECFDF5',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '20px',
+                      padding: '14px',
+                      minHeight: readyAndDispatchOrders.length === 0 ? '200px' : '360px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '4px 6px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
+                          style={{
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            background: '#10B981'
+                          }}
+                        />
+                        <strong style={{ fontSize: '0.88rem', fontWeight: 900, color: '#065F46', letterSpacing: '0.3px' }}>
+                          3. LISTOS / EN RUTA
+                        </strong>
+                      </div>
+                      <span
+                        style={{
+                          background: '#10B981',
+                          color: '#FFFFFF',
+                          fontWeight: 900,
+                          fontSize: '0.78rem',
+                          padding: '2px 10px',
+                          borderRadius: '999px'
+                        }}
+                      >
+                        {readyAndDispatchOrders.length}
+                      </span>
+                    </div>
+
+                    {readyAndDispatchOrders.length === 0 ? (
+                      <div
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textAlign: 'center',
+                          padding: '1.75rem 1rem',
+                          color: '#065F46',
+                          opacity: 0.65
+                        }}
+                      >
+                        <PackageCheck size={28} style={{ marginBottom: '6px' }} />
+                        <strong style={{ fontSize: '0.85rem' }}>Sin pedidos por retirar</strong>
+                        <span style={{ fontSize: '0.75rem' }}>Los platos terminados pasan aquí para entrega o ruta.</span>
+                      </div>
+                    ) : (
+                      <AnimatePresence>
+                        {readyAndDispatchOrders.map(order => renderOrderTicket(order, 'ready'))}
+                      </AnimatePresence>
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
+            </>
           )}
 
           {/* ── VISTA 2: PRODUCCIÓN AGRUPADA POR PLATO (BATCHING DE COCINA) ── */}

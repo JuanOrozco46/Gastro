@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/useApp';
 import { PaymentSimulatorService } from '../services/paymentService';
 import type { PaymentMethod, OrderFulfillment, CheckoutDetails } from '../types';
+import { calculateOrderFinancialBreakdown, MIN_DIGITAL_PAYMENT_COP } from '../utils/wompiFees';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2, AlertCircle, ShoppingBag, Bike, Utensils } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -20,12 +21,22 @@ interface PaymentModalProps {
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'pickup', prefilledTableId, prefilledTableToken, entryPoint }) => {
-  const { cart, tenants, currentTenant: contextTenant, currentUser, submitOrderWithPayment, retryRemotePayment, updateUserProfile, authMode, isSubmittingOrder, orderError } = useApp();
+  const { cart, cities, zones, selectedCityId, tenants, currentTenant: contextTenant, currentUser, submitOrderWithPayment, retryRemotePayment, updateUserProfile, authMode, isSubmittingOrder, orderError } = useApp();
   const currentTenant = (cart[0]?.product?.tenantId ? tenants.find(t => t.id === cart[0].product.tenantId) : undefined) || contextTenant;
+  const tenantCityName = cities.find(c => c.id === currentTenant.cityId)?.name || 'Colombia';
+  const tenantZoneName = zones.find(z => z.id === currentTenant.zoneId)?.name;
+  const userSelectedCityName = cities.find(c => c.id === selectedCityId)?.name;
+  const isCrossCityOrder = Boolean(
+    selectedCityId &&
+    currentTenant.cityId &&
+    selectedCityId !== currentTenant.cityId &&
+    entryPoint !== 'qr'
+  );
   const [method, setMethod] = useState<PaymentMethod>('wompi');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [confirmCrossCity, setConfirmCrossCity] = useState(false);
   const [wompiConfig, setWompiConfig] = useState<WompiCheckoutConfig | null>(null);
   const [pendingPaymentInfo, setPendingPaymentInfo] = useState<{orderId: string, paymentId: string, sandboxUrl?: string} | null>(null);
 
@@ -82,6 +93,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
     if (isOpen) {
       setFormError(null);
       setSuccess(false);
+      setConfirmCrossCity(false);
       setFulfillment(initialMode);
       if (currentUser?.name) setCustomerName(currentUser.name);
       if (currentUser?.phone) setCustomerPhone(currentUser.phone);
@@ -96,9 +108,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
   const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
   const deliveryFee = fulfillment === 'restaurant_delivery' ? (currentTenant.deliveryFee || 0) : 0;
   const total = subtotal + deliveryFee;
+  const isBelowDigitalMin = total > 0 && total < MIN_DIGITAL_PAYMENT_COP && currentTenant.acceptsCash !== false;
+  const minOrderAmount = Number(currentTenant.minOrder || 0);
+  const isBelowRestaurantMinOrder = fulfillment === 'restaurant_delivery' && minOrderAmount > 0 && subtotal > 0 && subtotal < minOrderAmount;
 
-  const platformFee = Math.round(total * currentTenant.commissionRate);
-  const restaurantPayout = total - platformFee;
+  const breakdown = calculateOrderFinancialBreakdown(total, method, currentTenant.commissionRate);
+  const platformFee = breakdown.gastroSyncFeeCop;
+  const gatewayFee = breakdown.wompiTotalFeeCop;
+  const restaurantPayout = breakdown.restaurantNetCop;
 
   const handlePaySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +129,27 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
 
     if (cart.length === 0) {
       setFormError('El carrito está vacío.');
+      return;
+    }
+
+    if (isBelowRestaurantMinOrder) {
+      setFormError(
+        `El pedido mínimo a domicilio en ${currentTenant.name} es de $${minOrderAmount.toLocaleString('es-CO')} COP en productos (te faltan $${(minOrderAmount - subtotal).toLocaleString('es-CO')} COP). Agrega más platos o cambia a Recoger en Local.`
+      );
+      return;
+    }
+
+    if (isCrossCityOrder && !confirmCrossCity) {
+      setFormError(
+        `Atención de cobertura: Tu ubicación seleccionada es ${userSelectedCityName || 'otra ciudad'}, pero ${currentTenant.name} opera únicamente en ${tenantCityName}. Marca la casilla de confirmación de ciudad antes de pagar.`
+      );
+      return;
+    }
+
+    if (method !== 'cash' && isBelowDigitalMin) {
+      setFormError(
+        `El monto mínimo para pagos digitales por pasarela (Wompi / Tarjeta) es de $${MIN_DIGITAL_PAYMENT_COP.toLocaleString('es-CO')} COP (por el cargo fijo de $700 + IVA). Selecciona Efectivo o agrega $${(MIN_DIGITAL_PAYMENT_COP - total).toLocaleString('es-CO')} COP más.`
+      );
       return;
     }
 
@@ -130,7 +168,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
         return;
       }
       if (!deliveryAddress.trim()) {
-        setFormError('Ingresa la dirección de entrega en Armenia, Quindío.');
+        setFormError(`Ingresa la dirección de entrega en ${tenantCityName}.`);
         return;
       }
     }
@@ -238,6 +276,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
   return (
     <AnimatePresence>
       <div 
+        className="payment-modal-overlay"
         style={{ 
           position: 'fixed', 
           inset: 0, 
@@ -256,7 +295,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="card" 
+          className="card payment-modal-card" 
           style={{ 
             width: '100%', 
             maxWidth: '540px', 
@@ -545,14 +584,70 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                 </div>
               )}
 
+              {/* Alerta Anti-Error de Ciudad Distinta */}
+              {isCrossCityOrder && (
+                <div style={{
+                  background: 'rgba(245, 158, 11, 0.12)',
+                  border: '1px solid rgba(245, 158, 11, 0.45)',
+                  borderRadius: '14px',
+                  padding: '12px 14px',
+                  marginBottom: '1rem',
+                  fontSize: '0.8rem',
+                  color: '#FDE68A'
+                }}>
+                  <div style={{ fontWeight: 800, color: '#FBBF24', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertCircle size={15} /> ⚠️ Verifica la ciudad del restaurante
+                  </div>
+                  <div style={{ lineHeight: 1.45, color: '#FEF3C7', marginBottom: '8px' }}>
+                    Estás explorando desde <strong>{userSelectedCityName || 'otra ciudad'}</strong>, pero{' '}
+                    <strong>{currentTenant.name}</strong> opera físicamente en{' '}
+                    <strong>{tenantCityName}{tenantZoneName ? ` (Zona ${tenantZoneName})` : ''}</strong>.
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700, color: '#FFFFFF', fontSize: '0.78rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={confirmCrossCity}
+                      onChange={e => {
+                        setConfirmCrossCity(e.target.checked);
+                        setFormError(null);
+                      }}
+                      style={{ width: '16px', height: '16px', accentColor: '#F59E0B', cursor: 'pointer' }}
+                    />
+                    <span>Confirmo que estoy en {tenantCityName} para recibir o recoger este pedido</span>
+                  </label>
+                </div>
+              )}
+
+              {/* Alerta de Pedido Mínimo del Restaurante */}
+              {isBelowRestaurantMinOrder && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: '14px',
+                  padding: '10px 14px',
+                  marginBottom: '1rem',
+                  fontSize: '0.78rem',
+                  color: '#FCA5A5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0, color: '#F87171' }} />
+                  <span>
+                    <strong>Pedido mínimo a domicilio: ${minOrderAmount.toLocaleString('es-CO')} COP.</strong>{' '}
+                    Te faltan <strong>${(minOrderAmount - subtotal).toLocaleString('es-CO')} COP</strong> en productos (o puedes elegir <em>Recoger en Local</em>).
+                  </span>
+                </div>
+              )}
+
               {/* Step 2: Form Fields per Fulfillment Mode */}
               {fulfillment === 'pickup' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.25rem' }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 14px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.82rem' }}>
                     <p style={{ color: 'white', fontWeight: 700, margin: 0 }}>📍 Dirección de Recogida:</p>
-                    <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{currentTenant.name} · {currentTenant.address || 'Armenia, Quindío'}</p>
+                    <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{currentTenant.name} · {currentTenant.address || tenantCityName}</p>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '4px' }}>Nombre de quien recoge</label>
                       <input
@@ -602,7 +697,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '4px' }}>Dirección de entrega en Armenia *</label>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '4px' }}>Dirección de entrega en {tenantCityName} *</label>
                     <input
                       type="text"
                       placeholder="Ej. Cra 14 # 19-20, Barrio Norte"
@@ -714,6 +809,24 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                     </button>
                   ))}
                 </div>
+
+                {isBelowDigitalMin && method !== 'cash' && (
+                  <div style={{ marginTop: '8px', background: 'rgba(245, 158, 11, 0.14)', border: '1px solid rgba(245, 158, 11, 0.35)', padding: '9px 12px', borderRadius: '12px', fontSize: '0.76rem', color: '#FCD34D', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <span>
+                      ⚠️ Pagos digitales requieren mínimo <strong>${MIN_DIGITAL_PAYMENT_COP.toLocaleString('es-CO')} COP</strong> (por el cargo fijo de pasarela Wompi de $700 + IVA).
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMethod('cash');
+                        setFormError(null);
+                      }}
+                      style={{ background: '#F59E0B', color: '#0F172A', border: 'none', borderRadius: '8px', padding: '5px 10px', fontWeight: 900, fontSize: '0.73rem', cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      💵 Cambiar a Efectivo
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Method Details for Card */}
@@ -755,11 +868,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
               {/* Commission Transparency Note */}
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: '12px', border: '1px dashed rgba(255,255,255,0.12)', marginBottom: '1.25rem', fontSize: '0.78rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Para el restaurante (97%):</span>
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    {method === 'cash' ? 'Neto para el restaurante (97%):' : 'Neto restaurante (tras pasarela + 3%):'}
+                  </span>
                   <strong style={{ color: '#10B981' }}>${restaurantPayout.toLocaleString('es-CO')} COP</strong>
                 </div>
+                {gatewayFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Pasarela Wompi (2.65% + $700 + IVA):</span>
+                    <strong style={{ color: '#94A3B8' }}>${gatewayFee.toLocaleString('es-CO')} COP</strong>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Comisión GastroSync (3%):</span>
+                  <span style={{ color: 'var(--text-muted)' }}>Comisión GastroSync (3% Libre):</span>
                   <strong style={{ color: '#F59E0B' }}>${platformFee.toLocaleString('es-CO')} COP</strong>
                 </div>
               </div>

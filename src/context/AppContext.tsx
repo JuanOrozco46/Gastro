@@ -1161,7 +1161,9 @@ const location = useLocationSlice();
         return { success: false };
       }
       const platformFee = Math.round(calculatedTotal * orderTenant.commissionRate);
-      const restaurantPayout = calculatedTotal - platformFee;
+      const gatewayFee =
+        method === 'cash' ? 0 : Math.round((calculatedTotal * 0.0265 + 700) * 1.19);
+      const restaurantPayout = Math.max(0, calculatedTotal - platformFee - gatewayFee);
 
       const normalizedTransaction: Transaction = {
         ...transaction,

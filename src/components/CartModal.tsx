@@ -73,13 +73,13 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
                             ${item.product.price.toLocaleString('es-CO')} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>(x{item.quantity})</span>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px' }}>
-                          <button onClick={() => removeFromCart(item.product.id)} style={{ width: 28, height: 28, borderRadius: '6px', border: 'none', background: 'var(--neutral-surface)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {item.quantity === 1 ? <Trash2 size={14} color="var(--danger)" /> : <Minus size={14} />}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '10px' }}>
+                          <button onClick={() => removeFromCart(item.product.id)} style={{ width: 34, height: 34, borderRadius: '8px', border: 'none', background: 'var(--neutral-surface)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                            {item.quantity === 1 ? <Trash2 size={15} color="var(--danger)" /> : <Minus size={15} />}
                           </button>
-                          <span style={{ fontWeight: 700, minWidth: 16, textAlign: 'center' }}>{item.quantity}</span>
-                          <button onClick={() => addToCart(item.product)} style={{ width: 28, height: 28, borderRadius: '6px', border: 'none', background: 'var(--neutral-surface)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Plus size={14} />
+                          <span style={{ fontWeight: 700, minWidth: 18, textAlign: 'center' }}>{item.quantity}</span>
+                          <button onClick={() => addToCart(item.product)} style={{ width: 34, height: 34, borderRadius: '8px', border: 'none', background: 'var(--neutral-surface)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                            <Plus size={15} />
                           </button>
                         </div>
                       </div>
@@ -103,7 +103,7 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
             </div>
 
             {cart.length > 0 && (
-              <div style={{ padding: '1.25rem', borderTop: '1px solid var(--neutral-border)', background: 'var(--neutral-surface-alt)' }}>
+              <div style={{ padding: '1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px))', borderTop: '1px solid var(--neutral-border)', background: 'var(--neutral-surface-alt)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                   <span>Subtotal</span><span>${cartTotal.toLocaleString('es-CO')}</span>
                 </div>
@@ -116,7 +116,7 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
                 {isCartTenantOpen ? (
                   <button 
                     onClick={() => { onClose(); onCheckout(); }}
-                    style={{ width: '100%', padding: '16px', borderRadius: '16px', background: 'var(--primary)', color: 'white', border: 'none', fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    style={{ width: '100%', padding: '16px', borderRadius: '16px', background: 'var(--primary)', color: 'white', border: 'none', fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}
                   >
                     <Bike size={20} /> Pagar a Domicilio
                   </button>

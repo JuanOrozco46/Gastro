@@ -136,10 +136,15 @@ serve(async (req) => {
       integritySecret
     );
 
-    // Platform fee (3%) and payout
-    const subtotal = Number(order.subtotal_cop || canonicalTotal);
-    const platformFee = Math.floor(subtotal * 0.03);
-    const restaurantPayout = canonicalTotal - platformFee;
+    // 1. Comisión libre para GastroSync (3% exacto)
+    const platformFee = Math.round(canonicalTotal * 0.03);
+    // 2. Costo de pasarela Wompi (2.65% + $700 COP + 19% IVA sobre la comisión de Wompi)
+    const isCashProvider = String(provider).toLowerCase().trim() === 'cash';
+    const rawWompiBase = isCashProvider ? 0 : canonicalTotal * 0.0265 + 700;
+    const gatewayFee = isCashProvider ? 0 : Math.round(rawWompiBase * 1.19);
+    const gatewayIva = isCashProvider ? 0 : Math.max(0, gatewayFee - Math.round(rawWompiBase));
+    // 3. Neto del restaurante después de descontar el 3% de GastroSync y el costo de pasarela Wompi
+    const restaurantPayout = Math.max(0, canonicalTotal - platformFee - gatewayFee);
 
     // Create payment intent record with status 'pending'
     const { data: paymentRecord, error: paymentError } = await supabaseAdmin
@@ -150,6 +155,8 @@ serve(async (req) => {
         provider_reference: providerReference,
         amount_cop: canonicalTotal,
         platform_fee_cop: platformFee,
+        gateway_fee_cop: gatewayFee,
+        gateway_iva_cop: gatewayIva,
         restaurant_payout_cop: restaurantPayout,
         status: 'pending'
       })

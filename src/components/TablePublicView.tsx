@@ -8,7 +8,7 @@ import { fetchLiveOrdersForTable, subscribeToTableOrders } from '../services/sup
 import type { Product, Tenant, RestaurantTable, Order } from '../types';
 
 export const TablePublicView: React.FC = () => {
-  const { products, cart, addToCart, setCurrentTenantBySlug } = useApp();
+  const { products, cart, addToCart, removeFromCart, setCurrentTenantBySlug } = useApp();
   
   const [table, setTable] = useState<RestaurantTable | null>(null);
   const [restaurant, setRestaurant] = useState<Tenant | null>(null);
@@ -100,31 +100,34 @@ export const TablePublicView: React.FC = () => {
       transition={{ duration: 0.4 }}
       className="tab-content active"
     >
-      <div style={{
-        background: 'var(--glass-medium)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '28px',
-        padding: '2rem 2.5rem',
-        marginBottom: '2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1.5rem',
-        boxShadow: '0 16px 40px rgba(0, 0, 0, 0.4)'
-      }}>
+      <div
+        className="table-qr-hero"
+        style={{
+          background: 'var(--glass-medium)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '24px',
+          padding: 'clamp(1.15rem, 3vw, 2rem) clamp(1.15rem, 3.5vw, 2.5rem)',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.4)'
+        }}
+      >
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span className="badge badge-secondary" style={{ padding: '6px 14px', fontSize: '0.78rem', fontWeight: 800 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+            <span className="badge badge-secondary" style={{ padding: '6px 14px', fontSize: '0.75rem', fontWeight: 800 }}>
               📱 ESCANEO QR EN MESA
             </span>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Sincronización en vivo</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Sincronización en vivo</span>
           </div>
-          <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'white', letterSpacing: '-0.5px' }}>
+          <h2 style={{ fontSize: 'clamp(1.35rem, 4.5vw, 2rem)', fontWeight: 900, color: 'white', letterSpacing: '-0.5px', lineHeight: 1.2 }}>
             {restaurant.name} • <span style={{ color: 'var(--primary)' }}>Mesa #{table.tableNumber}</span>
           </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: '4px' }}>
             {table.displayName ? `Zona: ${table.displayName} • ` : ''}Elige tus platos y envía la comanda a cocina.
           </p>
         </div>
@@ -132,32 +135,32 @@ export const TablePublicView: React.FC = () => {
         <div style={{
           background: 'rgba(255, 255, 255, 0.05)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '20px',
-          padding: '12px 20px',
+          borderRadius: '18px',
+          padding: '10px 16px',
           display: 'flex',
           alignItems: 'center',
-          gap: '14px'
+          gap: '12px'
         }}>
-          <div style={{ background: 'var(--primary-light)', padding: '10px', borderRadius: '12px', color: 'var(--primary)' }}>
-            <QrCode size={28} />
+          <div style={{ background: 'var(--primary-light)', padding: '9px', borderRadius: '12px', color: 'var(--primary)' }}>
+            <QrCode size={24} />
           </div>
           <div>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>
               ESTADO DE CONEXIÓN
             </span>
-            <strong style={{ fontSize: '0.9rem', color: '#10B981', display: 'block' }}>🟢 Mesa Conectada</strong>
+            <strong style={{ fontSize: '0.86rem', color: '#10B981', display: 'block' }}>🟢 Mesa Conectada</strong>
           </div>
         </div>
       </div>
 
-      <div className="grid-2 table-view-grid" style={{ gap: '1.75rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+      <div className="grid-2 table-view-grid" style={{ gap: '1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
           {tableOrders.length > 0 && (
             <div>
-              <div className="card-header" style={{ marginBottom: '1.25rem' }}>
-                <div className="card-title" style={{ fontSize: '1.25rem', fontWeight: 900, color: 'white' }}>
-                  <ShoppingBag size={22} style={{ color: 'var(--primary)' }} /> Pedidos en curso
+              <div className="card-header" style={{ marginBottom: '1rem' }}>
+                <div className="card-title" style={{ fontSize: '1.15rem', fontWeight: 900, color: 'white' }}>
+                  <ShoppingBag size={20} style={{ color: 'var(--primary)' }} /> Pedidos en curso
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -167,9 +170,9 @@ export const TablePublicView: React.FC = () => {
                     backdropFilter: 'blur(16px)',
                     border: '1px solid rgba(255, 255, 255, 0.09)',
                     borderRadius: '20px',
-                    padding: '1.25rem'
+                    padding: '1.1rem 1.25rem'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                       <span style={{ color: 'white', fontWeight: 800 }}>Pedido #{o.id.substring(0,6).toUpperCase()}</span>
                       <span className="badge" style={{ 
                         background: o.status === 'delivered' ? 'rgba(16, 185, 129, 0.2)' : 'var(--primary-glass)', 
@@ -215,13 +218,13 @@ export const TablePublicView: React.FC = () => {
           )}
 
           <div>
-            <div className="card-header" style={{ marginBottom: '1.25rem' }}>
-              <div className="card-title" style={{ fontSize: '1.25rem', fontWeight: 900, color: 'white' }}>
-                <Utensils size={22} style={{ color: 'var(--primary)' }} /> Carta Digital en Vivo
+            <div className="card-header" style={{ marginBottom: '1rem' }}>
+              <div className="card-title" style={{ fontSize: '1.15rem', fontWeight: 900, color: 'white' }}>
+                <Utensils size={20} style={{ color: 'var(--primary)' }} /> Carta Digital en Vivo
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tenantProducts.length === 0 ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>El menú no está disponible en este momento.</div>
               ) : (
@@ -229,12 +232,13 @@ export const TablePublicView: React.FC = () => {
                   <motion.div 
                     key={product.id}
                     whileHover={{ scale: 1.01 }}
-                    className="card" 
+                    className="card table-qr-product-card" 
                     style={{ 
                       display: 'flex', 
-                      gap: '16px', 
-                      alignItems: 'center', 
-                      padding: '1.25rem',
+                      gap: '14px', 
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      padding: '1rem 1.15rem',
                       background: 'var(--glass-light)',
                       backdropFilter: 'blur(16px)',
                       borderColor: 'rgba(255, 255, 255, 0.09)',
@@ -242,24 +246,24 @@ export const TablePublicView: React.FC = () => {
                     }}
                   >
                     <div style={{ 
-                      width: '64px', 
-                      height: '64px', 
+                      width: '58px', 
+                      height: '58px', 
                       borderRadius: '16px', 
                       background: 'var(--primary-glass)', 
                       border: '1px solid var(--primary-glass-border)',
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center', 
-                      fontSize: '1.8rem',
+                      fontSize: '1.7rem',
                       flexShrink: 0
                     }}>
                       {product.emoji}
                     </div>
 
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</h4>
-                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '3px 0 6px', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{product.desc}</p>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)' }}>
+                    <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                      <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'white', lineHeight: 1.3 }}>{product.name}</h4>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '3px 0 6px', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{product.desc}</p>
+                      <span style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--primary)' }}>
                         ${product.price.toLocaleString('es-CO')} COP
                       </span>
                     </div>
@@ -267,7 +271,7 @@ export const TablePublicView: React.FC = () => {
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className="btn btn-primary"
+                      className="btn btn-primary table-qr-add-btn"
                       style={{ borderRadius: '12px', padding: '10px 16px', fontWeight: 800, fontSize: '0.85rem', minHeight: '44px', flexShrink: 0 }}
                       onClick={() => addToCart(product)}
                     >
@@ -281,6 +285,7 @@ export const TablePublicView: React.FC = () => {
         </div>
 
         <div 
+          id="table-qr-comanda-card"
           className="card" 
           style={{ 
             position: 'sticky', 
@@ -315,18 +320,56 @@ export const TablePublicView: React.FC = () => {
                     exit={{ opacity: 0, x: 10 }}
                     style={{ 
                       display: 'flex', 
-                      justifyContent: 'space-between', 
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '10px',
                       fontSize: '0.88rem',
                       padding: '8px 12px',
                       background: 'rgba(255, 255, 255, 0.04)',
                       borderRadius: '10px'
                     }}
                   >
-                    <span>
-                      <strong style={{ color: 'var(--primary)', marginRight: '6px' }}>{item.quantity}x</strong> 
-                      <span style={{ color: 'white' }}>{item.product.name}</span>
-                    </span>
-                    <strong style={{ color: 'white' }}>${(item.product.price * item.quantity).toLocaleString('es-CO')}</strong>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ color: 'white', fontWeight: 700, display: 'block' }}>{item.product.name}</span>
+                      <strong style={{ color: 'var(--primary)', fontSize: '0.8rem' }}>
+                        ${(item.product.price * item.quantity).toLocaleString('es-CO')}
+                      </strong>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(item.product.id)}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          background: 'rgba(255,255,255,0.06)',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontWeight: 900
+                        }}
+                      >
+                        -
+                      </button>
+                      <strong style={{ color: 'white', minWidth: '18px', textAlign: 'center' }}>{item.quantity}</strong>
+                      <button
+                        type="button"
+                        onClick={() => addToCart(item.product)}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          background: 'rgba(255,255,255,0.06)',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontWeight: 900
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -364,6 +407,40 @@ export const TablePublicView: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Barra inferior flotante en móvil para enviar comanda de mesa sin hacer scroll */}
+      {cartQty > 0 && !isPaymentOpen && (
+        <div className="table-qr-mobile-sticky-bar">
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.8)', fontWeight: 700 }}>
+              Mesa #{table.tableNumber} · {cartQty} plato{cartQty !== 1 ? 's' : ''}
+            </span>
+            <strong style={{ fontSize: '1rem', color: '#FFFFFF', fontWeight: 900 }}>
+              ${cartTotal.toLocaleString('es-CO')} COP
+            </strong>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsPaymentOpen(true)}
+            style={{
+              background: '#10B981',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '10px 18px',
+              fontWeight: 900,
+              fontSize: '0.86rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)'
+            }}
+          >
+            <CreditCard size={16} /> Pagar y Enviar
+          </button>
+        </div>
+      )}
 
       <PaymentModal
         isOpen={isPaymentOpen}

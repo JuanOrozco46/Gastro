@@ -166,8 +166,8 @@ const PostCard: React.FC<PostCardProps> = ({
             </div>
             <div className="gf-author-sub">
               <span className="gf-category-pill">{tenant?.category || post.tenantCategory}</span>
-              {(tenant?.address || post.tenantAddress) && (
-                <span className="gf-address"><MapPin size={10} /> {tenant?.address || post.tenantAddress}</span>
+              {(post.tenantAddress || tenant?.address) && (
+                <span className="gf-address"><MapPin size={10} /> {post.tenantAddress || tenant?.address}</span>
               )}
             </div>
           </div>
@@ -400,15 +400,26 @@ export const CustomerDeliveryApp: React.FC = () => {
         if (selectedZoneId && tenant.zoneId !== selectedZoneId) {
           return acc;
         }
+        const tCityName = cities.find(c => c.id === tenant.cityId)?.name;
+        const tZoneName = zones.find(z => z.id === tenant.zoneId)?.name;
+        const enrichedLocation = [
+          tCityName,
+          tZoneName ? `Zona ${tZoneName}` : null,
+          tenant.address
+        ]
+          .filter(Boolean)
+          .join(' · ');
+
         acc.push({
           ...post,
           tenantName: tenant.name,
           tenantCategory: tenant.category,
-          tenantLogoEmoji: tenant.logoEmoji || '🍽️'
+          tenantLogoEmoji: tenant.logoEmoji || '🍽️',
+          tenantAddress: enrichedLocation || post.tenantAddress
         });
         return acc;
       }, []);
-    }, [activePosts, tenantMap, selectedZoneId, activeCity, cities]);
+    }, [activePosts, tenantMap, selectedZoneId, activeCity, cities, zones]);
 
   const activeTenantsInZoneCount = useMemo(() => {
     const hasTenantsInCity = activeCity ? tenants.some(t => t.status === 'active' && t.cityId === activeCity.id) : false;
@@ -420,10 +431,13 @@ export const CustomerDeliveryApp: React.FC = () => {
     }).length;
   }, [tenants, selectedZoneId, activeCity]);
 
+  const hasTenantsInActiveCity = activeCity ? tenants.some(t => t.status === 'active' && t.cityId === activeCity.id) : false;
   const currentZoneObj = zones.find(z => z.id === selectedZoneId);
-  const zoneInfoText = !selectedZoneId
-    ? `Descubre lo nuevo cerca de ti en ${activeCity ? activeCity.name : 'tu ciudad'}.`
-    : `Descubre restaurantes y platos en Zona ${currentZoneObj?.name || ''}.`;
+  const zoneInfoText = !hasTenantsInActiveCity && activeCity
+    ? `📍 Aún no hay locales activos en ${activeCity.name}. Explorando catálogo nacional de Colombia.`
+    : !selectedZoneId
+      ? `Descubre lo nuevo cerca de ti en ${activeCity ? activeCity.name : 'tu ciudad'}.`
+      : `Descubre restaurantes y platos en Zona ${currentZoneObj?.name || ''}.`;
 
   const cartTotal = cart.reduce((s, i) => s + (i.product?.price || 0) * i.quantity, 0);
   const cartQty   = cart.reduce((s, i) => s + i.quantity, 0);
@@ -634,6 +648,8 @@ export const CustomerDeliveryApp: React.FC = () => {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '4px 10px',
               fontSize: '0.78rem',
               color: 'var(--text-muted)',
               padding: '8px 12px 0 12px'
@@ -1001,7 +1017,7 @@ export const CustomerDeliveryApp: React.FC = () => {
               {/* No ads banner */}
               <div className="gf-no-ads-card">
                 <div className="gf-no-ads-icon">🚫📢</div>
-                <p><strong>Contenido real de restaurantes.</strong> Lo que ves aquí son publicaciones directas de los locales aliados en Armenia.</p>
+                <p><strong>Contenido real de restaurantes.</strong> Lo que ves aquí son publicaciones directas de los locales aliados en {activeCity ? activeCity.name : 'tu ciudad'}.</p>
                 <a href="#" className="gf-no-ads-link">¿Eres restaurante? Únete <ExternalLink size={11} /></a>
               </div>
 
@@ -1110,6 +1126,72 @@ export const CustomerDeliveryApp: React.FC = () => {
         isVisible={!isMobileCartOpen && !isPaymentOpen}
         onOpen={() => setIsMobileCartOpen(true)}
       />
+
+      {/* ── Barra de Navegación Inferior Nativa para Móviles (<= 768px) ── */}
+      <nav className="gf-mobile-bottom-nav" aria-label="Navegación principal móvil">
+        <button
+          type="button"
+          className={`gf-mobile-nav-item ${activeTab === 'feed' && !isProfileModalOpen ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('feed');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        >
+          <Zap size={19} />
+          <span>Feed</span>
+        </button>
+
+        <button
+          type="button"
+          className={`gf-mobile-nav-item ${activeTab === 'directory' && !isProfileModalOpen ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('directory');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        >
+          <MapPin size={19} />
+          <span>Locales</span>
+        </button>
+
+        <button
+          type="button"
+          className={`gf-mobile-nav-item ${activeTab === 'orders' && !isProfileModalOpen ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('orders');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          style={{ position: 'relative' }}
+        >
+          <div style={{ position: 'relative', display: 'inline-flex' }}>
+            <Package size={19} />
+            {activeOrdersCount > 0 && (
+              <span className="gf-mobile-nav-badge">{activeOrdersCount}</span>
+            )}
+          </div>
+          <span>Pedidos</span>
+        </button>
+
+        <button
+          type="button"
+          className={`gf-mobile-nav-item ${activeTab === 'support' && !isProfileModalOpen ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('support');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        >
+          <MessageCircle size={19} />
+          <span>Soporte</span>
+        </button>
+
+        <button
+          type="button"
+          className={`gf-mobile-nav-item ${isProfileModalOpen ? 'active' : ''}`}
+          onClick={() => setIsProfileModalOpen(true)}
+        >
+          <User size={19} />
+          <span>Mi Perfil</span>
+        </button>
+      </nav>
 
       {isMobileCartOpen && (
         <Suspense fallback={null}>

@@ -541,7 +541,31 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                         {tenant.name}
                         <span title="Local Verificado"><CheckCircle2 size={16} className="verified-icon" /></span>
                       </h3>
-                      <span className="tenant-category-tag">{tenant.category}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                        <span className="tenant-category-tag">{tenant.category}</span>
+                        {(() => {
+                          const tCity = cities.find(c => c.id === tenant.cityId)?.name;
+                          const tZone = zones.find(z => z.id === tenant.zoneId)?.name;
+                          if (!tCity && !tZone) return null;
+                          return (
+                            <span style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              color: '#FBBF24',
+                              background: 'rgba(245, 158, 11, 0.14)',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              padding: '2px 8px',
+                              borderRadius: '999px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <MapPin size={10} />
+                              {tCity || 'Colombia'}{tZone ? ` · ${tZone}` : ''}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </div>
 
                     <button
@@ -591,7 +615,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                     </span>
                     <span className="spec-dot">•</span>
                     <span className="spec-item">
-                      📍 {tenant.address || 'Zona Local'}
+                      📍 {tenant.address || cities.find(c => c.id === tenant.cityId)?.name || 'Zona Local'}
                     </span>
                     {tenant.minOrder && (
                       <>

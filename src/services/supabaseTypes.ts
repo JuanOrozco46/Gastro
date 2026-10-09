@@ -56,6 +56,17 @@ export interface DbRestaurant {
   accepting_orders?: boolean;
   rating_avg?: number | string | null;
   rating_count?: number | null;
+  accepts_cash?: boolean | null;
+  table_service_enabled?: boolean | null;
+  payout_bank_name?: string | null;
+  payout_account_type?: string | null;
+  payout_account_number?: string | null;
+  payout_account_holder?: string | null;
+  payout_document_type?: string | null;
+  payout_document_number?: string | null;
+  wompi_merchant_id?: string | null;
+  cash_commission_limit_cop?: number | null;
+  auto_lock_cash_on_limit?: boolean | null;
   restaurant_hours?: {
     id: string;
     day_of_week: number;
@@ -171,6 +182,7 @@ export interface DbOrder {
   table_number: string | null;
   restaurant_notes: string | null;
   cancellation_reason: string | null;
+  payment_method?: string | null;
   subtotal_cop: number;
   delivery_fee_cop: number;
   total_cop: number;
@@ -235,6 +247,17 @@ export function mapDbRestaurantToTenant(db: DbRestaurant): Tenant {
     isNew: true,
     tablesCount: 0,
     ownerUserId: db.owner_user_id || undefined,
+    tableServiceEnabled: db.table_service_enabled ?? undefined,
+    acceptsCash: db.accepts_cash ?? true,
+    payoutBankName: db.payout_bank_name || undefined,
+    payoutAccountType: db.payout_account_type || undefined,
+    payoutAccountNumber: db.payout_account_number || undefined,
+    payoutAccountHolder: db.payout_account_holder || undefined,
+    payoutDocumentType: db.payout_document_type || undefined,
+    payoutDocumentNumber: db.payout_document_number || undefined,
+    wompiMerchantId: db.wompi_merchant_id || undefined,
+    cashCommissionLimitCop: db.cash_commission_limit_cop ?? 50000,
+    autoLockCashOnLimit: db.auto_lock_cash_on_limit ?? true,
     hours: db.restaurant_hours ? db.restaurant_hours.map(h => ({
       id: h.id,
       restaurantId: db.id,
@@ -348,6 +371,6 @@ export function mapDbOrderToOrder(db: DbOrder): Order {
     cancellationReason: db.cancellation_reason || undefined,
     paymentId: db.payments?.[0]?.id,
     paymentStatus: db.payments?.[0]?.status,
-    paymentMethod: (db.payments?.[0]?.provider as any) || undefined
+    paymentMethod: ((db.payments?.[0]?.provider || db.payment_method) as any) || 'cash'
   };
 }

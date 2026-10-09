@@ -1149,6 +1149,8 @@ interface DBRestaurantUpdate {
   phone?: string;
   whatsapp?: string;
   address?: string;
+  city_id?: string;
+  zone_id?: string | null;
   logo_url?: string;
   logo_emoji?: string;
   banner_url?: string;
@@ -1174,6 +1176,8 @@ export async function updateRemoteTenant(tenantId: string, updates: Partial<Tena
     if (typeof updates.phone === 'string') dbUpdates.phone = updates.phone;
     if (typeof updates.whatsapp === 'string') dbUpdates.whatsapp = updates.whatsapp;
     if (typeof updates.address === 'string') dbUpdates.address = updates.address;
+    if (typeof updates.cityId === 'string' && updates.cityId) dbUpdates.city_id = updates.cityId;
+    if (typeof updates.zoneId === 'string') dbUpdates.zone_id = updates.zoneId || null;
     if (typeof updates.logoUrl === 'string') dbUpdates.logo_url = updates.logoUrl;
     if (typeof updates.logoEmoji === 'string') dbUpdates.logo_emoji = updates.logoEmoji;
     if (typeof updates.bannerUrl === 'string') dbUpdates.banner_url = updates.bannerUrl;
@@ -1833,3 +1837,64 @@ export async function deleteRestaurantReview(
   }
 }
 
+export async function ensureColombiaCityAndZone(
+  cityName: string,
+  zoneName = 'Centro'
+): Promise<{
+  success: boolean;
+  cityId?: string;
+  cityName?: string;
+  zoneId?: string;
+  zoneName?: string;
+  error?: string;
+}> {
+  const cleanCity = cityName.trim();
+  const cleanZone = zoneName.trim() || 'Centro';
+  if (!cleanCity) {
+    return { success: false, error: 'Ingresa el nombre de la ciudad o municipio.' };
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      success: true,
+      cityId: `city_${cleanCity.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+      cityName: cleanCity,
+      zoneId: `zone_${cleanZone.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+      zoneName: cleanZone
+    };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('ensure_colombia_city_and_zone', {
+      p_city_name: cleanCity,
+      p_zone_name: cleanZone
+    });
+
+    if (error || !data) {
+      return {
+        success: false,
+        error: error?.message || 'No se pudo registrar la ciudad/zona en la base de datos.'
+      };
+    }
+
+    const res = data as {
+      city_id?: string;
+      city_name?: string;
+      zone_id?: string;
+      zone_name?: string;
+    };
+
+    return {
+      success: true,
+      cityId: res.city_id,
+      cityName: res.city_name || cleanCity,
+      zoneId: res.zone_id,
+      zoneName: res.zone_name || cleanZone
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Error registrando ciudad o municipio.'
+    };
+  }
+}
