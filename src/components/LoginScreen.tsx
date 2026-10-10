@@ -6,7 +6,8 @@ import {
   Lock, Mail, User, Phone, MapPin, Camera, Trash2,
   Eye, EyeOff, Utensils, Check,
   AlertCircle, Building2, CheckCircle2, X, KeyRound,
-  Compass, QrCode, ShieldCheck, ArrowUpRight, ChefHat, BarChart3, Bike
+  Compass, QrCode, ShieldCheck, ArrowUpRight, ChefHat, BarChart3, Bike,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { PartnerApplicationModal } from './PartnerApplicationModal';
 import {
@@ -21,25 +22,47 @@ import {
   evaluatePasswordStrength
 } from '../utils/formValidation';
 
-/* ── Editorial Gastronomy Pillars shown on the left showcase ────────── */
-const EDITORIAL_PILLARS = [
+/* ── Carrusel Fotográfico Libre de Derechos (Licencia Unsplash) ────────── */
+const SHOWCASE_SLIDES = [
   {
+    id: 'feed-local',
     icon: Compass,
-    title: 'Carta Viva & Descubrimiento Local',
-    tag: 'Directo del restaurante',
-    desc: 'Explora platos reales publicados por las cocinas de tu ciudad y pide sin intermediarios.'
+    tag: 'Carta Viva · Feed Gastronómico',
+    headline: 'Descubre los platos reales de tu ciudad antes de pedir.',
+    desc: 'Explora fotos e historias publicadas cada día por las cocinas locales de tu zona y ordena en segundos sin intermediarios.',
+    highlight: 'La Trattoria Artesanal · $ 34.000 COP precio real de carta',
+    imageUrl: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&w=1400&q=85',
+    imageAlt: 'Pizza napolitana artesanal recién salida del horno de leña',
   },
   {
+    id: 'mesa-qr-domicilio',
     icon: QrCode,
-    title: 'Mesa QR, Recogida y Domicilio',
-    tag: 'Omnicanal en vivo',
-    desc: 'Ordena desde la mesa escaneando el código QR o recibe en tu puerta con seguimiento directo a cocina.'
+    tag: 'Mesa QR · Recogida · Domicilio',
+    headline: 'Ordena desde la mesa con QR o recibe directo en tu puerta.',
+    desc: 'Sin esperar la cuenta ni hacer filas: tu pedido entra directo al tablero KDS de la cocina con seguimiento en vivo.',
+    highlight: 'Comanda conectada en tiempo real con cocina · 0 esperas',
+    imageUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1400&q=85',
+    imageAlt: 'Mesa compartida en restaurante local con platos recién servidos',
   },
   {
+    id: 'comision-justa',
     icon: ShieldCheck,
-    title: 'Alianza Justa del 3%',
-    tag: 'Transparencia en COP',
-    desc: 'Precios reales de carta sin sobrecostos ocultos, respaldando el oficio del restaurador independiente.'
+    tag: 'Alianza Justa del 3% · Transparencia en COP',
+    headline: 'Pagas el precio real del menú, apoyando al restaurante local.',
+    desc: 'Mientras otras plataformas cobran hasta un 30% que infla tu cuenta, GastroSync opera con solo el 3% para proteger el oficio gastronómico.',
+    highlight: '97% del valor de cada plato va directo al restaurante',
+    imageUrl: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1400&q=85',
+    imageAlt: 'Chef emplata una preparación artesanal en cocina profesional',
+  },
+  {
+    id: 'ecosistema-restaurante',
+    icon: ChefHat,
+    tag: 'Tecnología Todo-en-Uno · +16 Ciudades',
+    headline: 'Menú digital QR, pantalla KDS de cocina y pagos integrados.',
+    desc: 'Todo lo que un restaurante independiente en Colombia necesita para vender en salón y a domicilio sin mensualidades fijas.',
+    highlight: '0% mensualidad · Activación rápida para restaurantes aliados',
+    imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1400&q=85',
+    imageAlt: 'Hamburguesa artesanal gourmet preparada con ingredientes frescos',
   },
 ];
 
@@ -127,6 +150,29 @@ export const LoginScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
+
+  // Carrusel fotográfico lateral (pausa automática en hover / foco)
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+
+  React.useEffect(() => {
+    if (isCarouselPaused) return;
+    const timer = window.setInterval(() => {
+      setActiveSlide(prev => (prev + 1) % SHOWCASE_SLIDES.length);
+    }, 6000);
+    return () => window.clearInterval(timer);
+  }, [isCarouselPaused]);
+
+  const handlePrevSlide = () => {
+    setActiveSlide(prev => (prev - 1 + SHOWCASE_SLIDES.length) % SHOWCASE_SLIDES.length);
+  };
+
+  const handleNextSlide = () => {
+    setActiveSlide(prev => (prev + 1) % SHOWCASE_SLIDES.length);
+  };
+
+  const currentSlide = SHOWCASE_SLIDES[activeSlide] || SHOWCASE_SLIDES[0];
+  const CurrentSlideIcon = currentSlide.icon;
 
   // Password strength
   const passwordStrength = evaluatePasswordStrength(password);
@@ -439,102 +485,139 @@ export const LoginScreen: React.FC = () => {
       exit={{ opacity: 0 }}
       className="login-page"
     >
-      {/* ── LEFT PANEL — La Mesa Editorial & Manifiesto Local ── */}
+      {/* ── LEFT PANEL — Carrusel Fotográfico de Ventajas GastroSync ── */}
       <motion.aside
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
         className="login-brand-panel"
-        aria-label="Presentación editorial de GastroSync"
+        aria-label="Ventajas de GastroSync"
+        onMouseEnter={() => setIsCarouselPaused(true)}
+        onMouseLeave={() => setIsCarouselPaused(false)}
+        onFocusCapture={() => setIsCarouselPaused(true)}
+        onBlurCapture={() => setIsCarouselPaused(false)}
       >
+        {/* Full-bleed Photo Background with Smooth Crossfade */}
+        <div className="gs-carousel-media" aria-hidden="true">
+          <AnimatePresence mode="wait">
+            <motion.img
+              key={currentSlide.id}
+              src={currentSlide.imageUrl}
+              alt={currentSlide.imageAlt}
+              className="gs-carousel-img"
+              loading="eager"
+              decoding="async"
+              initial={{ opacity: 0, scale: 1.04 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.55, ease: 'easeOut' }}
+            />
+          </AnimatePresence>
+          <div className="gs-carousel-scrim" />
+        </div>
+
         <div className="gs-auth-editorial-frame">
-          <div>
-            {/* Top Masthead */}
-            <div className="gs-auth-brand-top">
-              <div className="gs-auth-brand-mark">
-                <div className="gs-auth-seal">
-                  <Utensils size={22} />
-                </div>
-                <div>
-                  <span className="gs-auth-brand-name">GastroSync</span>
-                  <span className="gs-auth-brand-sub">Armenia · Pereira · Colombia</span>
-                </div>
+          {/* Top Brand Bar over Photo */}
+          <div className="gs-auth-brand-top">
+            <div className="gs-auth-brand-mark">
+              <div className="gs-auth-seal">
+                <Utensils size={20} />
               </div>
-              <span className="gs-auth-edition-tag">
-                <MapPin size={13} /> Red Gastronómica Local
-              </span>
+              <div>
+                <span className="gs-auth-brand-name">GastroSync</span>
+                <span className="gs-auth-brand-sub">Colombia · Red Gastronómica Local</span>
+              </div>
             </div>
 
-            {/* Main Editorial Statement */}
-            <div className="gs-auth-editorial-lead">
-              <h1 className="gs-auth-headline">
-                La mesa de tu ciudad,<br />
-                conectada directo a{' '}
-                <span className="gs-auth-headline-accent">su cocina.</span>
-              </h1>
-              <p className="gs-auth-lead-copy">
-                Descubre platos reales en tu zona, pide a domicilio, para recoger o desde la mesa con código QR. Sin comisiones abusivas que inflen la carta.
-              </p>
-            </div>
-
-            {/* Live Culinary & Kitchen Specimen — Tangible Product Truth */}
-            <div className="gs-auth-specimen" aria-label="Ejemplo de plato y comanda en vivo">
-              <div className="gs-auth-specimen-head">
-                <span className="gs-auth-specimen-kitchen">
-                  <ChefHat size={14} /> La Trattoria Artesanal · Armenia
-                </span>
-                <span className="gs-auth-specimen-live">
-                  <span className="gs-auth-specimen-dot" /> Mesa #4 · QR Activo
-                </span>
-              </div>
-              <div className="gs-auth-specimen-row">
-                <div>
-                  <strong className="gs-auth-specimen-dish">Tagliatelle al Ragú de Res & Parmigiano</strong>
-                  <span className="gs-auth-specimen-meta">Precio directo de carta · Comisión justa 3% ($840 COP)</span>
-                </div>
-                <span className="gs-auth-specimen-price">$ 28.000 COP</span>
-              </div>
-            </div>
+            <span className="gs-auth-edition-tag">
+              <MapPin size={13} /> 0{activeSlide + 1} / 0{SHOWCASE_SLIDES.length}
+            </span>
           </div>
 
-          {/* Static Semantic 3-Pillar Editorial Ledger */}
-          <ul className="gs-auth-pillars" aria-label="Pilares de GastroSync">
-            {EDITORIAL_PILLARS.map(pillar => {
-              const IconComp = pillar.icon;
-              return (
-                <li key={pillar.title} className="gs-auth-pillar-item">
-                  <div className="gs-auth-pillar-icon" aria-hidden="true">
-                    <IconComp size={18} />
-                  </div>
-                  <div className="gs-auth-pillar-body">
-                    <div className="gs-auth-pillar-title-row">
-                      <span className="gs-auth-pillar-title">{pillar.title}</span>
-                      <span className="gs-auth-pillar-tag">{pillar.tag}</span>
-                    </div>
-                    <p className="gs-auth-pillar-desc">{pillar.desc}</p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          {/* Bottom Story Showcase & Controls */}
+          <div className="gs-carousel-bottom">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentSlide.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className="gs-carousel-caption"
+              >
+                <span className="gs-carousel-eyebrow">
+                  <CurrentSlideIcon size={14} />
+                  <span>{currentSlide.tag}</span>
+                </span>
 
-          {/* Partner Colophon at base of Left Panel */}
-          <div className="gs-auth-partner-colophon">
-            <div className="gs-auth-partner-copy">
-              <span className="gs-auth-partner-title">¿Diriges un restaurante en la región?</span>
-              <span className="gs-auth-partner-sub">
-                Únete con 0% de mensualidad, comisión única del 3%, menú QR y tablero KDS en vivo.
-              </span>
+                <h1 className="gs-auth-headline">{currentSlide.headline}</h1>
+
+                <p className="gs-auth-lead-copy">{currentSlide.desc}</p>
+
+                <div className="gs-carousel-highlight">
+                  <span className="gs-auth-specimen-dot" />
+                  <span>{currentSlide.highlight}</span>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Progress Bars + Arrow Controls */}
+            <div className="gs-carousel-controls">
+              <div className="gs-carousel-dots" role="tablist" aria-label="Seleccionar ventaja de GastroSync">
+                {SHOWCASE_SLIDES.map((slide, idx) => {
+                  const isActive = idx === activeSlide;
+                  return (
+                    <button
+                      key={slide.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      aria-label={`Ventaja ${idx + 1}: ${slide.tag}`}
+                      onClick={() => setActiveSlide(idx)}
+                      className={`gs-carousel-dot ${isActive ? 'active' : ''}`}
+                    />
+                  );
+                })}
+              </div>
+
+              <div className="gs-carousel-arrows">
+                <button
+                  type="button"
+                  onClick={handlePrevSlide}
+                  className="gs-carousel-arrow"
+                  aria-label="Ventaja anterior"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextSlide}
+                  className="gs-carousel-arrow"
+                  aria-label="Siguiente ventaja"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowPartnerModal(true)}
-              className="gs-auth-partner-cta"
-            >
-              <Building2 size={16} />
-              <span>Vincular restaurante</span>
-              <ArrowUpRight size={15} />
-            </button>
+
+            {/* Partner Colophon at base of Left Panel */}
+            <div className="gs-auth-partner-colophon">
+              <div className="gs-auth-partner-copy">
+                <span className="gs-auth-partner-title">¿Diriges un restaurante en Colombia?</span>
+                <span className="gs-auth-partner-sub">
+                  0% de mensualidad · Comisión única del 3% · Menú QR y KDS en vivo.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPartnerModal(true)}
+                className="gs-auth-partner-cta"
+              >
+                <Building2 size={16} />
+                <span>Vincular restaurante</span>
+                <ArrowUpRight size={15} />
+              </button>
+            </div>
           </div>
         </div>
       </motion.aside>

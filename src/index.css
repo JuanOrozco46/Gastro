@@ -2781,20 +2781,50 @@ input:focus, select:focus, textarea:focus {
   align-items: stretch;
 }
 
-/* ── LEFT: Editorial Brand Showcase ─────────────────────── */
+/* ── LEFT: Full-Bleed Photographic Showcase Carousel ─────── */
 .login-brand-panel {
   position: relative;
   background: var(--neutral-dark);
   color: #FAFAF8;
   border-radius: var(--radius-xl);
   border: 1px solid var(--primary-border);
-  padding: 2.75rem 2.5rem;
+  padding: 2.25rem 2.35rem;
   overflow: hidden;
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 640px;
+  min-height: 660px;
+}
+
+.gs-carousel-media {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  background: var(--neutral-dark);
+}
+
+.gs-carousel-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.gs-carousel-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(20, 16, 13, 0.62) 0%,
+      rgba(20, 16, 13, 0.16) 34%,
+      rgba(20, 16, 13, 0.82) 68%,
+      rgba(20, 16, 13, 0.96) 100%
+    );
+  pointer-events: none;
 }
 
 .gs-auth-editorial-frame {
@@ -2804,7 +2834,8 @@ input:focus, select:focus, textarea:focus {
   flex-direction: column;
   justify-content: space-between;
   height: 100%;
-  gap: 1.75rem;
+  flex: 1;
+  gap: 2rem;
 }
 
 .gs-auth-brand-top {
@@ -2812,8 +2843,6 @@ input:focus, select:focus, textarea:focus {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid rgba(250, 247, 242, 0.12);
   flex-wrap: wrap;
 }
 
@@ -2827,8 +2856,9 @@ input:focus, select:focus, textarea:focus {
   width: 44px;
   height: 44px;
   border-radius: var(--radius-md);
-  background: rgba(200, 90, 56, 0.2);
-  border: 1px solid var(--primary-border);
+  background: rgba(20, 16, 13, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(244, 166, 136, 0.38);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2848,7 +2878,7 @@ input:focus, select:focus, textarea:focus {
 
 .gs-auth-brand-sub {
   font-size: 0.72rem;
-  color: #C9BFB3;
+  color: #E8E0D5;
   letter-spacing: 0.6px;
   text-transform: uppercase;
   font-weight: 600;
@@ -2862,205 +2892,160 @@ input:focus, select:focus, textarea:focus {
   gap: 6px;
   padding: 5px 11px;
   border-radius: var(--radius-sm);
-  background: rgba(250, 247, 242, 0.08);
-  border: 1px solid rgba(250, 247, 242, 0.16);
-  color: #F5F0E8;
-  font-size: 0.72rem;
-  font-weight: 600;
+  background: rgba(20, 16, 13, 0.58);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(250, 247, 242, 0.22);
+  color: #FAFAF8;
+  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  font-weight: 700;
   letter-spacing: 0.5px;
 }
 
-.gs-auth-editorial-lead {
+.gs-carousel-bottom {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  margin-top: 2rem;
+  gap: 1.25rem;
+  margin-top: auto;
+}
+
+.gs-carousel-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.gs-carousel-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(200, 90, 56, 0.28);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(244, 166, 136, 0.42);
+  color: #FFD2BF;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 }
 
 .gs-auth-headline {
   font-family: var(--font-display);
-  font-size: clamp(1.85rem, 3.1vw, 2.7rem);
+  font-size: clamp(1.75rem, 2.7vw, 2.35rem);
   font-weight: 700;
-  line-height: 1.12;
+  line-height: 1.14;
   letter-spacing: -0.02em;
   color: #FAFAF8;
   margin: 0;
-}
-
-.gs-auth-headline-accent {
-  color: #F4A688;
-  font-style: italic;
-  font-weight: 600;
+  max-width: 24ch;
 }
 
 .gs-auth-lead-copy {
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: #D8D0C5;
-  max-width: 54ch;
+  font-size: 0.94rem;
+  line-height: 1.55;
+  color: #EAE2D7;
+  max-width: 52ch;
   margin: 0;
 }
 
-/* Live Culinary & Kitchen Pass Specimen inside Left Panel */
-.gs-auth-specimen {
-  margin-top: 1.35rem;
-  padding: 13px 15px;
-  border-radius: var(--radius-md);
-  background: rgba(250, 247, 242, 0.05);
-  border: 1px solid rgba(250, 247, 242, 0.14);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.gs-auth-specimen-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding-bottom: 7px;
-  border-bottom: 1px dashed rgba(250, 247, 242, 0.14);
-}
-
-.gs-auth-specimen-kitchen {
+.gs-carousel-highlight {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: #F5F0E8;
-}
-
-.gs-auth-specimen-kitchen svg {
-  color: #F4A688;
-}
-
-.gs-auth-specimen-live {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
+  gap: 8px;
+  padding: 6px 11px;
+  border-radius: var(--radius-sm);
+  background: rgba(250, 247, 242, 0.10);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(250, 247, 242, 0.20);
+  font-size: 0.78rem;
   font-weight: 600;
-  color: #A7F3D0;
+  color: #FAFAF8;
 }
 
 .gs-auth-specimen-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #34D399;
+  flex-shrink: 0;
 }
 
-.gs-auth-specimen-row {
+/* Carousel Segmented Dots & Prev/Next Arrows */
+.gs-carousel-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 0.25rem;
 }
 
-.gs-auth-specimen-dish {
-  display: block;
-  font-family: var(--font-display);
-  font-size: 0.98rem;
-  font-weight: 700;
-  color: #FAFAF8;
+.gs-carousel-dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 220px;
 }
 
-.gs-auth-specimen-meta {
-  display: block;
-  font-size: 0.74rem;
-  color: #C9BFB3;
-  margin-top: 2px;
-}
-
-.gs-auth-specimen-price {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #FAFAF8;
-  background: rgba(200, 90, 56, 0.24);
-  border: 1px solid rgba(244, 166, 136, 0.32);
-  padding: 5px 10px;
-  border-radius: var(--radius-xs, 6px);
-  white-space: nowrap;
-}
-
-/* Static Semantic 3-Pillar Editorial Ledger on Left Panel */
-.gs-auth-pillars {
-  list-style: none;
-  margin: 0;
+.gs-carousel-dot {
+  flex: 1;
+  height: 6px;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid rgba(250, 247, 242, 0.12);
+  border-radius: 999px;
+  border: none;
+  background: rgba(250, 247, 242, 0.28);
+  cursor: pointer;
+  transition: background 0.25s ease, transform 0.25s ease;
 }
 
-.gs-auth-pillar-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  width: 100%;
-  text-align: left;
-  padding: 13px 6px;
-  border-bottom: 1px solid rgba(250, 247, 242, 0.10);
-  color: #D8D0C5;
+.gs-carousel-dot:hover {
+  background: rgba(250, 247, 242, 0.55);
 }
 
-.gs-auth-pillar-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background: rgba(200, 90, 56, 0.18);
-  border: 1px solid rgba(244, 166, 136, 0.26);
+.gs-carousel-dot.active {
+  background: var(--primary);
+  transform: scaleY(1.25);
+}
+
+.gs-carousel-dot:focus-visible {
+  outline: 2px solid #F4A688;
+  outline-offset: 3px;
+}
+
+.gs-carousel-arrows {
   display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gs-carousel-arrow {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 247, 242, 0.24);
+  background: rgba(20, 16, 13, 0.52);
+  backdrop-filter: blur(6px);
+  color: #FAFAF8;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #F4A688;
-  flex-shrink: 0;
-  margin-top: 2px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
-.gs-auth-pillar-body {
-  flex: 1;
-  min-width: 0;
+.gs-carousel-arrow:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  transform: translateY(-1px);
 }
 
-.gs-auth-pillar-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.gs-auth-pillar-title {
-  font-family: var(--font-display);
-  font-size: 0.98rem;
-  font-weight: 700;
-  color: #FAFAF8;
-}
-
-/* WCAG AA >= 5.8:1 contrast on #2C2520 */
-.gs-auth-pillar-tag {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #F4A688;
-  background: rgba(200, 90, 56, 0.22);
-  border: 1px solid rgba(244, 166, 136, 0.28);
-  padding: 2px 8px;
-  border-radius: 6px;
-  letter-spacing: 0.3px;
-}
-
-.gs-auth-pillar-desc {
-  font-size: 0.85rem;
-  line-height: 1.45;
-  color: #C9BFB3;
-  margin: 4px 0 0;
+.gs-carousel-arrow:focus-visible {
+  outline: 2px solid #F4A688;
+  outline-offset: 2px;
 }
 
 /* Partner Colophon at base of Left Panel */
@@ -3069,8 +3054,8 @@ input:focus, select:focus, textarea:focus {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-top: 1.25rem;
-  border-top: 1px solid rgba(250, 247, 242, 0.14);
+  padding-top: 1.1rem;
+  border-top: 1px solid rgba(250, 247, 242, 0.18);
   flex-wrap: wrap;
 }
 
@@ -3081,15 +3066,15 @@ input:focus, select:focus, textarea:focus {
 
 .gs-auth-partner-title {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: #FAFAF8;
   display: block;
 }
 
 .gs-auth-partner-sub {
-  font-size: 0.85rem;
-  color: #C9BFB3;
+  font-size: 0.82rem;
+  color: #DFD7CC;
   display: block;
   margin-top: 2px;
 }
@@ -3760,20 +3745,17 @@ input:focus, select:focus, textarea:focus {
   }
 
   .login-brand-panel {
-    min-height: auto;
-    padding: 1.6rem 1.5rem;
+    min-height: 380px;
+    padding: 1.5rem 1.4rem;
   }
 
   .gs-auth-editorial-frame {
-    gap: 1.25rem;
-  }
-
-  .gs-auth-editorial-lead {
-    margin-top: 1.15rem;
+    gap: 1.5rem;
   }
 
   .gs-auth-headline {
-    font-size: clamp(1.6rem, 4.6vw, 2.15rem);
+    font-size: clamp(1.5rem, 4.4vw, 2rem);
+    max-width: 28ch;
   }
 
   .login-form-panel {
@@ -3788,35 +3770,30 @@ input:focus, select:focus, textarea:focus {
   }
 
   .login-brand-panel {
-    padding: 1.25rem 1.15rem;
+    min-height: 320px;
+    padding: 1.15rem 1.1rem;
     border-radius: var(--radius-lg);
   }
 
-  .gs-auth-brand-top {
-    padding-bottom: 0.9rem;
+  .gs-carousel-bottom {
+    gap: 0.9rem;
   }
 
-  .gs-auth-edition-tag {
-    display: none;
-  }
-
-  .gs-auth-editorial-lead {
-    margin-top: 0.85rem;
-    gap: 0.55rem;
+  .gs-carousel-caption {
+    gap: 0.5rem;
   }
 
   .gs-auth-lead-copy {
-    font-size: 0.86rem;
-    line-height: 1.5;
+    font-size: 0.85rem;
+    line-height: 1.45;
   }
 
-  /* Keep the masthead, specimen, and partner CTA on mobile; hide the 3-item pillar list to keep the login form above the fold */
-  .gs-auth-pillars {
-    display: none;
+  .gs-carousel-highlight {
+    font-size: 0.74rem;
   }
 
   .gs-auth-partner-colophon {
-    padding-top: 0.9rem;
+    padding-top: 0.85rem;
     gap: 10px;
   }
 
