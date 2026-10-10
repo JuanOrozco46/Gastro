@@ -94,11 +94,11 @@ function RegisterSectionHead({
 }) {
   return (
     <div className="pam-section-head">
-      <div className={`pam-step ${done ? 'done' : ''}`}>
+      <div className={`pam-step ${done ? 'done' : ''}`} aria-hidden="true">
         {done ? <Check size={15} strokeWidth={3} /> : step}
       </div>
       <div className="pam-section-title-wrap">
-        <h3 className="pam-section-title">{title}</h3>
+        <h4 className="pam-section-title">{title}</h4>
         <p className="pam-section-desc">{desc}</p>
       </div>
     </div>
@@ -118,6 +118,7 @@ export const LoginScreen: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [defaultAddress, setDefaultAddress] = useState('');
   const [defaultDeliveryNotes, setDefaultDeliveryNotes] = useState('');
+  const [showOptionalAddress, setShowOptionalAddress] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   const [isCompressingAvatar, setIsCompressingAvatar] = useState(false);
@@ -125,7 +126,6 @@ export const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [activeFeature, setActiveFeature] = useState(0);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
 
   // Password strength
@@ -157,6 +157,18 @@ export const LoginScreen: React.FC = () => {
     }));
   };
 
+  // Permitir cerrar el modal de recuperación con la tecla Escape
+  React.useEffect(() => {
+    if (!showResetModal) return;
+    const handleKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') {
+        setShowResetModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showResetModal]);
+
   // Field validation handlers (onBlur)
   const handleEmailBlur = () => {
     setTabFieldError('email', validateEmail(email));
@@ -186,9 +198,12 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleAddressBlur = () => {
+    const trimmed = defaultAddress.trim();
     setTabFieldError(
       'defaultAddress',
-      defaultAddress.trim().length >= 5 ? null : 'Ingresa tu dirección habitual de entrega.'
+      trimmed.length === 0 || trimmed.length >= 5
+        ? null
+        : 'Escribe al menos 5 caracteres o déjala vacía para configurarla en tu primer domicilio.'
     );
   };
 
@@ -269,16 +284,12 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
-  // Cycle editorial pillars every 4.5s
-  React.useEffect(() => {
-    const t = setInterval(() => setActiveFeature(i => (i + 1) % EDITORIAL_PILLARS.length), 4500);
-    return () => clearInterval(t);
-  }, []);
-
-  // Section completion & live progress for Register tab
+  // Section completion & live progress for Register tab (address is optional)
   const registerProgress = useMemo(() => {
+    const trimmedAddr = defaultAddress.trim();
+    const isAddressValid = trimmedAddr.length === 0 || trimmedAddr.length >= 5;
     const step1Done = !validateName(name) && !validateUsername(username);
-    const step2Done = !validatePhone(phone) && defaultAddress.trim().length >= 5;
+    const step2Done = !validatePhone(phone) && isAddressValid;
     const step3Done =
       !validateEmail(email) &&
       !validateRegisterPassword(password) &&
@@ -288,7 +299,6 @@ export const LoginScreen: React.FC = () => {
       !validateName(name),
       !validateUsername(username),
       !validatePhone(phone),
-      defaultAddress.trim().length >= 5,
       !validateEmail(email),
       !validateRegisterPassword(password) && !validatePasswordConfirm(password, confirmPassword)
     ];
@@ -336,12 +346,17 @@ export const LoginScreen: React.FC = () => {
       const nameErr = validateName(name);
       const usernameErr = validateUsername(username);
       const phoneErr = validatePhone(phone);
-      const addressErr = defaultAddress.trim().length >= 5 ? null : 'Ingresa tu dirección habitual de entrega.';
+      const trimmedAddress = defaultAddress.trim();
+      const addressErr =
+        trimmedAddress.length === 0 || trimmedAddress.length >= 5
+          ? null
+          : 'Escribe al menos 5 caracteres o déjala vacía para configurarla luego.';
       const emailErr = validateEmail(email);
       const passErr = validateRegisterPassword(password);
       const confirmErr = validatePasswordConfirm(password, confirmPassword);
 
       if (nameErr || usernameErr || phoneErr || addressErr || emailErr || passErr || confirmErr) {
+        if (addressErr) setShowOptionalAddress(true);
         setErrorsByTab(prev => ({
           ...prev,
           register: {
@@ -372,7 +387,7 @@ export const LoginScreen: React.FC = () => {
         const res = await registerAccount(name.trim(), email, password, 'client_delivery', {
           username: normalizeUsername(username),
           phone: phone.trim(),
-          defaultAddress: defaultAddress.trim(),
+          defaultAddress: defaultAddress.trim() || undefined,
           defaultDeliveryNotes: defaultDeliveryNotes.trim() || undefined,
           avatarFile,
           avatarDataUrl: avatarPreview || undefined
@@ -451,7 +466,7 @@ export const LoginScreen: React.FC = () => {
             </div>
 
             {/* Main Editorial Statement */}
-            <div className="gs-auth-editorial-Lead" style={{ marginTop: '2.25rem' }}>
+            <div className="gs-auth-editorial-lead">
               <h1 className="gs-auth-headline">
                 La mesa de tu ciudad,<br />
                 conectada directo a{' '}
@@ -461,21 +476,34 @@ export const LoginScreen: React.FC = () => {
                 Descubre platos reales en tu zona, pide a domicilio, para recoger o desde la mesa con código QR. Sin comisiones abusivas que inflen la carta.
               </p>
             </div>
+
+            {/* Live Culinary & Kitchen Specimen — Tangible Product Truth */}
+            <div className="gs-auth-specimen" aria-label="Ejemplo de plato y comanda en vivo">
+              <div className="gs-auth-specimen-head">
+                <span className="gs-auth-specimen-kitchen">
+                  <ChefHat size={14} /> La Trattoria Artesanal · Armenia
+                </span>
+                <span className="gs-auth-specimen-live">
+                  <span className="gs-auth-specimen-dot" /> Mesa #4 · QR Activo
+                </span>
+              </div>
+              <div className="gs-auth-specimen-row">
+                <div>
+                  <strong className="gs-auth-specimen-dish">Tagliatelle al Ragú de Res & Parmigiano</strong>
+                  <span className="gs-auth-specimen-meta">Precio directo de carta · Comisión justa 3% ($840 COP)</span>
+                </div>
+                <span className="gs-auth-specimen-price">$ 28.000 COP</span>
+              </div>
+            </div>
           </div>
 
-          {/* Interactive 3-Pillar Editorial Ledger */}
-          <div className="gs-auth-pillars" role="region" aria-label="Pilares de GastroSync">
-            {EDITORIAL_PILLARS.map((pillar, idx) => {
+          {/* Static Semantic 3-Pillar Editorial Ledger */}
+          <ul className="gs-auth-pillars" aria-label="Pilares de GastroSync">
+            {EDITORIAL_PILLARS.map(pillar => {
               const IconComp = pillar.icon;
-              const isActive = idx === activeFeature;
               return (
-                <button
-                  key={pillar.title}
-                  type="button"
-                  onClick={() => setActiveFeature(idx)}
-                  className={`gs-auth-pillar-btn ${isActive ? 'active' : ''}`}
-                >
-                  <div className="gs-auth-pillar-icon">
+                <li key={pillar.title} className="gs-auth-pillar-item">
+                  <div className="gs-auth-pillar-icon" aria-hidden="true">
                     <IconComp size={18} />
                   </div>
                   <div className="gs-auth-pillar-body">
@@ -485,10 +513,10 @@ export const LoginScreen: React.FC = () => {
                     </div>
                     <p className="gs-auth-pillar-desc">{pillar.desc}</p>
                   </div>
-                </button>
+                </li>
               );
             })}
-          </div>
+          </ul>
 
           {/* Partner Colophon at base of Left Panel */}
           <div className="gs-auth-partner-colophon">
@@ -524,60 +552,23 @@ export const LoginScreen: React.FC = () => {
           <div className="gs-auth-sheet-top">
             <div>
               <h2 className="gs-auth-sheet-heading">
-                {tab === 'login' ? 'Pase de acceso' : 'Registro de comensal'}
+                {tab === 'login' ? 'Pase de acceso' : 'Crear cuenta de comensal'}
               </h2>
               <p className="gs-auth-sheet-sub">
                 {tab === 'login'
                   ? 'Ingresa con tu cuenta para pedir o gestionar tu restaurante.'
-                  : 'Configura tu perfil gastronómico y dirección habitual en un paso.'}
+                  : 'Crea tu usuario @ y empieza a pedir en mesa QR, para recoger o a domicilio.'}
               </p>
             </div>
 
-            <div
-              className="gs-auth-status-badge"
-              title={
-                authMode === 'demo'
-                  ? 'Operando con cuentas locales de demostración'
-                  : 'Conectado en tiempo real con Supabase'
-              }
-            >
+            <div className="gs-auth-status-badge">
               <span className={`gs-auth-status-dot ${authMode === 'demo' ? 'demo' : ''}`} />
-              <span>{authMode === 'demo' ? 'Modo Local Activo' : 'Conectado en Vivo'}</span>
+              <span>{authMode === 'demo' ? 'Modo Demo Local' : 'Red Activa en Vivo'}</span>
             </div>
           </div>
 
-          {/* Quick Demo Role Switcher (Available in Local Demo Mode) */}
-          {canUseQuickDemo && (
-            <div className="gs-auth-demo-strip" style={{ marginTop: '1rem' }}>
-              <div className="gs-auth-demo-head">
-                <span>Acceso rápido de demostración (1 clic)</span>
-                <span>4 roles activos</span>
-              </div>
-              <div className="gs-auth-demo-pills">
-                {DEMO_ACCOUNTS.map(acc => {
-                  const meta = DEMO_ROLE_META[acc.id] || { shortLabel: acc.name, icon: User };
-                  const RoleIcon = meta.icon;
-                  const isSelected = email === acc.email && tab === 'login';
-                  return (
-                    <button
-                      key={acc.id}
-                      type="button"
-                      disabled={loading}
-                      onClick={() => handleQuickDemoSelect(acc.email, acc.demoPassword)}
-                      className={`gs-auth-demo-pill ${isSelected ? 'active' : ''}`}
-                      title={`Entrar como ${acc.name} (${acc.email})`}
-                    >
-                      <RoleIcon size={13} />
-                      <span>{meta.shortLabel}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Segmented Tab Switcher */}
-          <div className="auth-tabs" role="tablist" aria-label="Opciones de acceso" style={{ marginTop: '1.25rem' }}>
+          <div className="auth-tabs" role="tablist" aria-label="Opciones de acceso">
             <button
               type="button"
               role="tab"
@@ -598,6 +589,36 @@ export const LoginScreen: React.FC = () => {
             </button>
           </div>
 
+          {/* Quick Demo Role Switcher (Shown only on Login tab in Local Demo Mode) */}
+          {canUseQuickDemo && tab === 'login' && (
+            <div className="gs-auth-demo-strip">
+              <div className="gs-auth-demo-head">
+                <span>Acceso rápido de demostración (1 clic)</span>
+                <span>4 roles activos</span>
+              </div>
+              <div className="gs-auth-demo-pills">
+                {DEMO_ACCOUNTS.map(acc => {
+                  const meta = DEMO_ROLE_META[acc.id] || { shortLabel: acc.name, icon: User };
+                  const RoleIcon = meta.icon;
+                  const isSelected = email === acc.email && tab === 'login';
+                  return (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleQuickDemoSelect(acc.email, acc.demoPassword)}
+                      className={`gs-auth-demo-pill ${isSelected ? 'active' : ''}`}
+                      title={`Entrar como ${acc.name} (${acc.email})`}
+                    >
+                      <RoleIcon size={14} />
+                      <span>{meta.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Error Alert Box */}
           {loginError && (
             <motion.div
@@ -606,7 +627,7 @@ export const LoginScreen: React.FC = () => {
               className="auth-alert error"
               role="alert"
             >
-              <AlertCircle size={18} style={{ flexShrink: 0 }} />
+              <AlertCircle size={18} className="gs-flex-shrink-0" />
               <span>{loginError}</span>
             </motion.div>
           )}
@@ -623,6 +644,7 @@ export const LoginScreen: React.FC = () => {
                   <input
                     id="auth-email"
                     type="email"
+                    autoComplete="email"
                     placeholder="tu.correo@ejemplo.com"
                     value={email}
                     onChange={handleEmailChange}
@@ -664,6 +686,7 @@ export const LoginScreen: React.FC = () => {
                   <input
                     id="auth-password"
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
                     placeholder="••••••••••••"
                     value={password}
                     onChange={handlePasswordChange}
@@ -712,15 +735,31 @@ export const LoginScreen: React.FC = () => {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
                 </svg>
-                <span>Continuar con Google</span>
+                <span>
+                  {authMode === 'demo'
+                    ? 'Continuar con Google (requiere conexión en vivo)'
+                    : 'Continuar con Google'}
+                </span>
               </button>
             </form>
           ) : (
             /* ── TAB: REGISTER (Editorial 3-Stage Ledger without Nested Cards) ── */
             <form onSubmit={handleSubmit} noValidate className="login-form">
+              <div className="gs-register-owner-callout">
+                <span>¿Representas a un restaurante?</span>
+                <button
+                  type="button"
+                  onClick={() => setShowPartnerModal(true)}
+                  className="gs-auth-partner-inline-link"
+                >
+                  <Building2 size={13} />
+                  <span>Postular restaurante aliado (3%)</span>
+                </button>
+              </div>
+
               <div className="gs-register-progress-bar">
                 <div className="gs-register-progress-meta">
-                  <span>Completitud de tu perfil ({registerProgress.doneCount}/{registerProgress.totalCount})</span>
+                  <span>Progreso de registro ({registerProgress.doneCount}/{registerProgress.totalCount})</span>
                   <span>{registerProgress.pct}%</span>
                 </div>
                 <div className="gs-register-progress-track">
@@ -750,7 +789,7 @@ export const LoginScreen: React.FC = () => {
                     <p className="urm-avatar-sub">
                       Se mostrará junto a tu <strong>@{username || 'usuario'}</strong> al interactuar con los restaurantes.
                     </p>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+                    <div className="urm-avatar-actions">
                       <label className="urm-avatar-btn">
                         <Camera size={14} />
                         <span>
@@ -764,7 +803,7 @@ export const LoginScreen: React.FC = () => {
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
                           onChange={handleAvatarChange}
-                          style={{ display: 'none' }}
+                          className="gs-sr-only-input"
                         />
                       </label>
                       {avatarPreview && (
@@ -793,6 +832,7 @@ export const LoginScreen: React.FC = () => {
                       <input
                         id="auth-name"
                         type="text"
+                        autoComplete="name"
                         placeholder="Ej. María Fernanda López"
                         value={name}
                         onChange={handleNameChange}
@@ -817,14 +857,14 @@ export const LoginScreen: React.FC = () => {
                       <input
                         id="auth-username"
                         type="text"
+                        autoComplete="username"
                         placeholder="maria_lopez"
                         value={username}
                         onChange={handleUsernameChange}
                         onBlur={handleUsernameBlur}
                         aria-invalid={!!fieldErrors.username}
                         aria-describedby={fieldErrors.username ? 'auth-username-error' : undefined}
-                        className={`auth-input ${fieldErrors.username ? 'auth-input-error' : ''}`}
-                        style={{ paddingLeft: '38px' }}
+                        className={`auth-input has-at-prefix ${fieldErrors.username ? 'auth-input-error' : ''}`}
                         maxLength={24}
                         required
                       />
@@ -840,13 +880,13 @@ export const LoginScreen: React.FC = () => {
                 </div>
               </div>
 
-              {/* ── SECCIÓN 2: Datos para Autocompletar Pedidos ── */}
+              {/* ── SECCIÓN 2: Contacto y Entrega Opcional ── */}
               <div className="gs-register-ledger-section">
                 <RegisterSectionHead
                   step={2}
                   done={registerProgress.step2Done}
-                  title="Destino de tus pedidos"
-                  desc="Se autocompletará cada vez que pidas a domicilio en tu ciudad"
+                  title="Contacto y entregas"
+                  desc="Tu WhatsApp para notificaciones del pedido; la dirección puedes guardarla ahora o en tu primer domicilio"
                 />
 
                 <div className="pam-grid-1">
@@ -859,6 +899,7 @@ export const LoginScreen: React.FC = () => {
                       <input
                         id="auth-phone"
                         type="tel"
+                        autoComplete="tel"
                         placeholder="Ej. +57 300 123 4567"
                         value={phone}
                         onChange={handlePhoneChange}
@@ -876,45 +917,71 @@ export const LoginScreen: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="auth-field">
-                    <label htmlFor="auth-address" className="auth-label">Dirección habitual de entrega *</label>
-                    <div className="auth-input-wrap">
-                      <div className="auth-field-icon">
-                        <MapPin size={17} />
+                  {!showOptionalAddress && !defaultAddress ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowOptionalAddress(true)}
+                      className="gs-optional-address-toggle"
+                    >
+                      <MapPin size={15} />
+                      <span>+ Agregar dirección habitual de entrega ahora (opcional)</span>
+                    </button>
+                  ) : (
+                    <div className="gs-optional-address-fields">
+                      <div className="auth-field">
+                        <div className="auth-label-row">
+                          <label htmlFor="auth-address" className="auth-label">
+                            Dirección habitual de entrega (Opcional)
+                          </label>
+                          {!defaultAddress && (
+                            <button
+                              type="button"
+                              onClick={() => setShowOptionalAddress(false)}
+                              className="forgot-link"
+                            >
+                              Omitir por ahora
+                            </button>
+                          )}
+                        </div>
+                        <div className="auth-input-wrap">
+                          <div className="auth-field-icon">
+                            <MapPin size={17} />
+                          </div>
+                          <input
+                            id="auth-address"
+                            type="text"
+                            autoComplete="street-address"
+                            placeholder="Ej. Cra 14 # 19-20, Apto 302, Barrio..."
+                            value={defaultAddress}
+                            onChange={handleAddressChange}
+                            onBlur={handleAddressBlur}
+                            aria-invalid={!!fieldErrors.defaultAddress}
+                            aria-describedby={fieldErrors.defaultAddress ? 'auth-address-error' : undefined}
+                            className={`auth-input ${fieldErrors.defaultAddress ? 'auth-input-error' : ''}`}
+                          />
+                        </div>
+                        {fieldErrors.defaultAddress && (
+                          <div id="auth-address-error" role="alert" className="auth-field-error">
+                            {fieldErrors.defaultAddress}
+                          </div>
+                        )}
                       </div>
-                      <input
-                        id="auth-address"
-                        type="text"
-                        placeholder="Ej. Cra 14 # 19-20, Apto 302, Barrio..."
-                        value={defaultAddress}
-                        onChange={handleAddressChange}
-                        onBlur={handleAddressBlur}
-                        aria-invalid={!!fieldErrors.defaultAddress}
-                        aria-describedby={fieldErrors.defaultAddress ? 'auth-address-error' : undefined}
-                        className={`auth-input ${fieldErrors.defaultAddress ? 'auth-input-error' : ''}`}
-                        required
-                      />
-                    </div>
-                    {fieldErrors.defaultAddress && (
-                      <div id="auth-address-error" role="alert" className="auth-field-error">
-                        {fieldErrors.defaultAddress}
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="auth-field">
-                    <label htmlFor="auth-delivery-notes" className="auth-label">
-                      Notas de entrega (Opcional)
-                    </label>
-                    <input
-                      id="auth-delivery-notes"
-                      type="text"
-                      placeholder="Ej. Apto 302, Torre B, timbrar en portería"
-                      value={defaultDeliveryNotes}
-                      onChange={e => setDefaultDeliveryNotes(e.target.value)}
-                      className="auth-input no-icon-left"
-                    />
-                  </div>
+                      <div className="auth-field">
+                        <label htmlFor="auth-delivery-notes" className="auth-label">
+                          Notas de entrega (Opcional)
+                        </label>
+                        <input
+                          id="auth-delivery-notes"
+                          type="text"
+                          placeholder="Ej. Apto 302, Torre B, timbrar en portería"
+                          value={defaultDeliveryNotes}
+                          onChange={e => setDefaultDeliveryNotes(e.target.value)}
+                          className="auth-input no-icon-left"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -937,6 +1004,7 @@ export const LoginScreen: React.FC = () => {
                       <input
                         id="auth-reg-email"
                         type="email"
+                        autoComplete="email"
                         placeholder="tu.correo@ejemplo.com"
                         value={email}
                         onChange={handleEmailChange}
@@ -954,74 +1022,74 @@ export const LoginScreen: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="pam-grid-2">
-                    <div className="auth-field">
-                      <label htmlFor="auth-reg-password" className="auth-label">Contraseña *</label>
-                      <div className="auth-input-wrap">
-                        <div className="auth-field-icon">
-                          <Lock size={17} />
-                        </div>
-                        <input
-                          id="auth-reg-password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Mínimo 8 caracteres"
-                          value={password}
-                          onChange={handlePasswordChange}
-                          onBlur={handlePasswordBlur}
-                          aria-invalid={!!fieldErrors.password}
-                          aria-describedby={fieldErrors.password ? 'auth-reg-password-error' : undefined}
-                          className={`auth-input has-icon-right ${fieldErrors.password ? 'auth-input-error' : ''}`}
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(v => !v)}
-                          className="field-toggle-pw"
-                          aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                        >
-                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
+                  <div className="auth-field">
+                    <label htmlFor="auth-reg-password" className="auth-label">Contraseña *</label>
+                    <div className="auth-input-wrap">
+                      <div className="auth-field-icon">
+                        <Lock size={17} />
                       </div>
-                      {fieldErrors.password && (
-                        <div id="auth-reg-password-error" role="alert" className="auth-field-error">
-                          {fieldErrors.password}
-                        </div>
-                      )}
+                      <input
+                        id="auth-reg-password"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        placeholder="Mínimo 8 caracteres, mayúscula, minúscula y número"
+                        value={password}
+                        onChange={handlePasswordChange}
+                        onBlur={handlePasswordBlur}
+                        aria-invalid={!!fieldErrors.password}
+                        aria-describedby={fieldErrors.password ? 'auth-reg-password-error' : undefined}
+                        className={`auth-input has-icon-right ${fieldErrors.password ? 'auth-input-error' : ''}`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="field-toggle-pw"
+                        aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
+                    {fieldErrors.password && (
+                      <div id="auth-reg-password-error" role="alert" className="auth-field-error">
+                        {fieldErrors.password}
+                      </div>
+                    )}
+                  </div>
 
-                    <div className="auth-field">
-                      <label htmlFor="auth-confirm-password" className="auth-label">Confirmar contraseña *</label>
-                      <div className="auth-input-wrap">
-                        <div className="auth-field-icon">
-                          <Lock size={17} />
-                        </div>
-                        <input
-                          id="auth-confirm-password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Repite tu contraseña"
-                          value={confirmPassword}
-                          onChange={handleConfirmPasswordChange}
-                          onBlur={handleConfirmPasswordBlur}
-                          aria-invalid={!!fieldErrors.confirmPassword}
-                          aria-describedby={fieldErrors.confirmPassword ? 'auth-confirm-password-error' : undefined}
-                          className={`auth-input ${fieldErrors.confirmPassword ? 'auth-input-error' : ''}`}
-                          required
-                        />
+                  <div className="auth-field">
+                    <label htmlFor="auth-confirm-password" className="auth-label">Confirmar contraseña *</label>
+                    <div className="auth-input-wrap">
+                      <div className="auth-field-icon">
+                        <Lock size={17} />
                       </div>
-                      {fieldErrors.confirmPassword && (
-                        <div id="auth-confirm-password-error" role="alert" className="auth-field-error">
-                          {fieldErrors.confirmPassword}
-                        </div>
-                      )}
+                      <input
+                        id="auth-confirm-password"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        placeholder="Repite tu contraseña"
+                        value={confirmPassword}
+                        onChange={handleConfirmPasswordChange}
+                        onBlur={handleConfirmPasswordBlur}
+                        aria-invalid={!!fieldErrors.confirmPassword}
+                        aria-describedby={fieldErrors.confirmPassword ? 'auth-confirm-password-error' : undefined}
+                        className={`auth-input ${fieldErrors.confirmPassword ? 'auth-input-error' : ''}`}
+                        required
+                      />
                     </div>
+                    {fieldErrors.confirmPassword && (
+                      <div id="auth-confirm-password-error" role="alert" className="auth-field-error">
+                        {fieldErrors.confirmPassword}
+                      </div>
+                    )}
                   </div>
 
                   {/* Password Strength Meter & Live Checklist */}
                   {password.length > 0 && (
-                    <div className="pam-strength">
+                    <div className="pam-strength" aria-live="polite">
                       <div className="pam-strength-bars">
-                        {[1, 2, 3, 4].map(lvl => (
-                          <div
+                        {[1, 2, 3, 4, 5].map(lvl => (
+                          <span
                             key={lvl}
                             className="pam-strength-bar"
                             style={{
@@ -1034,14 +1102,18 @@ export const LoginScreen: React.FC = () => {
                         <span>Nivel de seguridad</span>
                         <span style={{ color: passwordStrength.color }}>{passwordStrength.label}</span>
                       </div>
-                      <div className="pam-checks">
+                      <ul className="pam-checks">
                         {passwordStrength.checks.map((c, idx) => (
-                          <div key={idx} className={`pam-check ${c.passed ? 'ok' : ''}`}>
-                            <span className="pam-check-dot">{c.passed ? '✓' : ''}</span>
+                          <li key={idx} className={`pam-check ${c.passed ? 'ok' : ''}`}>
+                            {c.passed ? (
+                              <Check size={12} strokeWidth={3} aria-hidden="true" />
+                            ) : (
+                              <span className="pam-check-dot" aria-hidden="true" />
+                            )}
                             <span>{c.text}</span>
-                          </div>
+                          </li>
                         ))}
-                      </div>
+                      </ul>
                     </div>
                   )}
                 </div>
@@ -1059,6 +1131,27 @@ export const LoginScreen: React.FC = () => {
                     : username
                     ? `Crear mi cuenta como @${username}`
                     : 'Crear Mi Cuenta'}
+                </span>
+              </button>
+
+              <div className="gs-auth-divider">o regístrate rápido con</div>
+
+              <button
+                type="button"
+                onClick={() => loginWithGoogle()}
+                disabled={authMode === 'demo'}
+                className="gs-auth-google-btn"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                <span>
+                  {authMode === 'demo'
+                    ? 'Continuar con Google (requiere conexión en vivo)'
+                    : 'Continuar con Google'}
                 </span>
               </button>
             </form>
@@ -1086,12 +1179,20 @@ export const LoginScreen: React.FC = () => {
         {/* Modal de Restablecimiento de Contraseña */}
         <AnimatePresence>
           {showResetModal && (
-            <div className="gs-reset-overlay">
+            <div
+              className="gs-reset-overlay"
+              onClick={e => {
+                if (e.target === e.currentTarget) setShowResetModal(false);
+              }}
+            >
               <motion.div
                 initial={{ scale: 0.96, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.96, opacity: 0 }}
                 className="gs-reset-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="gs-reset-title"
               >
                 <button
                   type="button"
@@ -1107,20 +1208,30 @@ export const LoginScreen: React.FC = () => {
                     <KeyRound size={22} />
                   </div>
                   <div>
-                    <h3 className="gs-reset-title">Recuperar Contraseña</h3>
+                    <h3 id="gs-reset-title" className="gs-reset-title">Recuperar Contraseña</h3>
                     <span className="gs-reset-sub">Restablece el acceso a tu cuenta</span>
                   </div>
                 </div>
 
                 {resetSuccessMessage ? (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="auth-alert success"
-                  >
-                    <CheckCircle2 size={20} style={{ flexShrink: 0 }} />
-                    <span>{resetSuccessMessage}</span>
-                  </motion.div>
+                  <div className="gs-reset-success-stack">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="auth-alert success"
+                      role="status"
+                    >
+                      <CheckCircle2 size={20} className="gs-flex-shrink-0" />
+                      <span>{resetSuccessMessage}</span>
+                    </motion.div>
+                    <button
+                      type="button"
+                      onClick={() => setShowResetModal(false)}
+                      className="auth-submit"
+                    >
+                      <span>Volver a iniciar sesión</span>
+                    </button>
+                  </div>
                 ) : (
                   <form onSubmit={handleResetPasswordSubmit} noValidate className="login-form">
                     <p className="gs-reset-copy">
@@ -1129,7 +1240,7 @@ export const LoginScreen: React.FC = () => {
 
                     {resetErrorMessage && (
                       <div className="auth-alert error" role="alert">
-                        <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                        <AlertCircle size={18} className="gs-flex-shrink-0" />
                         <span>{resetErrorMessage}</span>
                       </div>
                     )}
@@ -1145,6 +1256,7 @@ export const LoginScreen: React.FC = () => {
                         <input
                           id="reset-email"
                           type="email"
+                          autoComplete="email"
                           placeholder="tu.correo@ejemplo.com"
                           value={resetEmail}
                           onChange={e => {
@@ -1184,3 +1296,4 @@ export const LoginScreen: React.FC = () => {
     </motion.div>
   );
 };
+

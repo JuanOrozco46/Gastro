@@ -210,7 +210,7 @@ const UserProfileModalInner: React.FC<{
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
                           onChange={handleAvatarChange}
-                          style={{ display: 'none' }}
+                          className="gs-sr-only-input"
                         />
                       </label>
                       {avatarPreview && (
