@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700;800&display=swap');
 
 :root {
   /* GastroSync — Warm Gastronomy Identity */
@@ -42,9 +42,9 @@
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 18px;
-  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-family: 'Figtree', system-ui, -apple-system, sans-serif;
   --font-display: 'Playfair Display', Georgia, serif;
-  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Figtree', system-ui, -apple-system, sans-serif;
   --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.05);
   --shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.08);
 }
@@ -457,7 +457,6 @@ input:focus, select:focus, textarea:focus {
 .ticket-card {
   background: var(--neutral-surface);
   border: 1px solid var(--neutral-border);
-  border-left: 6px solid var(--primary);
   border-radius: var(--radius-md);
   padding: 1.1rem;
   margin-bottom: 1rem;
@@ -465,10 +464,10 @@ input:focus, select:focus, textarea:focus {
   animation: slideIn 0.3s ease-out;
 }
 
-.ticket-card.pending { border-left-color: #3B82F6; }
-.ticket-card.accepted { border-left-color: #10B981; }
-.ticket-card.preparing { border-left-color: var(--tertiary); }
-.ticket-card.ready { border-left-color: var(--secondary); }
+.ticket-card.pending { border-color: #3B82F6; }
+.ticket-card.accepted { border-color: #10B981; }
+.ticket-card.preparing { border-color: var(--tertiary); }
+.ticket-card.ready { border-color: var(--secondary); }
 
 @keyframes slideIn {
   from { opacity: 0; transform: scale(0.96); }
@@ -596,7 +595,7 @@ input:focus, select:focus, textarea:focus {
 
 .toast {
   background: var(--neutral-dark);
-  border-left: 5px solid var(--secondary);
+  border: 1px solid var(--secondary);
   padding: 14px 22px;
   border-radius: var(--radius-md);
   color: white;
@@ -2773,47 +2772,615 @@ input:focus, select:focus, textarea:focus {
 
 .login-page {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  min-height: calc(100vh - 80px);
-  gap: 2rem;
-  max-width: 1400px;
+  grid-template-columns: 1.08fr 1fr;
+  min-height: calc(100vh - 48px);
+  gap: 1.75rem;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 1.5rem;
-  align-items: center;
+  align-items: stretch;
 }
 
 @media (max-width: 960px) {
   .login-page {
     grid-template-columns: 1fr;
     padding: 1rem;
+    min-height: auto;
   }
 }
 
-/* ── LEFT: Brand Panel ──────────────────────────────────── */
+/* ── LEFT: Editorial Brand Showcase ─────────────────────── */
 .login-brand-panel {
   position: relative;
   background: var(--neutral-dark);
+  color: #FAFAF8;
   border-radius: var(--radius-xl);
-  padding: 3rem 2.5rem;
+  border: 1px solid var(--primary-border);
+  padding: 2.75rem 2.5rem;
   overflow: hidden;
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 580px;
+  min-height: 640px;
 }
 
-/* ── RIGHT: Form Panel ──────────────────────────────────── */
+.gs-auth-editorial-frame {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  gap: 2rem;
+}
+
+.gs-auth-brand-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(250, 247, 242, 0.12);
+}
+
+.gs-auth-brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gs-auth-seal {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: rgba(200, 90, 56, 0.16);
+  border: 1px solid var(--primary-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.gs-auth-brand-name {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #FAFAF8;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  display: block;
+}
+
+.gs-auth-brand-sub {
+  font-size: 0.72rem;
+  color: var(--text-light);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  font-weight: 600;
+  display: block;
+  margin-top: 2px;
+}
+
+.gs-auth-edition-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  background: rgba(250, 247, 242, 0.06);
+  border: 1px solid rgba(250, 247, 242, 0.14);
+  color: #F5F0E8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.gs-auth-editorial-Lead {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.gs-auth-headline {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.2vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  color: #FAFAF8;
+  margin: 0;
+}
+
+.gs-auth-headline-accent {
+  color: var(--primary);
+  font-style: italic;
+  font-weight: 600;
+}
+
+.gs-auth-lead-copy {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #D0C8BC;
+  max-width: 52ch;
+  margin: 0;
+}
+
+/* Interactive 3-Pillar Editorial Ledger on Left Panel */
+.gs-auth-pillars {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(250, 247, 242, 0.12);
+}
+
+.gs-auth-pillar-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(250, 247, 242, 0.10);
+  color: #D0C8BC;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.gs-auth-pillar-btn:hover {
+  background: rgba(250, 247, 242, 0.04);
+}
+
+.gs-auth-pillar-btn.active {
+  background: rgba(200, 90, 56, 0.12);
+  color: #FAFAF8;
+}
+
+.gs-auth-pillar-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: rgba(250, 247, 242, 0.06);
+  border: 1px solid rgba(250, 247, 242, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all 0.2s ease;
+}
+
+.gs-auth-pillar-btn.active .gs-auth-pillar-icon {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #FFFFFF;
+}
+
+.gs-auth-pillar-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.gs-auth-pillar-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gs-auth-pillar-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #FAFAF8;
+}
+
+.gs-auth-pillar-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.4px;
+}
+
+.gs-auth-pillar-desc {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: #B0A89E;
+  margin-top: 3px;
+}
+
+/* Partner Colophon at base of Left Panel */
+.gs-auth-partner-colophon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(250, 247, 242, 0.14);
+  flex-wrap: wrap;
+}
+
+.gs-auth-partner-copy {
+  flex: 1;
+  min-width: 200px;
+}
+
+.gs-auth-partner-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #FAFAF8;
+  display: block;
+}
+
+.gs-auth-partner-sub {
+  font-size: 0.875rem;
+  color: #B0A89E;
+  display: block;
+  margin-top: 2px;
+}
+
+.gs-auth-partner-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #FFFFFF;
+  border: none;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+}
+
+.gs-auth-partner-cta:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+/* ── RIGHT: Access Sheet Panel ──────────────────────────── */
 .login-form-panel {
   background: var(--neutral-surface);
   border: 1px solid var(--neutral-border);
   border-radius: var(--radius-xl);
-  padding: 2.5rem;
+  padding: 2.5rem 2.75rem;
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
   width: 100%;
+  gap: 1.5rem;
+}
+
+.gs-auth-sheet-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--neutral-border);
+}
+
+.gs-auth-sheet-heading {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.gs-auth-sheet-sub {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.gs-auth-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  background: var(--neutral-surface-alt);
+  border: 1px solid var(--neutral-border);
+  color: var(--text-main);
+}
+
+.gs-auth-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--secondary);
+}
+
+.gs-auth-status-dot.demo {
+  background: var(--tertiary);
+}
+
+/* Quick Demo Role Switcher Strip */
+.gs-auth-demo-strip {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--neutral-surface-alt);
+  border: 1px solid var(--neutral-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gs-auth-demo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.gs-auth-demo-pills {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+@media (max-width: 540px) {
+  .gs-auth-demo-pills {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.gs-auth-demo-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 8px;
+  border-radius: var(--radius-xs, 6px);
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.gs-auth-demo-pill:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.gs-auth-demo-pill.active {
+  background: var(--neutral-dark);
+  border-color: var(--neutral-dark);
+  color: #FAFAF8;
+}
+
+/* Editorial Divider ("o continúa con") */
+.gs-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.gs-auth-divider::before,
+.gs-auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--neutral-border);
+}
+
+.gs-auth-google-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--neutral-border-strong);
+  background: var(--neutral-surface);
+  color: var(--text-main);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gs-auth-google-btn:hover:not(:disabled) {
+  background: var(--neutral-surface-alt);
+  border-color: var(--neutral-dark);
+}
+
+.gs-auth-google-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Editorial Register Ledger (No Nested Cards) */
+.gs-register-progress-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--neutral-border);
+}
+
+.gs-register-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.gs-register-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--neutral-surface-alt);
+  overflow: hidden;
+}
+
+.gs-register-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.gs-register-ledger-section {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--neutral-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gs-register-ledger-section:last-of-type {
+  border-bottom: none;
+}
+
+.gs-register-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+.gs-auth-sheet-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 1rem;
+  border-top: 1px solid var(--neutral-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.gs-auth-partner-inline-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.gs-auth-partner-inline-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+/* Reset Password Modal Clean Classes */
+.gs-reset-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--glass-overlay);
+  backdrop-filter: blur(8px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.gs-reset-dialog {
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  max-width: 440px;
+  width: 100%;
+  position: relative;
+  box-shadow: var(--shadow-hover);
+}
+
+.gs-reset-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.gs-reset-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+
+.gs-reset-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gs-reset-title {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+}
+
+.gs-reset-sub {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.gs-reset-copy {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
 }
 
 .login-form-container {

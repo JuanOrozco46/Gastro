@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-10T17:45:00.000Z",
+  "title": "Design System: GastroSync",
+  "extensions": {
+    "colorMeta": {
+      "terracotta-primary": {
+        "role": "primary",
+        "displayName": "Baked Terracotta",
+        "canonical": "#C85A38",
+        "tonalRamp": ["#3B160B", "#582212", "#782F1B", "#983E25", "#B84E30", "#C85A38", "#E39B84", "#F7E2DA"]
+      },
+      "terracotta-deep": {
+        "role": "primary",
+        "displayName": "Roasted Terracotta",
+        "canonical": "#A84830",
+        "tonalRamp": ["#2E1109", "#471B10", "#632618", "#843523", "#A84830", "#C76D56", "#E2A696", "#F6E3DD"]
+      },
+      "sage-secondary": {
+        "role": "secondary",
+        "displayName": "Botanical Sage",
+        "canonical": "#6B8C6A",
+        "tonalRamp": ["#1C261C", "#2C3B2B", "#3F543E", "#546F53", "#6B8C6A", "#8FA98E", "#B8C9B7", "#E4ECE3"]
+      },
+      "sage-deep": {
+        "role": "secondary",
+        "displayName": "Deep Sage",
+        "canonical": "#547053",
+        "tonalRamp": ["#161F16", "#243224", "#344833", "#445C43", "#547053", "#7B947A", "#AEC0AD", "#E0E8DF"]
+      },
+      "bronze-tertiary": {
+        "role": "tertiary",
+        "displayName": "Toasted Bronze",
+        "canonical": "#8B6F47",
+        "tonalRamp": ["#261E12", "#3B2F1D", "#54432A", "#6F5838", "#8B6F47", "#AC916B", "#CDBB9F", "#EFE8DD"]
+      },
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "#FAF7F2",
+        "tonalRamp": ["#2C2520", "#4A413B", "#6B6058", "#8F837A", "#B5AAA0", "#D8D0C5", "#EFEAE1", "#FAF7F2"]
+      },
+      "pure-surface": {
+        "role": "neutral",
+        "displayName": "Pure Porcelain",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["#26221E", "#453F3A", "#665E57", "#8A8179", "#B0A79F", "#D4CEC7", "#ECE8E3", "#FFFFFF"]
+      },
+      "almond-surface": {
+        "role": "neutral",
+        "displayName": "Almond Surface",
+        "canonical": "#F5F0E8",
+        "tonalRamp": ["#2B241E", "#483E35", "#695B4F", "#8C7B6D", "#B2A293", "#D4C8BA", "#E8E0D4", "#F5F0E8"]
+      },
+      "sand-border": {
+        "role": "neutral",
+        "displayName": "Sand Border",
+        "canonical": "#E8E2D8",
+        "tonalRamp": ["#2A241E", "#473E35", "#685C50", "#8B7D6F", "#AEA092", "#CCC1B4", "#E8E2D8", "#F6F3EE"]
+      },
+      "stone-border": {
+        "role": "neutral",
+        "displayName": "Stone Border",
+        "canonical": "#D0C8BC",
+        "tonalRamp": ["#28221D", "#443B33", "#63574C", "#857668", "#A69889", "#BEB2A4", "#D0C8BC", "#EFECE6"]
+      },
+      "espresso-dark": {
+        "role": "neutral",
+        "displayName": "Espresso Charcoal",
+        "canonical": "#2C2520",
+        "tonalRamp": ["#171310", "#2C2520", "#453B34", "#61544B", "#7F7066", "#A19288", "#C6BBB3", "#EAE5E1"]
+      },
+      "warm-ivory": {
+        "role": "neutral",
+        "displayName": "Warm Ivory",
+        "canonical": "#FAFAF8",
+        "tonalRamp": ["#292825", "#474540", "#68665F", "#8B8880", "#B0ADA5", "#D4D2CA", "#ECEBE6", "#FAFAF8"]
+      },
+      "warm-taupe": {
+        "role": "neutral",
+        "displayName": "Warm Taupe",
+        "canonical": "#78706A",
+        "tonalRamp": ["#211E1C", "#383431", "#57514C", "#78706A", "#968E88", "#B5AEA8", "#D4CFCB", "#F0EDEB"]
+      },
+      "muted-sand": {
+        "role": "neutral",
+        "displayName": "Muted Sand",
+        "canonical": "#B0A89E",
+        "tonalRamp": ["#26231F", "#423D37", "#615A52", "#837B71", "#9A9187", "#B0A89E", "#D1CBC3", "#F0EDE9"]
+      },
+      "status-emerald": {
+        "role": "secondary",
+        "displayName": "Status Emerald",
+        "canonical": "#10B981",
+        "tonalRamp": ["#063726", "#09543A", "#0C7551", "#0E9668", "#10B981", "#3ED19E", "#8AE5C3", "#D9F8EC"]
+      },
+      "status-cobalt": {
+        "role": "tertiary",
+        "displayName": "Status Cobalt",
+        "canonical": "#3B82F6",
+        "tonalRamp": ["#102A63", "#183F94", "#2256C5", "#2E6CE0", "#3B82F6", "#6EA3F9", "#A6C8FB", "#E1EDFE"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Títulos principales de portada, nombre del restaurante en cabeceras de perfil y titulares de bienvenida."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Logotipo de marca en el header y encabezados de modales o secciones principales."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Títulos de tarjetas, identificadores de orden en KDS y nombres de platos estrella."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texto base de interfaz, ítems de comanda, inputs de formulario, pestañas de navegación y botones."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Insignias de estado, subtítulo geográfico del logo y etiquetas de navegación móvil."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-rest",
+        "value": "0 2px 12px rgba(0, 0, 0, 0.05)",
+        "purpose": "Elevación estándar para tarjetas y contenedores de contenido principal."
+      },
+      {
+        "name": "card-hover",
+        "value": "0 8px 28px rgba(0, 0, 0, 0.08)",
+        "purpose": "Elevación al pasar el cursor sobre tarjetas interactivas."
+      },
+      {
+        "name": "terracotta-glow",
+        "value": "0 6px 18px rgba(216, 90, 56, 0.12)",
+        "purpose": "Sombra cálida reservada para tarjetas de restaurantes destacados al hacer hover."
+      },
+      {
+        "name": "kds-ticket",
+        "value": "0 4px 14px rgba(0, 0, 0, 0.04)",
+        "purpose": "Sombra ligera para separar comandas dentro de las columnas del KDS."
+      },
+      {
+        "name": "mobile-bottom-nav",
+        "value": "0 -8px 28px rgba(28, 25, 23, 0.08)",
+        "purpose": "Sombra superior suave para la barra de navegación móvil fija."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "0.2s ease",
+        "purpose": "Transición predeterminada para estados hover y focus en botones, pestañas e inputs."
+      },
+      {
+        "name": "tab-fade-in",
+        "value": "0.25s ease-in-out",
+        "purpose": "Entrada suave con desplazamiento vertical de 6px al cambiar de pestaña."
+      },
+      {
+        "name": "kds-slide-in",
+        "value": "0.3s ease-out",
+        "purpose": "Aparición con escala (0.96 -> 1) cuando entra un nuevo ticket a cocina."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "900px" },
+      { "name": "lg", "value": "992px" },
+      { "name": "xl", "value": "1400px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Botón principal de navegación y acciones administrativas sobre fondo Espresso Charcoal.",
+      "html": "<button class=\"ds-btn-primary\">Gestionar Menú</button>",
+      "css": ".ds-btn-primary { background: #2C2520; color: #FAFAF8; padding: 10px 18px; border-radius: 8px; border: none; font-family: 'Figtree', system-ui, sans-serif; font-size: 0.875rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s ease; } .ds-btn-primary:hover { background: #2A2522; transform: translateY(-1px); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(200, 90, 56, 0.28); }"
+    },
+    {
+      "name": "Brand Conversion Button (Terracotta)",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "CTA de conversión directa (Agregar al pedido, Confirmar compra).",
+      "html": "<button class=\"ds-btn-secondary\">Agregar · $28.000</button>",
+      "css": ".ds-btn-secondary { background: #C85A38; color: #FFFFFF; padding: 10px 18px; border-radius: 8px; border: none; font-family: 'Figtree', system-ui, sans-serif; font-size: 0.875rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s ease; } .ds-btn-secondary:hover { background: #A84830; transform: translateY(-1px); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(200, 90, 56, 0.3); }"
+    },
+    {
+      "name": "Almond Surface Button",
+      "kind": "button",
+      "refersTo": "button-inverted",
+      "description": "Botón secundario cálido para filtros, ubicación y acciones auxiliares.",
+      "html": "<button class=\"ds-btn-inverted\">Armenia · Zona Norte</button>",
+      "css": ".ds-btn-inverted { background: #F5F0E8; color: #2C2520; padding: 10px 18px; border-radius: 8px; border: 1px solid #E8E2D8; font-family: 'Figtree', system-ui, sans-serif; font-size: 0.875rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s ease; } .ds-btn-inverted:hover { background: #E8E2D8; } .ds-btn-inverted:focus-visible { outline: none; border-color: #C85A38; }"
+    },
+    {
+      "name": "Warm Form Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Campo de entrada con borde arena y anillo de enfoque cálido.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Ej. Cra 14 # 18N-30, Armenia\" />",
+      "css": ".ds-input { background: #FFFFFF; border: 1.5px solid #E8E2D8; border-radius: 8px; color: #2C2520; padding: 11px 16px; font-family: 'Figtree', system-ui, sans-serif; font-size: 0.875rem; width: 260px; transition: border-color 0.2s, box-shadow 0.2s; } .ds-input:hover { border-color: #D0C8BC; } .ds-input:focus, .ds-input:focus-visible { outline: none; border-color: #C85A38; box-shadow: 0 0 0 3px rgba(200, 169, 126, 0.15); }"
+    },
+    {
+      "name": "Segmented Navigation Tabs",
+      "kind": "nav",
+      "refersTo": "nav-tab-active",
+      "description": "Barra de pestañas sobre superficie almendra con estado activo en carbón espresso.",
+      "html": "<div class=\"ds-nav-tabs\"><button class=\"ds-nav-tab ds-active\">Directorio</button><button class=\"ds-nav-tab\">Feed Social</button><button class=\"ds-nav-tab\">Mis Pedidos</button></div>",
+      "css": ".ds-nav-tabs { display: inline-flex; background: #F5F0E8; padding: 4px; border-radius: 8px; border: 1px solid #E8E2D8; gap: 4px; font-family: 'Figtree', system-ui, sans-serif; } .ds-nav-tab { padding: 7px 16px; border-radius: 6px; border: none; background: transparent; color: #78706A; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; } .ds-nav-tab:hover { color: #2C2520; background: #FFFFFF; } .ds-nav-tab.ds-active { background: #2C2520; color: #FAFAF8; }"
+    },
+    {
+      "name": "KDS Order Ticket",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "Comanda operativa del KDS con borde izquierdo semántico de 6px y cantidades en terracota.",
+      "html": "<div class=\"ds-ticket\"><div class=\"ds-ticket-head\"><span class=\"ds-ticket-id\">#ORD-104</span><span class=\"ds-ticket-type\">Mesa 4 · QR</span></div><div class=\"ds-ticket-row\"><span><strong class=\"ds-qty\">2x</strong>Pizza Margarita Artesanal</span><span>12 min</span></div></div>",
+      "css": ".ds-ticket { background: #FFFFFF; border: 1px solid #E8E2D8; border-left: 6px solid #8B6F47; border-radius: 10px; padding: 16px; width: 280px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04); font-family: 'Figtree', system-ui, sans-serif; color: #2C2520; transition: transform 0.2s ease, box-shadow 0.2s ease; } .ds-ticket:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); } .ds-ticket-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #E8E2D8; } .ds-ticket-id { font-weight: 800; font-size: 1.05rem; } .ds-ticket-type { font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; background: #F5F0E8; font-weight: 700; } .ds-ticket-row { display: flex; justify-content: space-between; font-size: 0.85rem; } .ds-qty { color: #C85A38; font-weight: 800; margin-right: 6px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "La Mesa Editorial & El Pase de Cocina",
+    "overview": "GastroSync habita un mundo visual cálido, táctil y gastronómico donde la calidez de una carta impresa en papel algodón se encuentra con la precisión operativa de un pase de cocina profesional. En lugar de parecer una aplicación genérica de reparto llena de colores neón y cajas grises frías, el sistema utiliza superficies color crema cálido, acentos terracota horneado, salvia botánica y carbón espresso profundo para que la fotografía de los platos y la claridad de los precios en pesos colombianos (COP) sean los verdaderos protagonistas.\n\nLa densidad visual se adapta con intención al contexto físico del usuario: en el descubrimiento del comensal y el menú de mesa QR, el ritmo es aireado y apetitoso; en el panel administrativo del restaurante y el tablero KDS de cocina, la interfaz elimina cualquier ornamento superfluo para priorizar lectura a distancia, estados semánticos inequívocos y respuesta táctil inmediata. El sistema rechaza explícitamente los fondos azul pizarra fríos heredados (#0F172A), los rojos de alarma genéricos (#EF4444) como color de marca y el anidamiento innecesario de tarjetas dentro de tarjetas.",
+    "keyCharacteristics": [
+      "Paleta cálida sin negros ni grises puros: todos los neutros están entintados hacia el crema papel, almendra, arena y carbón espresso.",
+      "Contraste tipográfico entre encabezados serifa editoriales (Playfair Display) para identidad y cuerpo funcional de alta legibilidad (Figtree) para precios, modificadores y métricas.",
+      "Superficies táctiles delimitadas por bordes cálidos de 1px y sombras ambientales suaves en lugar de divisores pesados.",
+      "Adaptación nativa móvil mediante barra inferior con desenfoque translúcido y modales tipo bottom-sheet que respetan safe-area-inset-bottom.",
+      "Codificación cromática estricta para los estados de comanda en el KDS (Pendiente, Aceptado, En preparación, Listo)."
+    ],
+    "rules": [
+      {
+        "name": "The Tinted Neutral Rule",
+        "body": "Nunca uses negro puro (#000000), gris neutro frío (#808080) ni azul pizarra (#0F172A) en superficies, textos o fondos vidriados. Toda superficie oscura debe usar Espresso Charcoal (#2C2520 o sus variantes translúcidas rgba(44, 37, 32, 0.92)).",
+        "section": "colors"
+      },
+      {
+        "name": "The Terracotta Restraint Rule",
+        "body": "Baked Terracotta (#C85A38) reserva su impacto para acciones de conversión (pedir, pagar, incrementar cantidad) y señales críticas de atención; los botones de navegación y acciones administrativas principales descansan sobre Espresso Charcoal (#2C2520) para evitar saturar la pantalla de naranja/rojo.",
+        "section": "colors"
+      },
+      {
+        "name": "The Single Font-Stack Rule",
+        "body": "Ningún componente debe declarar fuentes fuera del sistema (como Outfit o Arial en estilos inline). Todo título editorial usa var(--font-display) y toda interfaz operativa o numérica usa var(--font-family).",
+        "section": "typography"
+      },
+      {
+        "name": "The Clean COP Currency Rule",
+        "body": "Los precios y montos en Pesos Colombianos deben presentarse siempre con peso 700 o 800, sin centavos decimales y con separador de miles claro (ej. $32.000), asegurando que el precio nunca se parta en dos líneas (white-space: nowrap).",
+        "section": "typography"
+      },
+      {
+        "name": "The Border-First Elevation Rule",
+        "body": "Ninguna tarjeta sobre el fondo crema debe depender únicamente de box-shadow para definir sus límites; siempre debe incluir border: 1px solid var(--neutral-border) (#E8E2D8).",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do usar exclusivamente las variables semánticas de :root (var(--primary), var(--neutral-bg), var(--neutral-surface), var(--text-main)) en todos los componentes nuevos y refactorizados.",
+      "Do convertir los modales en hojas inferiores (bottom-sheets con border-radius: 24px 24px 0 0 y max-height: 92dvh) en pantallas móviles (<= 640px).",
+      "Do mantener las barras de pestañas con scroll horizontal fluido (flex-wrap: nowrap; overflow-x: auto) en móvil para no empujar el contenido principal hacia abajo.",
+      "Do diferenciar el estado de los tickets del KDS mediante el borde izquierdo de 6px más etiqueta textual e ícono, nunca solo por color de fondo."
+    ],
+    "donts": [
+      "Don't usar estilos inline con colores heredados del tema oscuro frío (#0F172A, #1E293B, #EF4444, #94A3B8) como los que aún existen en vistas antiguas (PartnerLandingView.tsx, Header.tsx o table-qr-mobile-sticky-bar).",
+      "Don't anidar tarjetas con borde y sombra dentro de otras tarjetas con borde y sombra (cards in cards); usa Almond Surface (#F5F0E8) sin sombra para agrupar elementos secundarios dentro de una .card.",
+      "Don't declarar familias tipográficas ad-hoc como fontFamily: 'Outfit, sans-serif'; respeta la dupla Playfair Display + Inter.",
+      "Don't mostrar botones de cancelación o entrega final dentro de la vista del rol kitchen (KDS)."
+    ]
+  }
+}
