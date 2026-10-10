@@ -79,11 +79,11 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ post, tenant, onCl
 
         {/* Post Preview Bar */}
         <div className="gf-comments-post-summary">
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: tenant?.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="gf-post-summary-logo">
             {tenant?.logoUrl ? (
-              <img src={tenant.logoUrl} alt={tenant?.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={tenant.logoUrl} alt={tenant?.name} />
             ) : (
-              <span className="gf-post-summary-emoji" style={{ margin: 0, fontSize: '1.2rem' }}>{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
+              <span className="gf-post-summary-emoji">{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
             )}
           </div>
           <div className="gf-post-summary-text">
@@ -97,7 +97,9 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ post, tenant, onCl
         <div className="gf-comments-list">
           {comments.length === 0 ? (
             <div className="gf-no-comments">
-              <span>💬</span>
+              <span>
+                <MessageCircle size={32} />
+              </span>
               <p>Sé el primero en comentar sobre este plato</p>
             </div>
           ) : (
@@ -108,51 +110,36 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ post, tenant, onCl
 
               return (
                 <div key={c.id} className="gf-comment-item">
-                  <div
-                    className="gf-comment-avatar"
-                    style={{
-                      overflow: 'hidden',
-                      padding: 0,
-                      border: avatarImg ? '1.5px solid rgba(200, 169, 126, 0.45)' : undefined
-                    }}
-                  >
+                  <div className={`gf-comment-avatar ${avatarImg ? 'has-img' : ''}`}>
                     {avatarImg ? (
                       <img
                         src={avatarImg}
                         alt={c.userName}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        className="gf-comment-avatar-img"
                       />
                     ) : c.userAvatar && c.userAvatar !== '🥑' ? (
                       <span>{c.userAvatar}</span>
                     ) : (
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#d4a359' }}>
+                      <span className="gf-comment-initials">
                         {getInitials(c.userName)}
                       </span>
                     )}
                   </div>
                   <div className="gf-comment-content">
-                    <div className="gf-comment-author-row" style={{ flexWrap: 'wrap', gap: '6px' }}>
-                      <strong className="gf-comment-author">{c.userName}</strong>
-                      {handleStr && (
-                        <span
-                          style={{
-                            fontSize: '0.73rem',
-                            fontWeight: 700,
-                            color: '#d4a359',
-                            background: 'rgba(212, 163, 89, 0.12)',
-                            border: '1px solid rgba(212, 163, 89, 0.25)',
-                            padding: '1px 7px',
-                            borderRadius: '999px'
-                          }}
-                        >
-                          @{handleStr}
-                        </span>
-                      )}
+                    <div className="gf-comment-author-row">
+                      <div className="gf-comment-author-group">
+                        <strong className="gf-comment-author">{c.userName}</strong>
+                        {handleStr && (
+                          <span className="gf-comment-handle-pill">
+                            @{handleStr}
+                          </span>
+                        )}
+                      </div>
                       <span className="gf-comment-time">{c.timeAgo}</span>
                     </div>
                     <p className="gf-comment-text">{c.text}</p>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <div className="gf-comment-actions-col">
                     <button className="gf-comment-like-btn" type="button" aria-label="Me gusta comentario">
                       <Heart size={14} />
                       {c.likes > 0 && <span>{c.likes}</span>}
@@ -160,9 +147,8 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ post, tenant, onCl
                     {deletable && (
                       <button
                         type="button"
-                        className="gf-comment-like-btn"
+                        className="gf-comment-like-btn danger"
                         onClick={() => deleteComment(post.id, c.id)}
-                        style={{ color: 'var(--danger)' }}
                         title={isPostRestaurantMember && c.userId !== currentUser?.id ? 'Eliminar comentario (Restaurante)' : 'Eliminar mi comentario'}
                         aria-label="Eliminar comentario"
                       >
@@ -180,28 +166,13 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ post, tenant, onCl
         <form className="gf-comments-form" onSubmit={handleSubmit}>
           {currentUser && (
             <div
+              className="gf-comment-self-avatar"
               title={currentUserHandle ? `@${currentUserHandle}` : currentUser.name}
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                overflow: 'hidden',
-                flexShrink: 0,
-                background: 'rgba(212, 163, 89, 0.16)',
-                border: '1.5px solid rgba(212, 163, 89, 0.45)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.72rem',
-                fontWeight: 800,
-                color: '#d4a359'
-              }}
             >
               {currentUser.avatarUrl ? (
                 <img
                   src={currentUser.avatarUrl}
                   alt={currentUser.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 />
               ) : (
                 getInitials(currentUser.name)

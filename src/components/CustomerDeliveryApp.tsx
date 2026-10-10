@@ -11,7 +11,8 @@ import {
   Heart, MessageCircle, Share2, ShoppingBag, Bike,
   TrendingUp, MapPin, Trash2, Plus, Minus,
   Package, Play, Eye, X, ExternalLink,
-  Bookmark, Zap, Search, SlidersHorizontal, CheckCircle2, Building2, Clock, User
+  Bookmark, Zap, Search, SlidersHorizontal, CheckCircle2, Building2, Clock, User,
+  AlertCircle, Info, ShieldCheck
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { toggleRemoteSave, fetchRemoteSavedPosts } from '../services/supabaseDataService';
@@ -25,8 +26,8 @@ const CommentsModal = lazy(() => import('./CommentsModal').then(m => ({ default:
 const UserProfileModal = lazy(() => import('./UserProfileModal').then(m => ({ default: m.UserProfileModal })));
 
 const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
-  <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-    <div style={{ width: '24px', height: '24px', border: '2px solid', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
+  <div className="gf-fallback-loader">
+    <div className="gf-fallback-spinner" />
     {message}
   </div>
 );
@@ -50,32 +51,34 @@ const VideoModal: React.FC<{ post: Post; tenant?: Tenant; onClose: () => void; o
       animate={{ scale: 1, y: 0 }}
       exit={{ scale: 0.9, y: 20 }}
     >
-      <button className="video-modal-close" onClick={onClose}><X size={20} /></button>
+      <button className="video-modal-close" onClick={onClose} aria-label="Cerrar video"><X size={20} /></button>
 
       <div className="video-modal-player">
         {post.mediaUrl ? (
-          <video preload="none" poster={post.image}
+          <video
+            preload="none"
+            poster={post.image}
             src={post.mediaUrl}
             controls
             autoPlay
-            style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
+            className="video-modal-media"
           />
         ) : post.legacyExternalYoutubeId ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#111', color: '#94a3b8', flexDirection: 'column', gap: '10px' }}>
+          <div className="video-modal-legacy">
             <p>Este video antiguo ya no está disponible en la plataforma.</p>
           </div>
         ) : (
-          <img loading="lazy" decoding="async" src={post.image} alt={post.dishName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          <img loading="lazy" decoding="async" src={post.image} alt={post.dishName} className="video-modal-media" />
         )}
       </div>
 
       <div className="video-modal-footer">
         <div className="video-modal-info">
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: tenant?.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="video-modal-logo">
             {tenant?.logoUrl ? (
-              <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant?.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant?.name} />
             ) : (
-              <span className="video-modal-emoji" style={{ margin: 0 }}>{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
+              <span className="video-modal-emoji">{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
             )}
           </div>
           <div>
@@ -145,13 +148,13 @@ const PostCard: React.FC<PostCardProps> = ({
       transition={{ duration: 0.35 }}
     >
 
-      {/* ── Header (autor con anillo de historias) ── */}
+      {/* ── Header (autor con anillo editorial) ── */}
       <header className="gf-post-header">
-        <div className="gf-post-author" onClick={() => onOpenProfile(post.tenantId)} style={{ cursor: 'pointer' }}>
-          <div className="gf-story-ring">
-            <div className="gf-author-avatar" style={{ backgroundColor: tenant?.logoUrl ? 'transparent' : 'var(--surface-color)', overflow: 'hidden' }}>
+        <div className="gf-post-author" onClick={() => onOpenProfile(post.tenantId)}>
+          <div className="gf-post-avatar-ring">
+            <div className={`gf-author-avatar ${tenant?.logoUrl ? 'has-logo' : ''}`}>
               {tenant?.logoUrl ? (
-                <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant.name} className="gf-author-avatar-img" />
               ) : (
                 <span>{tenant?.logoEmoji || post.tenantLogoEmoji || '🍽️'}</span>
               )}
@@ -174,12 +177,8 @@ const PostCard: React.FC<PostCardProps> = ({
         </div>
       </header>
 
-      {/* ── Media cuadrada a sangrado completo, doble tap = like ── */}
-      <div
-        className="gf-media-wrapper"
-        style={{ aspectRatio: post.width && post.height ? `${post.width} / ${post.height}` : '4 / 5' }}
-        onClick={handleMediaTap}
-      >
+      {/* ── Media cuadrada 4:5 a sangrado completo, doble tap = like ── */}
+      <div className="gf-media-wrapper" onClick={handleMediaTap}>
         <img loading="lazy" decoding="async" src={post.image} alt={post.dishName} className="gf-media-img" />
 
         {/* Video overlay */}
@@ -187,9 +186,10 @@ const PostCard: React.FC<PostCardProps> = ({
           <button
             className="gf-play-overlay"
             onClick={(e) => { e.stopPropagation(); onPlayVideo(post); }}
+            aria-label={`Reproducir video de ${post.dishName}`}
           >
             <div className="gf-play-btn">
-              <Play size={24} fill="white" />
+              <Play size={24} fill="currentColor" />
             </div>
             {post.duration && (
               <span className="gf-video-duration">0:{post.duration}</span>
@@ -207,7 +207,7 @@ const PostCard: React.FC<PostCardProps> = ({
               exit={{ scale: 1.3, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 400, damping: 16 }}
             >
-              <Heart size={96} fill="white" strokeWidth={0} />
+              <Heart size={96} fill="currentColor" strokeWidth={0} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -220,7 +220,7 @@ const PostCard: React.FC<PostCardProps> = ({
         )}
       </div>
 
-      {/* ── Actions: solo iconos, como Instagram ── */}
+      {/* ── Actions ── */}
       <div className="gf-actions-row">
         <div className="gf-actions-left">
           <button
@@ -228,7 +228,7 @@ const PostCard: React.FC<PostCardProps> = ({
             onClick={() => onLike(post.id)}
             aria-label="Me gusta"
           >
-            <Heart size={24} fill={post.isLiked ? '#e11d48' : 'none'} strokeWidth={post.isLiked ? 0 : 1.8} />
+            <Heart size={24} fill={post.isLiked ? 'currentColor' : 'none'} strokeWidth={post.isLiked ? 0 : 1.8} />
           </button>
           <button className="gf-action-btn gf-action-icon" onClick={() => onOpenComments(post)} aria-label="Comentar">
             <MessageCircle size={24} strokeWidth={1.8} />
@@ -242,7 +242,7 @@ const PostCard: React.FC<PostCardProps> = ({
           onClick={() => onSave(post.id)}
           aria-label="Guardar"
         >
-          <Bookmark size={22} fill={saved ? 'var(--text-main)' : 'none'} strokeWidth={1.8} />
+          <Bookmark size={22} fill={saved ? 'currentColor' : 'none'} strokeWidth={1.8} />
         </button>
       </div>
 
@@ -257,7 +257,7 @@ const PostCard: React.FC<PostCardProps> = ({
         )}
 
         <p className="gf-caption-text">
-          <strong className="gf-handle" onClick={() => onOpenProfile(post.tenantId)} style={{ cursor: 'pointer' }}>
+          <strong className="gf-handle" onClick={() => onOpenProfile(post.tenantId)}>
             {handle}{' '}
           </strong>
           <span className="gf-caption-dish">{post.dishEmoji} {post.dishName}</span>{' — '}
@@ -285,29 +285,23 @@ const PostCard: React.FC<PostCardProps> = ({
       {/* ── CTA ── */}
       {(!post.productId || post.productId === post.id) ? (
         <div className="gf-cta-block">
-          <div style={{
-            padding: '12px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)',
-            borderRadius: '12px', fontSize: '0.8rem', color: '#F59E0B', textAlign: 'center', fontWeight: 600
-          }}>
-            📋 Solo para referencia - No disponible para pedido
+          <div className="gf-post-status-notice reference">
+            <Info size={14} />
+            <span>Publicación editorial — Explora el menú del restaurante para pedir</span>
           </div>
         </div>
       ) : !product ? (
         <div className="gf-cta-block">
-          <div style={{
-            padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '12px', fontSize: '0.8rem', color: '#EF4444', textAlign: 'center', fontWeight: 600
-          }}>
-            🚫 Este producto ya no está disponible
+          <div className="gf-post-status-notice closed">
+            <AlertCircle size={14} />
+            <span>Este producto ya no está disponible</span>
           </div>
         </div>
       ) : !product.available ? (
         <div className="gf-cta-block">
-          <div style={{
-            padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '12px', fontSize: '0.8rem', color: '#EF4444', textAlign: 'center', fontWeight: 600
-          }}>
-            ⚠️ Agotado temporalmente
+          <div className="gf-post-status-notice warning">
+            <Clock size={14} />
+            <span>Agotado temporalmente</span>
           </div>
         </div>
       ) : (
@@ -316,8 +310,10 @@ const PostCard: React.FC<PostCardProps> = ({
             className="gf-order-btn"
             onClick={() => onOrder(post.productId, post.tenantId)}
           >
-            <ShoppingBag size={16} />
-            <span>Añadir al Carrito</span>
+            <span className="gf-order-btn-label">
+              <ShoppingBag size={16} />
+              <span>Añadir al Carrito</span>
+            </span>
             <span className="gf-order-price">${post.price.toLocaleString('es-CO')}</span>
           </button>
           {isVideo && (
@@ -434,7 +430,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const hasTenantsInActiveCity = activeCity ? tenants.some(t => t.status === 'active' && t.cityId === activeCity.id) : false;
   const currentZoneObj = zones.find(z => z.id === selectedZoneId);
   const zoneInfoText = !hasTenantsInActiveCity && activeCity
-    ? `📍 Aún no hay locales activos en ${activeCity.name}. Explorando catálogo nacional de Colombia.`
+    ? `Aún no hay locales activos en ${activeCity.name}. Explorando catálogo nacional de Colombia.`
     : !selectedZoneId
       ? `Descubre lo nuevo cerca de ti en ${activeCity ? activeCity.name : 'tu ciudad'}.`
       : `Descubre restaurantes y platos en Zona ${currentZoneObj?.name || ''}.`;
@@ -443,7 +439,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const cartQty   = cart.reduce((s, i) => s + i.quantity, 0);
   const cartTenantId = cart[0]?.product?.tenantId;
   const cartTenant = cartTenantId ? tenantMap.get(cartTenantId) : null;
-  const isCartTenantOpen = cartTenant?.isOpen ?? true;
+  const isCartTenantOpen = (cartTenant?.isOpen ?? true) && cartTenant?.acceptingOrders !== false;
   const activeOrdersCount = orders.filter(o =>
     o &&
     o.status !== 'delivered' &&
@@ -457,7 +453,7 @@ export const CustomerDeliveryApp: React.FC = () => {
     const targetTenant = tenants.find(t => t.id === tenantIdOrSlug || t.slug === tenantIdOrSlug);
     if (targetTenant) {
       if (!targetTenant.isOpen) {
-        showToast('❌ Este restaurante está cerrado temporalmente y no acepta pedidos.');
+        showToast('Este restaurante está cerrado temporalmente y no acepta pedidos.');
         return;
       }
       setCurrentTenantBySlug(targetTenant.slug);
@@ -468,7 +464,7 @@ export const CustomerDeliveryApp: React.FC = () => {
     // Find product in catalog
     const prod = products.find(p => p.id === productId);
     if (!prod) {
-      showToast('⚠️ Este producto no está disponible en el catálogo actual.');
+      showToast('Este producto no está disponible en el catálogo actual.');
       console.warn(`Producto no encontrado: ${productId}`);
       return;
     }
@@ -609,7 +605,7 @@ export const CustomerDeliveryApp: React.FC = () => {
           <button className={`gf-tab-pill ${activeTab === 'directory' ? 'active' : ''}`} onClick={() => setActiveTab('directory')}>
             <MapPin size={15} /> Locales
           </button>
-          <button className={`gf-tab-pill ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')} style={{ position: 'relative' }}>
+          <button className={`gf-tab-pill ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
             <Package size={15} /> Pedidos
             {activeOrdersCount > 0 && <span className="tab-orders-badge">{activeOrdersCount}</span>}
           </button>
@@ -642,22 +638,13 @@ export const CustomerDeliveryApp: React.FC = () => {
       {activeTab === 'feed' && (
         <>
           {/* ── Location Selector Bar ── */}
-          <div style={{ marginBottom: '1.25rem' }}>
+          <div className="gf-location-section">
             <LocationSelector variant="full" />
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '4px 10px',
-              fontSize: '0.78rem',
-              color: 'var(--text-muted)',
-              padding: '8px 12px 0 12px'
-            }}>
+            <div className="gf-location-meta-bar">
               <span>{zoneInfoText}</span>
-              <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+              <strong>
                 {activeTenantsInZoneCount} local{activeTenantsInZoneCount !== 1 ? 'es' : ''} · {zoneFilteredPosts.length} post{zoneFilteredPosts.length !== 1 ? 's' : ''}
-              </span>
+              </strong>
             </div>
           </div>
 
@@ -703,7 +690,6 @@ export const CustomerDeliveryApp: React.FC = () => {
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.25 }}
-                  style={{ overflow: 'hidden' }}
                 >
                   {/* Price range */}
                   <div className="gf-filter-group">
@@ -748,10 +734,10 @@ export const CustomerDeliveryApp: React.FC = () => {
                       value={sortBy}
                       onChange={e => setSortBy(e.target.value as 'recent' | 'popular' | 'price_low' | 'price_high')}
                     >
-                      <option value="recent">⏱️ Más reciente</option>
-                      <option value="popular">❤️ Más popular</option>
-                      <option value="price_low">💰 Precio ↑</option>
-                      <option value="price_high">💎 Precio ↓</option>
+                      <option value="recent">Más reciente</option>
+                      <option value="popular">Más popular</option>
+                      <option value="price_low">Menor precio</option>
+                      <option value="price_high">Mayor precio</option>
                     </select>
                   </div>
                 </motion.div>
@@ -779,7 +765,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                 className={`gf-filter-chip ${filterCategory === cat ? 'active' : ''}`}
                 onClick={() => setFilterCategory(cat)}
               >
-                {cat === 'all' ? '✨ Todo' : cat}
+                {cat === 'all' ? 'Todo' : cat}
               </button>
             ))}
           </div>
@@ -790,102 +776,58 @@ export const CustomerDeliveryApp: React.FC = () => {
             {/* Posts column */}
             <div className="gf-posts-column">
               {isCatalogLoading ? (
-                <div 
-                  style={{
-                    textAlign: 'center',
-                    padding: '3.5rem 2rem',
-                    background: 'var(--glass-light)',
-                    backdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    borderRadius: '24px',
-                    color: 'var(--text-muted)',
-                    margin: '1rem 0'
-                  }}
-                >
-                  <div className="gf-spinner" style={{ margin: '0 auto 1rem', width: '32px', height: '32px', border: '3px solid var(--primary-glass-border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                  <h3 style={{ fontSize: '1.2rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
-                    Cargando catálogo...
-                  </h3>
-                  <p style={{ fontSize: '0.88rem' }}>Estamos preparando las mejores opciones gastronómicas para ti.</p>
+                <div className="gf-state-panel">
+                  <div className="gf-spinner-ring" />
+                  <h3 className="gf-state-title">Cargando catálogo...</h3>
+                  <p className="gf-state-desc">Estamos preparando las mejores opciones gastronómicas para ti.</p>
                 </div>
               ) : catalogError ? (
-                <div 
-                  style={{
-                    textAlign: 'center',
-                    padding: '3.5rem 2rem',
-                    background: 'var(--glass-light)',
-                    backdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    borderRadius: '24px',
-                    color: 'var(--text-muted)',
-                    margin: '1rem 0'
-                  }}
-                >
-                  <X size={48} style={{ color: '#EF4444', margin: '0 auto 1rem' }} />
-                  <h3 style={{ fontSize: '1.2rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
-                    Oops, algo salió mal
-                  </h3>
-                  <p style={{ fontSize: '0.88rem' }}>{catalogError}</p>
+                <div className="gf-state-panel">
+                  <div className="gf-state-icon-wrap danger">
+                    <AlertCircle size={26} />
+                  </div>
+                  <h3 className="gf-state-title">Oops, algo salió mal</h3>
+                  <p className="gf-state-desc">{catalogError}</p>
                 </div>
               ) : tenants.length === 0 ? (
-                <div 
-                  style={{
-                    textAlign: 'center',
-                    padding: '3.5rem 2rem',
-                    background: 'var(--glass-light)',
-                    backdropFilter: 'blur(16px)',
-                    border: '1px solid var(--primary-glass-border)',
-                    borderRadius: '24px',
-                    color: 'var(--text-muted)',
-                    margin: '1rem 0'
-                  }}
-                >
-                  <Building2 size={48} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
-                  <h3 style={{ fontSize: '1.3rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
-                    🚀 Pronto en GastroSync {activeCity ? activeCity.name : ''}
+                <div className="gf-state-panel">
+                  <div className="gf-state-icon-wrap">
+                    <Building2 size={26} />
+                  </div>
+                  <h3 className="gf-state-title">
+                    Pronto en GastroSync {activeCity ? activeCity.name : ''}
                   </h3>
-                  <p style={{ fontSize: '0.88rem', maxWidth: '440px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
+                  <p className="gf-state-desc">
                     Aún no hay restaurantes aliados activos en esta zona. Pronto podrás descubrir los mejores sabores de {activeCity ? activeCity.name : 'tu ciudad'} aquí.
                   </p>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+                  <p className="gf-state-desc">
                     ¿Tienes un restaurante o negocio gastronómico en {activeCity ? activeCity.name : 'tu ciudad'}?
                   </p>
                   <button
                     type="button"
-                    className="btn btn-primary"
-                    style={{ borderRadius: '12px', fontWeight: 800, padding: '10px 22px' }}
+                    className="btn btn-primary gf-state-cta"
                     onClick={() => {
                       const btn = document.querySelector('.gf-partner-apply-btn') as HTMLButtonElement | null;
                       if (btn) btn.click();
                     }}
                   >
-                    🤝 Únete como Restaurante Aliado
+                    Únete como Restaurante Aliado
                   </button>
                 </div>
               ) : filtered.length === 0 ? (
-                <div 
-                  style={{
-                    textAlign: 'center',
-                    padding: '3.5rem 2rem',
-                    background: 'var(--glass-light)',
-                    backdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    borderRadius: '24px',
-                    color: 'var(--text-muted)',
-                    margin: '1rem 0'
-                  }}
-                >
-                  <MapPin size={48} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
-                  <h3 style={{ fontSize: '1.3rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
+                <div className="gf-state-panel">
+                  <div className="gf-state-icon-wrap">
+                    <MapPin size={26} />
+                  </div>
+                  <h3 className="gf-state-title">
                     No hay publicaciones disponibles en esta zona
                   </h3>
-                  <p style={{ fontSize: '0.88rem', maxWidth: '420px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
+                  <p className="gf-state-desc">
                     No encontramos platillos para el filtro actual. Explora la oferta gastronómica de toda la ciudad.
                   </p>
                   <button
                     type="button"
-                    className="btn btn-primary"
-                    style={{ borderRadius: '12px', fontWeight: 800, padding: '10px 20px' }}
+                    className="btn btn-primary gf-state-cta"
                     onClick={() => {
                       setSelectedZone(null);
                       setFilterCategory('all');
@@ -928,14 +870,14 @@ export const CustomerDeliveryApp: React.FC = () => {
                 <div className="gf-cart-body">
                   {cart.length === 0 ? (
                     <div className="gf-cart-empty">
-                      <ShoppingBag size={32} style={{ color: '#CBD5E1', marginBottom: 8 }} />
+                      <ShoppingBag size={32} className="gf-cart-empty-icon" />
                       <p>Tu carrito está vacío</p>
                       <span>Añade platillos desde el feed</span>
                     </div>
                   ) : (
                     <>
-                      <div style={{ padding: '0 1rem 0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Restaurante actual: <strong style={{ color: 'var(--primary)' }}>{cartTenant?.name}</strong>
+                      <div className="gf-cart-tenant-note">
+                        Restaurante actual: <strong>{cartTenant?.name}</strong>
                       </div>
                       <div className="gf-cart-items">
                         {cart.map((item, i) => (
@@ -943,23 +885,26 @@ export const CustomerDeliveryApp: React.FC = () => {
                             <div className="gf-ci-emoji">{item.product.emoji}</div>
                             <div className="gf-ci-info">
                               <span className="gf-ci-name">{item.product.name}</span>
-                              <span className="gf-ci-price">${item.product.price.toLocaleString('es-CO')} <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>(x{item.quantity})</span></span>
+                              <span className="gf-ci-price">
+                                ${item.product.price.toLocaleString('es-CO')}{' '}
+                                <span className="gf-ci-qty-tag">(x{item.quantity})</span>
+                              </span>
                             </div>
                             <div className="gf-ci-controls">
-                              <button className="gf-ci-btn" onClick={() => removeFromCart(item.product.id)}>
+                              <button className="gf-ci-btn" onClick={() => removeFromCart(item.product.id)} aria-label="Disminuir cantidad">
                                 {item.quantity === 1 ? <Trash2 size={11} /> : <Minus size={11} />}
                               </button>
                               <span>{item.quantity}</span>
-                              <button className="gf-ci-btn add" onClick={() => addToCart(item.product)}><Plus size={11} /></button>
+                              <button className="gf-ci-btn add" onClick={() => addToCart(item.product)} aria-label="Aumentar cantidad"><Plus size={11} /></button>
                             </div>
                           </div>
                         ))}
                       </div>
-                      
-                      <div style={{ padding: '10px 15px' }}>
-                        <button 
-                          className="btn btn-outline" 
-                          style={{ width: '100%', fontSize: '0.8rem', padding: '8px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+
+                      <div className="gf-cart-upsell-wrap">
+                        <button
+                          type="button"
+                          className="btn btn-outline gf-cart-upsell-btn"
                           onClick={() => {
                             if (cartTenant) {
                               setCurrentTenantBySlug(cartTenant.slug);
@@ -979,7 +924,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                   <div className="gf-cart-footer">
                     <div className="gf-cart-rows">
                       <div className="gf-cart-row"><span>Subtotal</span><span>${cartTotal.toLocaleString('es-CO')}</span></div>
-                      <div className="gf-cart-row"><span>🛵 Domicilio</span><span className="gf-free">Gratis</span></div>
+                      <div className="gf-cart-row"><span>Domicilio</span><span className="gf-free">Gratis</span></div>
                     </div>
                     <div className="gf-cart-total">
                       <span>Total</span>
@@ -990,7 +935,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                         <Bike size={17} /> Pagar a Domicilio
                       </button>
                     ) : (
-                      <button className="gf-checkout-btn" disabled style={{ background: 'rgba(255, 255, 255, 0.1)', cursor: 'not-allowed', color: 'var(--text-muted)' }}>
+                      <button className="gf-checkout-btn is-disabled" disabled>
                         <Clock size={17} /> Restaurante Cerrado
                       </button>
                     )}
@@ -1009,16 +954,28 @@ export const CustomerDeliveryApp: React.FC = () => {
                       <span className="gf-trend-name">{p.dishName}</span>
                       <span className="gf-trend-by">{p.tenantName}</span>
                     </div>
-                    <span className="gf-trend-likes">❤️ {fmt(p.likes)}</span>
+                    <span className="gf-trend-likes">
+                      <Heart size={11} fill="currentColor" />
+                      {fmt(p.likes)}
+                    </span>
                   </div>
                 ))}
               </div>
 
               {/* No ads banner */}
               <div className="gf-no-ads-card">
-                <div className="gf-no-ads-icon">🚫📢</div>
+                <div className="gf-no-ads-header">
+                  <ShieldCheck size={15} />
+                  <span>Gastronomía sin anuncios</span>
+                </div>
                 <p><strong>Contenido real de restaurantes.</strong> Lo que ves aquí son publicaciones directas de los locales aliados en {activeCity ? activeCity.name : 'tu ciudad'}.</p>
-                <a href="#" className="gf-no-ads-link">¿Eres restaurante? Únete <ExternalLink size={11} /></a>
+                <button
+                  type="button"
+                  className="gf-no-ads-link"
+                  onClick={() => setActiveTab('directory')}
+                >
+                  Explorar directorio de restaurantes <ExternalLink size={11} />
+                </button>
               </div>
 
             </aside>
@@ -1047,7 +1004,7 @@ export const CustomerDeliveryApp: React.FC = () => {
         <div className="my-orders-wrapper">
           <div className="my-orders-page-header">
             <div>
-              <h2 className="feed-page-title">📦 Mis Pedidos</h2>
+              <h2 className="feed-page-title">Mis Pedidos</h2>
               <p className="feed-page-subtitle">Sigue el estado de tus pedidos en tiempo real</p>
             </div>
             {activeOrdersCount > 0 && (
@@ -1160,9 +1117,8 @@ export const CustomerDeliveryApp: React.FC = () => {
             setActiveTab('orders');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          style={{ position: 'relative' }}
         >
-          <div style={{ position: 'relative', display: 'inline-flex' }}>
+          <div className="gf-mobile-nav-icon-wrap">
             <Package size={19} />
             {activeOrdersCount > 0 && (
               <span className="gf-mobile-nav-badge">{activeOrdersCount}</span>

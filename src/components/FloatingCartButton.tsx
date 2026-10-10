@@ -27,56 +27,20 @@ export const FloatingCartButton: React.FC<FloatingCartButtonProps> = ({ onOpen, 
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 50, opacity: 0, scale: 0.9 }}
           whileTap={{ scale: 0.95 }}
-          style={{
-            position: 'fixed',
-            bottom: 'calc(78px + env(safe-area-inset-bottom, 0px))',
-            right: '16px',
-            zIndex: 998,
-            backgroundColor: 'var(--primary)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '30px',
-            padding: '12px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            boxShadow: '0 8px 24px rgba(216, 90, 56, 0.45)',
-            cursor: 'pointer',
-            fontWeight: 800,
-            fontSize: '0.96rem',
-            minHeight: '48px',
-            minWidth: '48px', // Touch target
-            transition: 'background-color 0.2s ease',
-          }}
           aria-label={`Ver carrito, ${totalQty} productos`}
         >
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="floating-cart-icon-wrap">
             <ShoppingBag size={22} fill="currentColor" />
-            <motion.span 
+            <motion.span
               key={totalQty}
+              className="floating-cart-badge"
               initial={{ scale: 1.5 }}
               animate={{ scale: 1 }}
-              style={{
-                position: 'absolute',
-                top: '-8px',
-                right: '-10px',
-                backgroundColor: 'white',
-                color: 'var(--primary)',
-                borderRadius: '50%',
-                width: '20px',
-                height: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.75rem',
-                fontWeight: 900,
-                border: '2px solid var(--primary)'
-              }}
             >
               {totalQty}
             </motion.span>
           </div>
-          <span style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>
+          <span className="floating-cart-amount">
             ${totalCop.toLocaleString('es-CO')}
           </span>
         </motion.button>

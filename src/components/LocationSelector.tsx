@@ -66,27 +66,18 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   if (variant === 'compact' || variant === 'header') {
     return (
-      <div className={`gf-location-selector-compact ${className}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)', fontWeight: 700, fontSize: '0.88rem' }}>
+      <div className={`gf-location-selector-compact ${className}`}>
+        <div className="gs-loc-compact-text">
           <MapPin size={16} />
           <span>{activeCity ? activeCity.name : 'Seleccionar ciudad'}</span>
-          {activeZone && <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>· {activeZone.name}</span>}
+          {activeZone && <span className="gs-loc-compact-zone">· {activeZone.name}</span>}
         </div>
         <button
           type="button"
           onClick={handleGPSClick}
           aria-label="Usar mi ubicación GPS"
           title="Detectar ubicación automáticamente"
-          style={{
-            background: locationPreference === 'gps' ? 'var(--primary-glow, rgba(239, 68, 68, 0.15))' : 'transparent',
-            border: 'none',
-            borderRadius: '6px',
-            padding: '4px',
-            color: 'var(--primary)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center'
-          }}
+          className={`gs-loc-compact-gps-btn ${locationPreference === 'gps' ? 'is-active' : ''}`}
         >
           <Navigation size={14} className={userLocationState.isResolving ? 'animate-spin' : ''} />
         </button>
@@ -95,55 +86,31 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   }
 
   return (
-    <div
-      className={`gf-location-selector ${className}`}
-      style={{
-        background: 'var(--bg-card, #ffffff)',
-        border: '1px solid var(--border-color, #E5E7EB)',
-        borderRadius: '16px',
-        padding: '14px 18px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
-      }}
-    >
+    <div className={`gf-location-selector ${className}`}>
       {/* Privacy Explanation Modal / Banner */}
       {showPrivacyPrompt && (
         <div
-          style={{
-            background: 'var(--primary-glass-border, rgba(239, 68, 68, 0.08))',
-            border: '1px solid var(--primary, #EF4444)',
-            borderRadius: '12px',
-            padding: '12px 14px',
-            fontSize: '0.83rem',
-            color: 'var(--text-main, #111827)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}
+          className="gs-loc-privacy-banner"
           role="region"
           aria-label="Aviso de privacidad de ubicación"
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-            <Info size={18} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: '2px' }} />
+          <div className="gs-loc-privacy-row">
+            <Info size={18} className="gs-loc-privacy-icon" />
             <span>
               Usaremos tu ubicación aproximada para mostrarte restaurantes y publicaciones cercanos. Puedes elegir tu ciudad manualmente en cualquier momento.
             </span>
           </div>
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+          <div className="gs-loc-privacy-actions">
             <button
               type="button"
-              className="btn btn-outline"
-              style={{ fontSize: '0.78rem', padding: '4px 10px', borderRadius: '8px' }}
+              className="btn btn-outline gs-loc-privacy-btn"
               onClick={() => setShowPrivacyPrompt(false)}
             >
               Cancelar
             </button>
             <button
               type="button"
-              className="btn btn-primary"
-              style={{ fontSize: '0.78rem', padding: '4px 12px', borderRadius: '8px', fontWeight: 700 }}
+              className="btn btn-primary gs-loc-privacy-btn"
               onClick={confirmGPSRequest}
             >
               Permitir GPS
@@ -152,23 +119,9 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
         </div>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '10px',
-              background: userLocationState.permission === 'granted'
-                ? 'rgba(16, 185, 129, 0.15)'
-                : 'rgba(239, 68, 68, 0.1)',
-              color: userLocationState.permission === 'granted' ? '#10B981' : 'var(--primary, #EF4444)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
+      <div className="gs-loc-main-row">
+        <div className="gs-loc-status-group">
+          <div className={`gs-loc-icon-badge ${userLocationState.permission === 'granted' ? 'is-granted' : ''}`}>
             {userLocationState.isResolving ? (
               <RefreshCw size={18} className="animate-spin" />
             ) : userLocationState.permission === 'granted' ? (
@@ -178,67 +131,36 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
             )}
           </div>
           <div>
-            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted, #6B7280)', fontWeight: 700, display: 'block' }}>
+            <span className="gs-loc-eyebrow">
               {locationPreference === 'gps' ? 'Ubicación GPS' : 'Ubicación Manual'}
             </span>
-            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main, #111827)' }}>
+            <span className="gs-loc-active-name">
               {activeCity ? activeCity.name : 'Cargando ciudades...'}
               {activeZone ? ` · Zona ${activeZone.name}` : ' · Todas las zonas'}
             </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <div className="gs-loc-controls-group">
           {/* GPS Button */}
           <button
             type="button"
             onClick={handleGPSClick}
             disabled={userLocationState.isResolving}
             aria-label="Usar mi ubicación GPS"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 12px',
-              borderRadius: '10px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              border: locationPreference === 'gps'
-                ? '1px solid var(--primary, #EF4444)'
-                : '1px solid var(--border-color, #E5E7EB)',
-              background: locationPreference === 'gps'
-                ? 'rgba(239, 68, 68, 0.08)'
-                : 'var(--bg-subtle, #F3F4F6)',
-              color: locationPreference === 'gps'
-                ? 'var(--primary, #EF4444)'
-                : 'var(--text-main, #111827)',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
+            className={`gs-loc-gps-action-btn ${locationPreference === 'gps' ? 'is-active' : ''}`}
           >
             <Navigation size={14} className={userLocationState.isResolving ? 'animate-spin' : ''} />
             <span>{userLocationState.isResolving ? 'Detectando...' : 'Usar mi ubicación'}</span>
           </button>
 
           {/* City Selector */}
-          <div style={{ position: 'relative' }}>
+          <div className="gs-loc-select-wrap">
             <select
               value={selectedCityId}
               onChange={handleCityChange}
               aria-label="Seleccionar ciudad manualmente"
-              style={{
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                background: 'var(--bg-subtle, #F3F4F6)',
-                border: '1px solid var(--border-color, #E5E7EB)',
-                borderRadius: '10px',
-                padding: '8px 32px 8px 12px',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                color: 'var(--text-main, #111827)',
-                cursor: 'pointer',
-                outline: 'none'
-              }}
+              className="gs-loc-select"
             >
               {cities.map(city => {
                 const cityCount = tenants.filter(t => t.status === 'active' && t.cityId === city.id).length;
@@ -249,58 +171,26 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
                 );
               })}
             </select>
-            <ChevronDown
-              size={14}
-              style={{
-                position: 'absolute',
-                right: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                pointerEvents: 'none',
-                color: 'var(--text-muted, #6B7280)'
-              }}
-            />
+            <ChevronDown size={14} className="gs-loc-select-chevron" />
           </div>
 
           {/* Zone Selector */}
           {cityZones.length > 0 && (
-            <div style={{ position: 'relative' }}>
+            <div className="gs-loc-select-wrap">
               <select
                 value={selectedZoneId || 'all'}
                 onChange={handleZoneChange}
                 aria-label="Seleccionar zona manualmente"
-                style={{
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  background: 'var(--bg-subtle, #F3F4F6)',
-                  border: '1px solid var(--border-color, #E5E7EB)',
-                  borderRadius: '10px',
-                  padding: '8px 32px 8px 12px',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  color: 'var(--text-main, #111827)',
-                  cursor: 'pointer',
-                  outline: 'none'
-                }}
+                className="gs-loc-select"
               >
-                <option value="all">🇨🇴 Todas las zonas</option>
+                <option value="all">Todas las zonas</option>
                 {cityZones.map(zone => (
                   <option key={zone.id} value={zone.id}>
                     Zona {zone.name}
                   </option>
                 ))}
               </select>
-              <ChevronDown
-                size={14}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none',
-                  color: 'var(--text-muted, #6B7280)'
-                }}
-              />
+              <ChevronDown size={14} className="gs-loc-select-chevron" />
             </div>
           )}
         </div>
@@ -309,22 +199,22 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       {/* Dynamic Location Status Banner (Live region for accessibility) */}
       <div aria-live="polite">
         {userLocationState.isResolving && (
-          <div style={{ fontSize: '0.78rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+          <div className="gs-loc-live-feedback resolving">
             <RefreshCw size={12} className="animate-spin" />
             <span>Detectando ubicación GPS...</span>
           </div>
         )}
 
         {userLocationState.permission === 'denied' && (
-          <div style={{ fontSize: '0.78rem', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', fontWeight: 600 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="gs-loc-live-feedback denied">
+            <div className="gs-loc-live-msg">
               <AlertCircle size={14} />
               <span>Permiso de ubicación bloqueado. Puedes seleccionar tu ciudad manualmente.</span>
             </div>
             <button
               type="button"
               onClick={switchToManualLocation}
-              style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: '0.75rem' }}
+              className="gs-loc-manual-link"
             >
               Elegir manualmente
             </button>
@@ -332,15 +222,15 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
         )}
 
         {userLocationState.error && userLocationState.permission !== 'denied' && (
-          <div style={{ fontSize: '0.78rem', color: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', fontWeight: 600 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="gs-loc-live-feedback warning">
+            <div className="gs-loc-live-msg">
               <AlertCircle size={14} />
               <span>{userLocationState.error}</span>
             </div>
             <button
               type="button"
               onClick={switchToManualLocation}
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: '0.75rem' }}
+              className="gs-loc-manual-link"
             >
               Elegir manualmente
             </button>

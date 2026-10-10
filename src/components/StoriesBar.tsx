@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/useApp';
 import type { Story, StoryItem } from '../types';
-import { X, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Zap, Flame } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface StoriesBarProps {
@@ -65,7 +65,10 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
     <>
       <div className="gf-stories-section">
         <div className="gf-stories-title-row">
-          <span className="gf-stories-badge">🔥 EN VIVO HOY</span>
+          <span className="gf-stories-badge">
+            <Flame size={13} />
+            EN VIVO HOY
+          </span>
           <span className="gf-stories-subtitle">Reels & cocinas en tiempo real</span>
         </div>
 
@@ -111,6 +114,7 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
           const items = activeStory.story.items || [];
           const currentItem: StoryItem | undefined = items[activeStory.itemIndex];
           if (!currentItem) return null;
+          const canOrderStoryItem = Boolean(currentItem.productId && currentItem.productId !== '0' && currentItem.price > 0);
 
           return (
             <motion.div
@@ -127,7 +131,6 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, y: 30 }}
               >
-                
                 {/* Progress bar */}
                 <div className="gf-story-progress-bar">
                   {items.map((_, idx) => (
@@ -157,14 +160,16 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
                 {/* Media Content */}
                 <div className="gf-story-media-container">
                   {currentItem.mediaUrl ? (
-                    <video preload="none" poster={currentItem.image}
+                    <video
+                      preload="none"
+                      poster={currentItem.image}
                       src={currentItem.mediaUrl}
                       autoPlay
                       muted
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      className="gf-story-media-video"
                     />
                   ) : currentItem.legacyExternalYoutubeId ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#111', color: '#94a3b8', flexDirection: 'column', padding: '20px', textAlign: 'center' }}>
+                    <div className="gf-story-legacy-fallback">
                       <p>Este reel antiguo ya no está disponible en GastroSync.</p>
                     </div>
                   ) : (
@@ -184,22 +189,27 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
                 <div className="gf-story-viewer-footer">
                   <div className="gf-story-dish-meta">
                     <h4>{currentItem.dishName}</h4>
-                    <span className="gf-story-dish-price">${currentItem.price.toLocaleString('es-CO')} COP</span>
+                    {canOrderStoryItem ? (
+                      <span className="gf-story-dish-price">${currentItem.price.toLocaleString('es-CO')} COP</span>
+                    ) : (
+                      <span className="gf-story-dish-ref">Historia de cocina</span>
+                    )}
                   </div>
-                  <motion.button
-                    className="gf-story-buy-btn"
-                    onClick={() => {
-                      onOrderProduct(currentItem.productId, getSlug(currentItem.tenantId));
-                      setActiveStory(null);
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Zap size={16} fill="white" />
-                    <span>Pedir Ahora</span>
-                  </motion.button>
+                  {canOrderStoryItem && (
+                    <motion.button
+                      className="gf-story-buy-btn"
+                      onClick={() => {
+                        onOrderProduct(currentItem.productId, getSlug(currentItem.tenantId));
+                        setActiveStory(null);
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Zap size={16} fill="currentColor" />
+                      <span>Pedir Ahora</span>
+                    </motion.button>
+                  )}
                 </div>
-
               </motion.div>
             </motion.div>
           );
