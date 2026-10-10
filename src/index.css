@@ -11184,5 +11184,147 @@ body {
   cursor: not-allowed;
 }
 
+/* =========================================================
+   VIEW LOADER & ERROR BOUNDARY (RESILIENCIA DE CHUNKS)
+   ========================================================= */
+.gs-view-loader {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-muted);
+  padding: 32px 20px;
+}
 
+.gs-view-loader__spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--primary-glass-border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
 
+.gs-view-loader__label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.gs-error-boundary {
+  min-height: calc(100vh - 96px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.gs-error-boundary__card {
+  width: 100%;
+  max-width: 520px;
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.gs-error-boundary__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: rgba(217, 78, 40, 0.12);
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gs-error-boundary__eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary);
+}
+
+.gs-error-boundary__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.2vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-main);
+}
+
+.gs-error-boundary__description {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 52ch;
+}
+
+.gs-error-boundary__code {
+  margin: 4px 0 0;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--neutral-bg);
+  border: 1px solid var(--neutral-border);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.gs-error-boundary__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.gs-error-boundary__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.gs-error-boundary__btn--primary {
+  background: var(--primary);
+  color: #FFFFFF;
+  border: 1px solid transparent;
+}
+
+.gs-error-boundary__btn--primary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.gs-error-boundary__btn--secondary {
+  background: transparent;
+  color: var(--text-main);
+  border: 1px solid var(--neutral-border);
+}
+
+.gs-error-boundary__btn--secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}

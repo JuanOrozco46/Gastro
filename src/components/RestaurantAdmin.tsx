@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useApp } from '../context/useApp';
 import { getOperationalTenant } from '../utils/tenantHelpers';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,6 +7,7 @@ import { ProfileTab } from './RestaurantAdmin/ProfileTab';
 import { NotificationBell } from './NotificationBell';
 import { RestaurantTablesAdmin } from './RestaurantTablesAdmin';
 import { KdsBoard } from './KdsBoard';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import {
   QrCode,
   Utensils,
@@ -40,19 +41,19 @@ import {
   Star
 } from 'lucide-react';
 
-const FinancialAnalytics = lazy(() =>
+const FinancialAnalytics = lazyWithRetry(() =>
   import('./FinancialAnalytics').then(m => ({ default: m.FinancialAnalytics }))
 );
-const SupportTab = lazy(() =>
+const SupportTab = lazyWithRetry(() =>
   import('./RestaurantAdmin/SupportTab').then(m => ({ default: m.SupportTab }))
 );
-const MenuTab = lazy(() =>
+const MenuTab = lazyWithRetry(() =>
   import('./RestaurantAdmin/MenuTab').then(m => ({ default: m.MenuTab }))
 );
-const TeamTab = lazy(() =>
+const TeamTab = lazyWithRetry(() =>
   import('./RestaurantAdmin/TeamTab').then(m => ({ default: m.TeamTab }))
 );
-const ReviewsTab = lazy(() =>
+const ReviewsTab = lazyWithRetry(() =>
   import('./RestaurantAdmin/ReviewsTab').then(m => ({ default: m.ReviewsTab }))
 );
 

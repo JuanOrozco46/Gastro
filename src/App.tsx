@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { AppProvider } from './context/AppContext';
 import { useApp } from './context/useApp';
 import { Header } from './components/Header';
@@ -7,35 +7,21 @@ import { ForcePasswordModal } from './components/ForcePasswordModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LegalCenterModal } from './components/LegalCenterModal';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 
-// Módulos importados dinámicamente para Code-Splitting óptimo
-const LoginScreen = lazy(() => import('./components/LoginScreen').then(m => ({ default: m.LoginScreen })));
-const EmailVerificationScreen = lazy(() => import('./components/EmailVerificationScreen').then(m => ({ default: m.EmailVerificationScreen })));
-const CustomerDeliveryApp = lazy(() => import('./components/CustomerDeliveryApp').then(m => ({ default: m.CustomerDeliveryApp })));
-const KitchenPanel = lazy(() => import('./components/KitchenPanel').then(m => ({ default: m.KitchenPanel })));
-const RestaurantAdmin = lazy(() => import('./components/RestaurantAdmin').then(m => ({ default: m.RestaurantAdmin })));
-const TablePublicView = lazy(() => import('./components/TablePublicView').then(m => ({ default: m.TablePublicView })));
-const SuperAdminView = lazy(() => import('./components/SuperAdminView').then(m => ({ default: m.SuperAdminView })));
+// Módulos importados dinámicamente con auto-recuperación ante despliegues nuevos en Vercel
+const LoginScreen = lazyWithRetry(() => import('./components/LoginScreen').then(m => ({ default: m.LoginScreen })));
+const EmailVerificationScreen = lazyWithRetry(() => import('./components/EmailVerificationScreen').then(m => ({ default: m.EmailVerificationScreen })));
+const CustomerDeliveryApp = lazyWithRetry(() => import('./components/CustomerDeliveryApp').then(m => ({ default: m.CustomerDeliveryApp })));
+const KitchenPanel = lazyWithRetry(() => import('./components/KitchenPanel').then(m => ({ default: m.KitchenPanel })));
+const RestaurantAdmin = lazyWithRetry(() => import('./components/RestaurantAdmin').then(m => ({ default: m.RestaurantAdmin })));
+const TablePublicView = lazyWithRetry(() => import('./components/TablePublicView').then(m => ({ default: m.TablePublicView })));
+const SuperAdminView = lazyWithRetry(() => import('./components/SuperAdminView').then(m => ({ default: m.SuperAdminView })));
 
 const ViewLoader: React.FC = () => (
-  <div style={{
-    minHeight: '60vh',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '16px',
-    color: 'var(--text-muted)'
-  }}>
-    <div style={{
-      width: '40px',
-      height: '40px',
-      border: '3px solid var(--primary-glass-border)',
-      borderTopColor: 'var(--primary)',
-      borderRadius: '50%',
-      animation: 'spin 0.8s linear infinite'
-    }} />
-    <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Cargando módulo GastroSync...</span>
+  <div className="gs-view-loader" role="status" aria-live="polite">
+    <div className="gs-view-loader__spinner" aria-hidden="true" />
+    <span className="gs-view-loader__label">Cargando módulo GastroSync...</span>
   </div>
 );
 
@@ -94,7 +80,7 @@ const MainContent: React.FC = () => {
   return (
     <main>
       <ForcePasswordModal />
-      <ErrorBoundary moduleName="Aplicación Principal">
+      <ErrorBoundary key={userRole} moduleName="Aplicación Principal">
         <Suspense fallback={<ViewLoader />}>
           {userRole === 'client_delivery' && <CustomerDeliveryApp />}
           {userRole === 'kitchen' && <KitchenPanel />}

@@ -134,7 +134,7 @@ describe('GastroSync QA Hardening — Payment & Security Suite', () => {
 
   it('verifica que App.tsx envuelve las vistas lazy en ErrorBoundary y el modo Demo tiene datos coherentes para t1', () => {
     const appTsx = fs.readFileSync(path.join(ROOT, 'src', 'App.tsx'), 'utf8');
-    assert.match(appTsx, /<ErrorBoundary moduleName="Aplicación Principal">/);
+    assert.match(appTsx, /<ErrorBoundary(?:\s+key=\{userRole\})?\s+moduleName="Aplicación Principal">/);
     assert.match(appTsx, /<ErrorBoundary moduleName="Servicio en Mesa QR">/);
 
     const defaultData = fs.readFileSync(path.join(ROOT, 'src', 'context', 'defaultData.ts'), 'utf8');
@@ -192,6 +192,21 @@ describe('GastroSync QA Hardening — Payment & Security Suite', () => {
     assert.match(cookieBanner, /gs-cookie-banner/);
     assert.match(cookieBanner, /Solo esenciales/);
   });
+
+  it('verifica la auto-recuperación ante fallos de chunks dinámicos tras despliegues en Vercel (lazyWithRetry + vite:preloadError + ErrorBoundary)', () => {
+    const lazyHelper = fs.readFileSync(path.join(ROOT, 'src', 'utils', 'lazyWithRetry.ts'), 'utf8');
+    assert.match(lazyHelper, /failed to fetch dynamically imported module/);
+    assert.match(lazyHelper, /vite:preloadError/);
+    assert.match(lazyHelper, /gs_last_chunk_reload_ts/);
+
+    const appTsx = fs.readFileSync(path.join(ROOT, 'src', 'App.tsx'), 'utf8');
+    assert.match(appTsx, /lazyWithRetry\(\(\) => import\('\.\/components\/LoginScreen'\)/);
+
+    const errBoundary = fs.readFileSync(path.join(ROOT, 'src', 'components', 'ErrorBoundary.tsx'), 'utf8');
+    assert.match(errBoundary, /isChunkLoadError/);
+    assert.match(errBoundary, /gs-error-boundary/);
+
+    const vercelConfig = fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8');
+    assert.match(vercelConfig, /\/\(\(\?!assets\/\)\.\*\)/);
+  });
 });
-
-
