@@ -10,6 +10,7 @@ import {
   ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { PartnerApplicationModal } from './PartnerApplicationModal';
+import { openLegalCenter, openCookieSettingsBanner } from '../utils/legalNavigation';
 import {
   validateEmail,
   validateName,
@@ -83,6 +84,7 @@ interface TabFieldErrors {
   phone: string | null;
   defaultAddress: string | null;
   confirmPassword: string | null;
+  legalConsent: string | null;
 }
 
 const EMPTY_FIELD_ERRORS: TabFieldErrors = {
@@ -93,6 +95,7 @@ const EMPTY_FIELD_ERRORS: TabFieldErrors = {
   phone: null,
   defaultAddress: null,
   confirmPassword: null,
+  legalConsent: null,
 };
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -147,6 +150,7 @@ export const LoginScreen: React.FC = () => {
   const [isCompressingAvatar, setIsCompressingAvatar] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
+  const [acceptedLegalConsent, setAcceptedLegalConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
@@ -346,13 +350,14 @@ export const LoginScreen: React.FC = () => {
       !validateUsername(username),
       !validatePhone(phone),
       !validateEmail(email),
-      !validateRegisterPassword(password) && !validatePasswordConfirm(password, confirmPassword)
+      !validateRegisterPassword(password) && !validatePasswordConfirm(password, confirmPassword),
+      acceptedLegalConsent
     ];
     const doneCount = checks.filter(Boolean).length;
     const pct = Math.round((doneCount / checks.length) * 100);
 
     return { step1Done, step2Done, step3Done, doneCount, totalCount: checks.length, pct };
-  }, [name, username, phone, defaultAddress, email, password, confirmPassword]);
+  }, [name, username, phone, defaultAddress, email, password, confirmPassword, acceptedLegalConsent]);
 
   const handleQuickDemoSelect = async (demoEmail: string, demoPassword: string) => {
     setTab('login');
@@ -400,8 +405,11 @@ export const LoginScreen: React.FC = () => {
       const emailErr = validateEmail(email);
       const passErr = validateRegisterPassword(password);
       const confirmErr = validatePasswordConfirm(password, confirmPassword);
+      const legalErr = acceptedLegalConsent
+        ? null
+        : 'Debes autorizar el tratamiento de tus datos personales y aceptar los Términos y Condiciones (Ley 1581 de 2012).';
 
-      if (nameErr || usernameErr || phoneErr || addressErr || emailErr || passErr || confirmErr) {
+      if (nameErr || usernameErr || phoneErr || addressErr || emailErr || passErr || confirmErr || legalErr) {
         if (addressErr) setShowOptionalAddress(true);
         setErrorsByTab(prev => ({
           ...prev,
@@ -413,6 +421,7 @@ export const LoginScreen: React.FC = () => {
             email: emailErr,
             password: passErr,
             confirmPassword: confirmErr,
+            legalConsent: legalErr,
           },
         }));
         return;
@@ -1202,6 +1211,61 @@ export const LoginScreen: React.FC = () => {
                 </div>
               </div>
 
+              {/* Consentimiento Informado (Ley Estatutaria 1581 de 2012 - Habeas Data) */}
+              <div className="gs-consent-field-wrap">
+                <label
+                  htmlFor="auth-legal-consent"
+                  className={`gs-consent-card ${acceptedLegalConsent ? 'is-checked' : ''} ${
+                    fieldErrors.legalConsent ? 'has-error' : ''
+                  }`}
+                >
+                  <input
+                    id="auth-legal-consent"
+                    type="checkbox"
+                    className="gs-consent-checkbox"
+                    checked={acceptedLegalConsent}
+                    onChange={e => {
+                      setAcceptedLegalConsent(e.target.checked);
+                      setTabFieldError('legalConsent', null);
+                    }}
+                    aria-invalid={!!fieldErrors.legalConsent}
+                    aria-describedby={fieldErrors.legalConsent ? 'auth-legal-consent-error' : undefined}
+                  />
+                  <span className="gs-consent-text">
+                    He leído y acepto los{' '}
+                    <button
+                      type="button"
+                      className="gs-inline-legal-link"
+                      onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openLegalCenter('terms');
+                      }}
+                    >
+                      Términos y Condiciones
+                    </button>{' '}
+                    y autorizo de manera previa, expresa e informada el tratamiento de mis datos personales conforme a la{' '}
+                    <button
+                      type="button"
+                      className="gs-inline-legal-link"
+                      onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openLegalCenter('privacy');
+                      }}
+                    >
+                      Política de Privacidad y Habeas Data (Ley 1581 de 2012)
+                    </button>
+                    . *
+                  </span>
+                </label>
+                {fieldErrors.legalConsent && (
+                  <div id="auth-legal-consent-error" role="alert" className="auth-field-error">
+                    {fieldErrors.legalConsent}
+                  </div>
+                )}
+              </div>
+
               <button
                 type="submit"
                 className="auth-submit"
@@ -1241,17 +1305,52 @@ export const LoginScreen: React.FC = () => {
           )}
         </div>
 
-        {/* Sheet Footer with Partner Link */}
+        {/* Sheet Footer with Partner Link & Legal Center Links */}
         <footer className="gs-auth-sheet-footer">
-          <span>GastroSync · Ecosistema Gastronómico Local</span>
-          <button
-            type="button"
-            onClick={() => setShowPartnerModal(true)}
-            className="gs-auth-partner-inline-link"
-          >
-            <Building2 size={13} />
-            <span>¿Tienes un restaurante? Regístralo aquí (3% comisión)</span>
-          </button>
+          <div className="gs-auth-footer-top">
+            <span>GastroSync · Ecosistema Gastronómico Local</span>
+            <button
+              type="button"
+              onClick={() => setShowPartnerModal(true)}
+              className="gs-auth-partner-inline-link"
+            >
+              <Building2 size={13} />
+              <span>¿Tienes un restaurante? Regístralo aquí (3% comisión)</span>
+            </button>
+          </div>
+          <nav className="gs-auth-legal-links" aria-label="Enlaces legales y de privacidad">
+            <button
+              type="button"
+              className="gs-auth-legal-btn"
+              onClick={() => openLegalCenter('privacy')}
+            >
+              Política de Privacidad (Ley 1581)
+            </button>
+            <span className="gs-auth-legal-sep" aria-hidden="true">·</span>
+            <button
+              type="button"
+              className="gs-auth-legal-btn"
+              onClick={() => openLegalCenter('terms')}
+            >
+              Términos y Condiciones
+            </button>
+            <span className="gs-auth-legal-sep" aria-hidden="true">·</span>
+            <button
+              type="button"
+              className="gs-auth-legal-btn"
+              onClick={() => openCookieSettingsBanner()}
+            >
+              Preferencias de Cookies
+            </button>
+            <span className="gs-auth-legal-sep" aria-hidden="true">·</span>
+            <button
+              type="button"
+              className="gs-auth-legal-btn"
+              onClick={() => openLegalCenter('rnbd')}
+            >
+              RNBD (SIC) y Licencias
+            </button>
+          </nav>
         </footer>
 
         <PartnerApplicationModal

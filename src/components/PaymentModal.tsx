@@ -3,6 +3,7 @@ import { useApp } from '../context/useApp';
 import { PaymentSimulatorService } from '../services/paymentService';
 import type { PaymentMethod, OrderFulfillment, CheckoutDetails } from '../types';
 import { calculateOrderFinancialBreakdown, MIN_DIGITAL_PAYMENT_COP } from '../utils/wompiFees';
+import { openLegalCenter } from '../utils/legalNavigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -1035,6 +1036,26 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                     </>
                   )}
                 </div>
+                <p className="gs-checkout-legal-note">
+                  Al confirmar tu pedido autorizas compartir tus datos de entrega con{' '}
+                  <strong>{currentTenant.name}</strong> conforme a nuestra{' '}
+                  <button
+                    type="button"
+                    className="gs-inline-legal-link"
+                    onClick={() => openLegalCenter('privacy')}
+                  >
+                    Política de Privacidad (Ley 1581)
+                  </button>{' '}
+                  y los{' '}
+                  <button
+                    type="button"
+                    className="gs-inline-legal-link"
+                    onClick={() => openLegalCenter('terms')}
+                  >
+                    Términos de Compra (Ley 1480)
+                  </button>
+                  .
+                </p>
               </div>
             </form>
           )}

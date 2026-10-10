@@ -164,5 +164,34 @@ describe('GastroSync QA Hardening — Payment & Security Suite', () => {
     const errBoundary = fs.readFileSync(path.join(ROOT, 'src', 'components', 'ErrorBoundary.tsx'), 'utf8');
     assert.match(errBoundary, /this\.props\.moduleName/);
   });
+
+  it('verifica la suite de Cumplimiento Legal en Colombia (Ley 1581 de 2012, RNBD, Consentimiento Informado, Supresión de Datos, Banner de Cookies y Sanitización de Claves)', () => {
+    const sql056 = fs.readFileSync(
+      path.join(ROOT, 'supabase', 'migrations', '056_privacy_and_data_deletion.sql'),
+      'utf8'
+    );
+    assert.match(sql056, /CREATE OR REPLACE FUNCTION public\.delete_my_user_account/i);
+    assert.match(sql056, /CREATE OR REPLACE FUNCTION public\.deactivate_and_purge_my_restaurant/i);
+    assert.match(sql056, /SET search_path = public/i);
+    assert.match(sql056, /Titular Suprimido \(Ley 1581\)/);
+
+    const debugSupabase = fs.readFileSync(path.join(ROOT, 'src', 'utils', 'debugSupabase.ts'), 'utf8');
+    assert.equal(debugSupabase.includes('key.substring'), false, 'Nunca debe imprimir fragmentos de la clave en consola');
+
+    const loginScreen = fs.readFileSync(path.join(ROOT, 'src', 'components', 'LoginScreen.tsx'), 'utf8');
+    assert.match(loginScreen, /acceptedLegalConsent/);
+    assert.match(loginScreen, /Política de Privacidad y Habeas Data \(Ley 1581 de 2012\)/);
+
+    const legalModal = fs.readFileSync(path.join(ROOT, 'src', 'components', 'LegalCenterModal.tsx'), 'utf8');
+    assert.match(legalModal, /Decreto 090/);
+    assert.match(legalModal, /100\.000 UVT/);
+    assert.match(legalModal, /SIL Open Font License/);
+    assert.match(legalModal, /Unsplash/);
+
+    const cookieBanner = fs.readFileSync(path.join(ROOT, 'src', 'components', 'CookieConsentBanner.tsx'), 'utf8');
+    assert.match(cookieBanner, /gs-cookie-banner/);
+    assert.match(cookieBanner, /Solo esenciales/);
+  });
 });
+
 

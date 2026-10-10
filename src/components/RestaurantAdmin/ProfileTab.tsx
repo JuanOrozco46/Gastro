@@ -22,10 +22,12 @@ import {
   Copy,
   Plus,
   Trash2,
-  Upload
+  Upload,
+  ShieldCheck
 } from 'lucide-react';
 import { uploadMediaFile } from '../../services/supabaseStorageService';
 import { ensureColombiaCityAndZone } from '../../services/supabaseDataService';
+import { openLegalCenter } from '../../utils/legalNavigation';
 
 const DAYS_OF_WEEK = [
   'Domingo',
@@ -51,10 +53,14 @@ const CATEGORY_PRESETS = [
 ];
 
 export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
-  const { cities, zones, refreshCities, refreshZones, updateTenant, showToast } = useApp();
+  const { cities, zones, refreshCities, refreshZones, updateTenant, deleteMyRestaurant, showToast } = useApp();
   const activeCities = cities.filter(c => c.isActive);
 
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'basic' | 'delivery' | 'hours'>('all');
+  const [showRestaurantDeleteZone, setShowRestaurantDeleteZone] = useState(false);
+  const [restaurantDeleteConfirmText, setRestaurantDeleteConfirmText] = useState('');
+  const [isDeletingRestaurant, setIsDeletingRestaurant] = useState(false);
+  const [restaurantDeleteError, setRestaurantDeleteError] = useState<string | null>(null);
 
   const [cityId, setCityId] = useState<string>(() => {
     return tenant.cityId || (activeCities[0]?.id ?? '');
@@ -1151,6 +1157,130 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
               </div>
             </section>
           )}
+
+          {/* ── SECCIÓN 4: PRIVACIDAD, HABEAS DATA Y BAJA VOLUNTARIA DEL RESTAURANTE (LEY 1581) ── */}
+          <section className="pam-section gs-privacy-zone-section">
+            <div className="gs-privacy-zone-header">
+              <div className="gs-privacy-zone-title-row">
+                <ShieldCheck size={18} />
+                <div>
+                  <h4>Privacidad, Datos Comerciales y Baja del Restaurante (Ley 1581 de 2012)</h4>
+                  <p>
+                    Gestiona los derechos de Habeas Data de <strong>{tenant.name}</strong> o solicita el retiro voluntario y purga de datos comerciales y bancarios.
+                  </p>
+                </div>
+              </div>
+              <div className="gs-privacy-quick-links">
+                <button
+                  type="button"
+                  className="gs-inline-legal-link"
+                  onClick={() => openLegalCenter('privacy')}
+                >
+                  Política de Privacidad
+                </button>
+                <span>·</span>
+                <button
+                  type="button"
+                  className="gs-inline-legal-link"
+                  onClick={() => openLegalCenter('terms')}
+                >
+                  Términos para Aliados
+                </button>
+                <span>·</span>
+                <button
+                  type="button"
+                  className="gs-inline-legal-link"
+                  onClick={() => openLegalCenter('rnbd')}
+                >
+                  RNBD (SIC)
+                </button>
+              </div>
+            </div>
+
+            {!showRestaurantDeleteZone ? (
+              <button
+                type="button"
+                className="gs-danger-outline-btn"
+                onClick={() => {
+                  setShowRestaurantDeleteZone(true);
+                  setRestaurantDeleteError(null);
+                }}
+              >
+                <Trash2 size={15} />
+                <span>Dar de baja mi restaurante y purgar datos comerciales</span>
+              </button>
+            ) : (
+              <div className="gs-danger-confirm-box">
+                <p className="gs-danger-confirm-copy">
+                  <strong>⚠️ Retiro definitivo del comercio (Ley 1581 de 2012):</strong> Al confirmar, el restaurante se suspenderá inmediatamente del directorio, se eliminarán sus publicaciones, mesas QR, horarios y productos sin historial contable, y se purgarán todos los teléfonos, direcciones y datos bancarios de dispersión.
+                </p>
+                <label htmlFor="delete-restaurant-confirm" className="auth-label">
+                  Escribe <strong>ELIMINAR RESTAURANTE</strong> para confirmar la baja:
+                </label>
+                <input
+                  id="delete-restaurant-confirm"
+                  type="text"
+                  className="pam-input no-icon"
+                  placeholder="ELIMINAR RESTAURANTE"
+                  value={restaurantDeleteConfirmText}
+                  onChange={e => {
+                    setRestaurantDeleteConfirmText(e.target.value);
+                    setRestaurantDeleteError(null);
+                  }}
+                />
+                {restaurantDeleteError && (
+                  <div className="auth-field-error" role="alert">
+                    {restaurantDeleteError}
+                  </div>
+                )}
+                <div className="gs-danger-confirm-actions">
+                  <button
+                    type="button"
+                    className="pam-btn-cancel"
+                    onClick={() => {
+                      setShowRestaurantDeleteZone(false);
+                      setRestaurantDeleteConfirmText('');
+                      setRestaurantDeleteError(null);
+                    }}
+                    disabled={isDeletingRestaurant}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="gs-danger-solid-btn"
+                    onClick={async () => {
+                      setRestaurantDeleteError(null);
+                      if (restaurantDeleteConfirmText.trim().toUpperCase() !== 'ELIMINAR RESTAURANTE') {
+                        setRestaurantDeleteError('Escribe exactamente ELIMINAR RESTAURANTE en mayúsculas.');
+                        return;
+                      }
+                      setIsDeletingRestaurant(true);
+                      try {
+                        const res = await deleteMyRestaurant(tenant.id, restaurantDeleteConfirmText);
+                        if (!res.success) {
+                          setRestaurantDeleteError(res.error || 'No se pudo procesar la baja del restaurante.');
+                        }
+                      } finally {
+                        setIsDeletingRestaurant(false);
+                      }
+                    }}
+                    disabled={
+                      isDeletingRestaurant ||
+                      restaurantDeleteConfirmText.trim().toUpperCase() !== 'ELIMINAR RESTAURANTE'
+                    }
+                  >
+                    <Trash2 size={15} />
+                    <span>
+                      {isDeletingRestaurant
+                        ? 'Purgando datos del comercio...'
+                        : 'Confirmar baja definitiva del restaurante'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
 
         {/* Footer de Guardado */}

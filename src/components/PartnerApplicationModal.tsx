@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { openLegalCenter } from '../utils/legalNavigation';
 import { useApp } from '../context/useApp';
 import { motion } from 'framer-motion';
 import { X, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck, Upload, Image, Clock, FileText, AlertCircle, Lock, Eye, EyeOff, Store, Sparkles, Check, ShoppingBag, Bike, QrCode } from 'lucide-react';
@@ -908,7 +909,31 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                   onChange={e => { setTermsAccepted(e.target.checked); if (e.target.checked) clearFieldError('terms'); }} />
                 <span className="pam-terms-box">{termsAccepted && <Check size={13} strokeWidth={3} />}</span>
                 <span>
-                  Acepto los <strong>Términos del Servicio</strong>, la comisión del <strong>3% para GastroSync</strong> (más tarifa de pasarela Wompi 2.65% + $700 + IVA en pagos digitales) y el sistema de <strong>cruce automático de saldos</strong>.
+                  Acepto los{' '}
+                  <button
+                    type="button"
+                    className="gs-inline-legal-link"
+                    onClick={e => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openLegalCenter('terms');
+                    }}
+                  >
+                    Términos y Condiciones para Aliados
+                  </button>
+                  , la comisión del <strong>3% para GastroSync</strong> (más tarifa de pasarela Wompi 2.65% + $700 + IVA en pagos digitales), el sistema de <strong>cruce automático de saldos</strong> y autorizo de manera previa, expresa e informada el tratamiento de mis datos conforme a la{' '}
+                  <button
+                    type="button"
+                    className="gs-inline-legal-link"
+                    onClick={e => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openLegalCenter('privacy');
+                    }}
+                  >
+                    Política de Privacidad y Habeas Data (Ley 1581 de 2012)
+                  </button>
+                  .
                 </span>
               </label>
               <FieldError name="terms" error={errors.terms} />

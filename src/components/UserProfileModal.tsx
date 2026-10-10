@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/useApp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, User, Phone, MapPin, Camera, Check, Sparkles, AlertCircle, Trash2
+  X, User, Phone, MapPin, Camera, Check, Sparkles, AlertCircle, Trash2, ShieldCheck, Scale
 } from 'lucide-react';
 import type { UserAccount } from '../types';
 import {
@@ -12,6 +12,7 @@ import {
   normalizeUsername,
   suggestUsernameFromName
 } from '../utils/formValidation';
+import { openLegalCenter, openCookieSettingsBanner } from '../utils/legalNavigation';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -45,7 +46,7 @@ const UserProfileModalInner: React.FC<{
   currentUser: UserAccount;
   onClose: () => void;
 }> = ({ currentUser, onClose }) => {
-  const { updateUserProfile, showToast } = useApp();
+  const { updateUserProfile, deleteMyAccount, showToast } = useApp();
 
   const [name, setName] = useState(() => currentUser.name || '');
   const [username, setUsername] = useState(
@@ -61,6 +62,12 @@ const UserProfileModalInner: React.FC<{
   const [isCompressing, setIsCompressing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Estado para Derecho de Supresión (Ley 1581 de 2012)
+  const [showDeleteZone, setShowDeleteZone] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [fieldErrors, setFieldErrors] = useState<{
     name?: string | null;
@@ -126,6 +133,25 @@ const UserProfileModalInner: React.FC<{
       onClose();
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleConfirmAccountDeletion = async () => {
+    setDeleteError(null);
+    if (deleteConfirmText.trim().toUpperCase() !== 'ELIMINAR MI CUENTA') {
+      setDeleteError('Debes escribir exactamente ELIMINAR MI CUENTA en mayúsculas.');
+      return;
+    }
+    setIsDeletingAccount(true);
+    try {
+      const res = await deleteMyAccount(deleteConfirmText);
+      if (!res.success) {
+        setDeleteError(res.error || 'No se pudo procesar la supresión de la cuenta.');
+        return;
+      }
+      onClose();
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -327,11 +353,118 @@ const UserProfileModalInner: React.FC<{
                   </div>
                 </div>
               </section>
+
+              {/* Sección 3: Privacidad, Habeas Data y Baja de Cuenta (Ley 1581 de 2012) */}
+              <section className="pam-section gs-privacy-zone-section">
+                <div className="gs-privacy-zone-header">
+                  <div className="gs-privacy-zone-title-row">
+                    <ShieldCheck size={18} />
+                    <div>
+                      <h3 className="pam-section-title">Privacidad, Habeas Data y Baja de Cuenta</h3>
+                      <p className="pam-section-desc">
+                        Derechos de conocer, actualizar, rectificar y suprimir tus datos (Ley 1581 de 2012)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="gs-privacy-quick-links">
+                    <button
+                      type="button"
+                      className="gs-inline-legal-link"
+                      onClick={() => openLegalCenter('privacy')}
+                    >
+                      Política de Privacidad
+                    </button>
+                    <span>·</span>
+                    <button
+                      type="button"
+                      className="gs-inline-legal-link"
+                      onClick={() => openLegalCenter('terms')}
+                    >
+                      Términos y Condiciones
+                    </button>
+                    <span>·</span>
+                    <button
+                      type="button"
+                      className="gs-inline-legal-link"
+                      onClick={() => openCookieSettingsBanner()}
+                    >
+                      Cookies
+                    </button>
+                  </div>
+                </div>
+
+                {!showDeleteZone ? (
+                  <button
+                    type="button"
+                    className="gs-danger-outline-btn"
+                    onClick={() => {
+                      setShowDeleteZone(true);
+                      setDeleteError(null);
+                    }}
+                  >
+                    <Trash2 size={15} />
+                    <span>Solicitar supresión de mi cuenta y datos personales</span>
+                  </button>
+                ) : (
+                  <div className="gs-danger-confirm-box">
+                    <p className="gs-danger-confirm-copy">
+                      <strong>⚠️ Acción irreversible (Derecho de Supresión — Ley 1581 de 2012):</strong> Se eliminarán de inmediato tu perfil, foto, reseñas, likes y comentarios, y se anonimizarán tus pedidos históricos como <em>&ldquo;Titular Suprimido (Ley 1581)&rdquo;</em>.
+                    </p>
+                    <label htmlFor="delete-account-confirm" className="auth-label">
+                      Escribe <strong>ELIMINAR MI CUENTA</strong> para confirmar:
+                    </label>
+                    <input
+                      id="delete-account-confirm"
+                      type="text"
+                      className="auth-input no-icon-left"
+                      placeholder="ELIMINAR MI CUENTA"
+                      value={deleteConfirmText}
+                      onChange={e => {
+                        setDeleteConfirmText(e.target.value);
+                        setDeleteError(null);
+                      }}
+                    />
+                    {deleteError && (
+                      <div className="auth-field-error" role="alert">
+                        {deleteError}
+                      </div>
+                    )}
+                    <div className="gs-danger-confirm-actions">
+                      <button
+                        type="button"
+                        className="pam-btn-cancel"
+                        onClick={() => {
+                          setShowDeleteZone(false);
+                          setDeleteConfirmText('');
+                          setDeleteError(null);
+                        }}
+                        disabled={isDeletingAccount}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="gs-danger-solid-btn"
+                        onClick={handleConfirmAccountDeletion}
+                        disabled={
+                          isDeletingAccount ||
+                          deleteConfirmText.trim().toUpperCase() !== 'ELIMINAR MI CUENTA'
+                        }
+                      >
+                        <Trash2 size={15} />
+                        <span>
+                          {isDeletingAccount ? 'Suprimiendo datos...' : 'Eliminar mi cuenta definitivamente'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
             </div>
 
             <div className="pam-footer">
               <div className="pam-footer-hint">
-                Conectado como <strong>{currentUser.email}</strong>
+                <Scale size={13} /> Conectado como <strong>{currentUser.email}</strong>
               </div>
               <div className="pam-footer-actions">
                 <button type="button" className="pam-btn-cancel" onClick={onClose} disabled={isSaving}>
@@ -349,3 +482,4 @@ const UserProfileModalInner: React.FC<{
     </AnimatePresence>
   );
 };
+

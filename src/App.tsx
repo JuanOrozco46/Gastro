@@ -5,6 +5,8 @@ import { Header } from './components/Header';
 import { Toast } from './components/Toast';
 import { ForcePasswordModal } from './components/ForcePasswordModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LegalCenterModal } from './components/LegalCenterModal';
+import { CookieConsentBanner } from './components/CookieConsentBanner';
 
 // Módulos importados dinámicamente para Code-Splitting óptimo
 const LoginScreen = lazy(() => import('./components/LoginScreen').then(m => ({ default: m.LoginScreen })));
@@ -112,6 +114,8 @@ export function App() {
         <Header />
         <MainContent />
         <Toast />
+        <LegalCenterModal />
+        <CookieConsentBanner />
       </div>
     </AppProvider>
   );

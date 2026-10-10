@@ -1919,3 +1919,97 @@ export async function ensureColombiaCityAndZone(
     };
   }
 }
+
+/**
+ * Ejecuta la supresión de la cuenta personal del usuario autenticado y anonimiza sus pedidos históricos
+ * conforme al Derecho de Supresión (Ley Estatutaria 1581 de 2012 - Habeas Data).
+ */
+export async function deleteMyUserAccountRemote(
+  confirmText: string
+): Promise<{ success: boolean; anonymizedOrders?: number; error?: string }> {
+  const normalized = confirmText.trim().toUpperCase();
+  if (normalized !== 'ELIMINAR MI CUENTA') {
+    return {
+      success: false,
+      error: 'Debes escribir exactamente ELIMINAR MI CUENTA para confirmar la supresión.'
+    };
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: true, anonymizedOrders: 0 };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('delete_my_user_account', {
+      p_confirm_text: normalized
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message || 'No se pudo completar la supresión de la cuenta.'
+      };
+    }
+
+    const res = (data || {}) as { anonymized_orders?: number };
+    return {
+      success: true,
+      anonymizedOrders: Number(res.anonymized_orders || 0)
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Error inesperado al suprimir la cuenta.'
+    };
+  }
+}
+
+/**
+ * Ejecuta la baja voluntaria de un restaurante aliado y purga sus datos comerciales y bancarios
+ * conforme a la Ley Estatutaria 1581 de 2012.
+ */
+export async function deactivateAndPurgeRestaurantRemote(
+  restaurantId: string,
+  confirmText: string
+): Promise<{ success: boolean; error?: string }> {
+  const normalized = confirmText.trim().toUpperCase();
+  if (normalized !== 'ELIMINAR RESTAURANTE') {
+    return {
+      success: false,
+      error: 'Debes escribir exactamente ELIMINAR RESTAURANTE para confirmar la baja.'
+    };
+  }
+
+  if (!restaurantId) {
+    return {
+      success: false,
+      error: 'No se encontró el identificador del restaurante.'
+    };
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: true };
+  }
+
+  try {
+    const { error } = await supabase.rpc('deactivate_and_purge_my_restaurant', {
+      p_restaurant_id: restaurantId,
+      p_confirm_text: normalized
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message || 'No se pudo procesar la baja del restaurante.'
+      };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Error inesperado al dar de baja el restaurante.'
+    };
+  }
+}
+

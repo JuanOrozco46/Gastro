@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/useApp';
-import { LogOut, User, Sparkles, ShieldCheck, ChefHat, BarChart3, Bike, QrCode } from 'lucide-react';
+import { LogOut, User, Sparkles, ShieldCheck, ChefHat, BarChart3, Bike, QrCode, Scale } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { UserProfileModal } from './UserProfileModal';
+import { openLegalCenter } from '../utils/legalNavigation';
 
 const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   client_delivery: { label: 'Cliente', icon: <Bike size={13} />, color: '#FF5533' },
@@ -135,15 +136,27 @@ export const Header: React.FC = () => {
           )}
         </div>
 
-        <motion.button
-          className="btn btn-outline gf-logout-btn"
-          onClick={logout}
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.96 }}
-          title="Cerrar Sesión"
-        >
-          <LogOut size={15} /> <span className="logout-text">Cerrar Sesión</span>
-        </motion.button>
+        <div className="gs-header-actions">
+          <button
+            type="button"
+            className="gs-header-legal-btn"
+            onClick={() => openLegalCenter('privacy')}
+            title="Política de Privacidad, Términos, Cookies y RNBD (Ley 1581)"
+          >
+            <Scale size={14} />
+            <span className="gs-header-legal-text">Legal y Privacidad</span>
+          </button>
+
+          <motion.button
+            className="btn btn-outline gf-logout-btn"
+            onClick={logout}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.96 }}
+            title="Cerrar Sesión"
+          >
+            <LogOut size={15} /> <span className="logout-text">Cerrar Sesión</span>
+          </motion.button>
+        </div>
       </motion.header>
 
       <UserProfileModal

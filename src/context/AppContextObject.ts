@@ -99,6 +99,8 @@ export interface AppContextType {
   reactivateRestaurantMember: (memberId: string) => Promise<{ success: boolean; error?: string }>;
   revokeRestaurantMember: (memberId: string) => Promise<{ success: boolean; error?: string }>;
   acceptRestaurantInvitation: (memberId: string) => Promise<{ success: boolean; error?: string }>;
+  deleteMyAccount: (confirmText: string) => Promise<{ success: boolean; error?: string }>;
+  deleteMyRestaurant: (restaurantId: string, confirmText: string) => Promise<{ success: boolean; error?: string }>;
   
   logout: () => void;
 }

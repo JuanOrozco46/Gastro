@@ -5,7 +5,7 @@ import { AppContext } from './AppContextObject';
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { normalizeUsername } from '../utils/formValidation';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant, fetchRestaurantMembers as fetchRemoteMembers, inviteRestaurantStaff as inviteRemoteStaff, resendStaffInvitation as resendRemoteInvitation, suspendRestaurantMember as suspendRemoteMember, reactivateRestaurantMember as reactivateRemoteMember, revokeRestaurantMember as revokeRemoteMember, acceptRestaurantInvitation as acceptRemoteInvitation } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant, fetchRestaurantMembers as fetchRemoteMembers, inviteRestaurantStaff as inviteRemoteStaff, resendStaffInvitation as resendRemoteInvitation, suspendRestaurantMember as suspendRemoteMember, reactivateRestaurantMember as reactivateRemoteMember, revokeRestaurantMember as revokeRemoteMember, acceptRestaurantInvitation as acceptRemoteInvitation, deleteMyUserAccountRemote, deactivateAndPurgeRestaurantRemote } from '../services/supabaseDataService';
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession, resendVerificationEmailAuth, updateSupabaseUserProfile, saveLocalProfileCache } from '../services/supabaseAuthService';
 import { DEMO_LOGIN_ENABLED } from './demoGate';
@@ -2103,6 +2103,151 @@ const location = useLocationSlice();
     }
   };
 
+  const deleteMyAccount = async (
+    confirmText: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) {
+      return { success: false, error: 'Debes iniciar sesión para eliminar tu cuenta.' };
+    }
+
+    const normalized = confirmText.trim().toUpperCase();
+    if (normalized !== 'ELIMINAR MI CUENTA') {
+      return {
+        success: false,
+        error: 'Escribe exactamente ELIMINAR MI CUENTA para confirmar la supresión.'
+      };
+    }
+
+    if (currentUser.tenantId && isRestaurantOwner(currentUser)) {
+      const ownedActive = (authMode === 'remote' ? remoteTenants : tenants).some(
+        t => t.id === currentUser.tenantId
+      );
+      if (ownedActive) {
+        return {
+          success: false,
+          error:
+            'Primero debes dar de baja tu restaurante desde Panel Admin > Configuración > Privacidad y Baja antes de eliminar tu cuenta personal.'
+        };
+      }
+    }
+
+    const activeStatuses: OrderStatus[] = [
+      'pending',
+      'accepted',
+      'preparing',
+      'ready',
+      'out_for_delivery'
+    ];
+    const myActiveOrders = orders.filter(
+      o =>
+        ((Boolean(currentUser.id) && o.customerId === currentUser.id) ||
+          (Boolean(currentUser.email) && o.customerId === currentUser.email)) &&
+        activeStatuses.includes(o.status)
+    );
+
+    if (myActiveOrders.length > 0) {
+      return {
+        success: false,
+        error: `Tienes ${myActiveOrders.length} pedido(s) activo(s) en curso. Espera a que finalicen antes de suprimir tu cuenta.`
+      };
+    }
+
+    if (authMode === 'remote') {
+      const res = await deleteMyUserAccountRemote(normalized);
+      if (!res.success) {
+        return {
+          success: false,
+          error: res.error || 'No se pudo completar la supresión de la cuenta.'
+        };
+      }
+    }
+
+    // Anonimizar órdenes históricas en el estado local (Art. 10 Ley 1581 de 2012)
+    setOrders(prev =>
+      prev.map(o => {
+        const isMine =
+          (Boolean(currentUser.id) && o.customerId === currentUser.id) ||
+          (Boolean(currentUser.email) && o.customerId === currentUser.email);
+        if (!isMine) return o;
+        return {
+          ...o,
+          customerId: undefined,
+          customerName: 'Titular Suprimido (Ley 1581)',
+          customerPhone: '0000000000',
+          deliveryAddress: undefined
+        };
+      })
+    );
+
+    clearCart();
+    logout();
+    showToast('✅ Tu cuenta y tus datos personales han sido suprimidos conforme a la Ley 1581 de 2012.');
+    return { success: true };
+  };
+
+  const deleteMyRestaurant = async (
+    restaurantId: string,
+    confirmText: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) {
+      return { success: false, error: 'Debes iniciar sesión.' };
+    }
+
+    if (!isRestaurantOwner(currentUser) && !isPlatformAdmin(currentUser)) {
+      return {
+        success: false,
+        error: 'Solo el propietario del restaurante puede solicitar su baja y purga de datos.'
+      };
+    }
+
+    const normalized = confirmText.trim().toUpperCase();
+    if (normalized !== 'ELIMINAR RESTAURANTE') {
+      return {
+        success: false,
+        error: 'Escribe exactamente ELIMINAR RESTAURANTE para confirmar la baja definitiva.'
+      };
+    }
+
+    const activeStatuses: OrderStatus[] = [
+      'pending',
+      'accepted',
+      'preparing',
+      'ready',
+      'out_for_delivery'
+    ];
+    const activeRestOrders = orders.filter(
+      o => o.tenantId === restaurantId && activeStatuses.includes(o.status)
+    );
+
+    if (activeRestOrders.length > 0) {
+      return {
+        success: false,
+        error: `El restaurante tiene ${activeRestOrders.length} pedido(s) activo(s) en cocina o entrega. Finalízalos o cancélalos antes de dar de baja el comercio.`
+      };
+    }
+
+    if (authMode === 'remote') {
+      const res = await deactivateAndPurgeRestaurantRemote(restaurantId, normalized);
+      if (!res.success) {
+        return {
+          success: false,
+          error: res.error || 'No se pudo procesar la baja del restaurante.'
+        };
+      }
+      setRemotePosts(prev => prev.filter(p => p.tenantId !== restaurantId));
+      setRemoteProducts(prev => prev.filter(p => p.tenantId !== restaurantId));
+      setRemoteTenants(prev => prev.filter(t => t.id !== restaurantId));
+    }
+
+    setPosts(prev => prev.filter(p => p.tenantId !== restaurantId));
+    setProducts(prev => prev.filter(p => p.tenantId !== restaurantId));
+    setTenants(prev => prev.filter(t => t.id !== restaurantId));
+
+    logout();
+    showToast('✅ Restaurante dado de baja y datos comerciales purgados conforme a la Ley 1581 de 2012.');
+    return { success: true };
+  };
+
   const activeTenants = authMode === 'remote' ? remoteTenants : tenants;
   const activeProducts = authMode === 'remote' ? remoteProducts : products;
   const activePosts = authMode === 'remote' ? remotePosts : posts;
@@ -2172,6 +2317,8 @@ const location = useLocationSlice();
     reactivateRestaurantMember,
     revokeRestaurantMember,
     acceptRestaurantInvitation,
+    deleteMyAccount,
+    deleteMyRestaurant,
     logout
   });
 
@@ -2221,6 +2368,8 @@ const location = useLocationSlice();
       reactivateRestaurantMember,
       revokeRestaurantMember,
       acceptRestaurantInvitation,
+      deleteMyAccount,
+      deleteMyRestaurant,
       logout
     };
   });
@@ -2270,6 +2419,8 @@ const location = useLocationSlice();
     reactivateRestaurantMember: ((...args) => handlersRef.current.reactivateRestaurantMember(...args)) as typeof reactivateRestaurantMember,
     revokeRestaurantMember: ((...args) => handlersRef.current.revokeRestaurantMember(...args)) as typeof revokeRestaurantMember,
     acceptRestaurantInvitation: ((...args) => handlersRef.current.acceptRestaurantInvitation(...args)) as typeof acceptRestaurantInvitation,
+    deleteMyAccount: ((...args) => handlersRef.current.deleteMyAccount(...args)) as typeof deleteMyAccount,
+    deleteMyRestaurant: ((...args) => handlersRef.current.deleteMyRestaurant(...args)) as typeof deleteMyRestaurant,
     logout: ((...args) => handlersRef.current.logout(...args)) as typeof logout
   }), []);
 

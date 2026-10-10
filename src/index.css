@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
 
 :root {
   /* GastroSync — Warm Gastronomy Identity */
@@ -17,6 +17,11 @@
 
   --tertiary: #8B6F47;
   --tertiary-light: rgba(139, 111, 71, 0.1);
+
+  --danger: #B91C1C;
+  --danger-light: rgba(185, 28, 28, 0.08);
+  --warning: #B45309;
+  --warning-light: rgba(180, 83, 9, 0.10);
 
   /* Neutrals — warm cream tones */
   --neutral-bg: #FAF7F2;
@@ -38,6 +43,7 @@
   --text-muted: #78706A;
   --text-light: #B0A89E;
 
+  --radius-xs: 6px;
   --radius-sm: 8px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -45,6 +51,7 @@
   --font-family: 'Figtree', system-ui, -apple-system, sans-serif;
   --font-display: 'Playfair Display', Georgia, serif;
   --font-heading: 'Figtree', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.05);
   --shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.08);
 }
@@ -10409,5 +10416,773 @@ body {
     justify-content: center;
   }
 }
+
+/* ── LEGAL, PRIVACY, HABEAS DATA & COOKIE CONSENT SUITE (LEY 1581 DE 2012) ── */
+.gs-inline-legal-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.gs-inline-legal-link:hover {
+  color: var(--primary-hover);
+}
+
+.gs-consent-field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.gs-consent-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--neutral-surface-alt);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.gs-consent-card.is-checked {
+  background: var(--primary-light);
+  border-color: var(--primary-border);
+}
+
+.gs-consent-card.has-error {
+  border-color: var(--danger);
+  background: var(--danger-light);
+}
+
+.gs-consent-checkbox {
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.gs-consent-text {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-main);
+}
+
+.gs-auth-footer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.gs-auth-legal-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px dashed var(--neutral-border);
+}
+
+.gs-auth-legal-btn {
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  font-family: inherit;
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.gs-auth-legal-btn:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.gs-auth-legal-sep {
+  color: var(--text-light);
+  font-size: 0.73rem;
+}
+
+.gs-checkout-legal-note {
+  margin: 6px 0 0;
+  font-size: 0.73rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.gs-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gs-header-legal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #FAF7F2;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.gs-header-legal-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* Legal Center Modal */
+.gs-legal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  background: rgba(20, 17, 15, 0.76);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.gs-legal-modal {
+  width: 100%;
+  max-width: 880px;
+  max-height: 90vh;
+  background: var(--neutral-bg);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 28px 72px rgba(20, 17, 15, 0.42);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gs-legal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.35rem 1.6rem 1.1rem;
+  background: var(--neutral-dark);
+  color: #FAF7F2;
+}
+
+.gs-legal-header-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gs-legal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(200, 90, 56, 0.22);
+  border: 1px solid rgba(200, 90, 56, 0.45);
+  color: #FDBA74;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.gs-legal-title {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #FAF7F2;
+  margin: 0;
+}
+
+.gs-legal-subtitle {
+  font-size: 0.8rem;
+  color: rgba(250, 247, 242, 0.76);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.gs-legal-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(250, 247, 242, 0.18);
+  background: rgba(250, 247, 242, 0.08);
+  color: #FAF7F2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.18s ease;
+}
+
+.gs-legal-close-btn:hover {
+  background: rgba(250, 247, 242, 0.18);
+}
+
+.gs-legal-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0.75rem 1.4rem;
+  background: var(--neutral-surface-alt);
+  border-bottom: 1px solid var(--neutral-border);
+  overflow-x: auto;
+}
+
+.gs-legal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.gs-legal-tab:hover {
+  background: var(--neutral-surface);
+  color: var(--text-main);
+}
+
+.gs-legal-tab.is-active {
+  background: var(--neutral-surface);
+  color: var(--primary);
+  border-color: var(--primary-border);
+  box-shadow: var(--shadow-card);
+}
+
+.gs-legal-body {
+  padding: 1.4rem 1.6rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.gs-legal-article {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.gs-legal-highlight-card {
+  padding: 1rem 1.15rem;
+  border-radius: var(--radius-md);
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gs-legal-highlight-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary);
+  font-size: 0.88rem;
+}
+
+.gs-legal-highlight-card p {
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.gs-legal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gs-legal-section h3 {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.gs-legal-section p {
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.gs-legal-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: var(--text-main);
+}
+
+.gs-legal-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.gs-legal-subcard {
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gs-legal-subcard h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.gs-legal-note {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--neutral-surface-alt);
+  border-left: 3px solid var(--secondary);
+  font-size: 0.8rem;
+  color: var(--text-main);
+}
+
+.gs-legal-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-md);
+  background: var(--neutral-surface);
+}
+
+.gs-legal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.gs-legal-table th {
+  background: var(--neutral-surface-alt);
+  color: var(--text-main);
+  font-weight: 800;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--neutral-border);
+}
+
+.gs-legal-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--neutral-border);
+  color: var(--text-muted);
+  vertical-align: top;
+}
+
+.gs-legal-table tr:last-child td {
+  border-bottom: none;
+}
+
+.gs-legal-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-md);
+}
+
+.gs-legal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.6rem;
+  background: var(--neutral-surface);
+  border-top: 1px solid var(--neutral-border);
+}
+
+.gs-legal-footer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.gs-legal-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gs-legal-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--primary);
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gs-legal-primary-btn:hover {
+  background: var(--primary-hover);
+}
+
+.gs-legal-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--neutral-border-strong);
+  background: var(--neutral-surface-alt);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gs-legal-secondary-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Cookie Consent Banner */
+.gs-cookie-banner {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 920px;
+  z-index: 11000;
+  background: var(--neutral-dark);
+  color: #FAF7F2;
+  border: 1px solid rgba(250, 247, 242, 0.14);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 22px 54px rgba(20, 17, 15, 0.45);
+  padding: 1rem 1.25rem;
+}
+
+.gs-cookie-banner-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gs-cookie-banner-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.gs-cookie-icon-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: rgba(200, 90, 56, 0.22);
+  border: 1px solid rgba(200, 90, 56, 0.42);
+  color: #FDBA74;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gs-cookie-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.gs-cookie-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gs-cookie-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #FAF7F2;
+  margin: 0;
+}
+
+.gs-cookie-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(107, 140, 106, 0.24);
+  color: #A7F3D0;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.gs-cookie-desc {
+  font-size: 0.79rem;
+  line-height: 1.5;
+  color: rgba(250, 247, 242, 0.82);
+  margin: 0;
+}
+
+.gs-cookie-preferences-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.gs-cookie-pref-card {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(250, 247, 242, 0.06);
+  border: 1px solid rgba(250, 247, 242, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.gs-cookie-pref-card.is-locked {
+  cursor: default;
+}
+
+.gs-cookie-pref-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #FAF7F2;
+}
+
+.gs-cookie-pref-card p {
+  font-size: 0.73rem;
+  line-height: 1.45;
+  color: rgba(250, 247, 242, 0.72);
+  margin: 0;
+}
+
+.gs-cookie-status-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #FDBA74;
+}
+
+.gs-cookie-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.gs-cookie-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gs-cookie-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(250, 247, 242, 0.18);
+  background: transparent;
+  color: #FAF7F2;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gs-cookie-btn-outline {
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(250, 247, 242, 0.24);
+  background: rgba(250, 247, 242, 0.08);
+  color: #FAF7F2;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gs-cookie-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--primary);
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.gs-cookie-btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+/* Privacy & Data Deletion Zone in Profile / Admin */
+.gs-privacy-zone-section {
+  border: 1px solid var(--neutral-border-strong);
+  background: var(--neutral-surface-alt);
+}
+
+.gs-privacy-zone-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.gs-privacy-zone-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--text-main);
+}
+
+.gs-privacy-quick-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.gs-danger-outline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(185, 28, 28, 0.35);
+  background: var(--danger-light);
+  color: var(--danger);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.gs-danger-outline-btn:hover {
+  background: rgba(185, 28, 28, 0.14);
+  border-color: var(--danger);
+}
+
+.gs-danger-confirm-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--neutral-surface);
+  border: 1px solid rgba(185, 28, 28, 0.38);
+}
+
+.gs-danger-confirm-copy {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.gs-danger-confirm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.gs-danger-solid-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--danger);
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gs-danger-solid-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 
 
