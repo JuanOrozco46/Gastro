@@ -7376,6 +7376,993 @@ input:focus, select:focus, textarea:focus {
   }
 }
 
+/* ==========================================================================
+   CHECKOUT & PAYMENT MODAL — Editorial "Comanda & Cuenta Directa"
+   ========================================================================== */
+
+.payment-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 17, 15, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  overflow-y: auto;
+  animation: fadeIn 0.2s ease both;
+}
+
+.payment-modal-card {
+  width: 100%;
+  max-width: 600px;
+  max-height: 92vh;
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 28px 68px rgba(20, 17, 15, 0.42);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  padding: 0;
+  color: var(--text-main);
+  animation: gf-surface-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Editorial Header (Obsidian Strip) ── */
+.gs-checkout-header {
+  background: var(--neutral-dark);
+  color: #FAF7F2;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(250, 247, 242, 0.08);
+  flex-shrink: 0;
+}
+
+.gs-checkout-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.gs-checkout-tenant-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-sm);
+  background: rgba(250, 247, 242, 0.1);
+  border: 1.5px solid rgba(200, 169, 126, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.gs-checkout-tenant-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gs-checkout-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.gs-checkout-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tertiary);
+}
+
+.gs-checkout-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #FAF7F2;
+  line-height: 1.2;
+}
+
+.gs-checkout-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: rgba(250, 247, 242, 0.72);
+  font-weight: 500;
+}
+
+.gs-checkout-close {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(250, 247, 242, 0.1);
+  border: 1px solid rgba(250, 247, 242, 0.16);
+  color: #FAF7F2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.gs-checkout-close:hover {
+  background: rgba(250, 247, 242, 0.2);
+}
+
+.gs-checkout-close:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ── Scrollable Form Body ── */
+.gs-checkout-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gs-checkout-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: var(--neutral-bg);
+}
+
+/* ── Compact Order Items Summary Strip ── */
+.gs-checkout-items-card {
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gs-checkout-items-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.gs-checkout-items-count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+}
+
+.gs-checkout-items-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.gs-checkout-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--neutral-border);
+  font-size: 0.875rem;
+}
+
+.gs-checkout-item-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.gs-checkout-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gs-checkout-item-qty {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--primary);
+  background: var(--neutral-surface-alt);
+  border: 1px solid var(--neutral-border);
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  flex-shrink: 0;
+}
+
+.gs-checkout-item-name {
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gs-checkout-item-price {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── Section Block ── */
+.gs-checkout-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.gs-checkout-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gs-checkout-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.gs-checkout-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--neutral-dark);
+  color: #FAF7F2;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Compact Autocomplete Profile Pill ── */
+.gs-checkout-profile-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 4px;
+  border-radius: 9999px;
+  background: var(--secondary-light);
+  border: 1px solid rgba(46, 109, 78, 0.24);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--secondary);
+}
+
+.gs-checkout-profile-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 800;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.gs-checkout-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ── Step 1: Fulfillment Cards Grid ── */
+.gs-fulfillment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.gs-fulfillment-card {
+  background: var(--neutral-surface);
+  border: 1.5px solid var(--neutral-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: inherit;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.15s;
+  position: relative;
+}
+
+.gs-fulfillment-card:hover {
+  border-color: var(--primary-border);
+  background: var(--neutral-surface);
+}
+
+.gs-fulfillment-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.gs-fulfillment-card.is-active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  box-shadow: 0 4px 14px rgba(194, 65, 12, 0.1);
+}
+
+.gs-fulfillment-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gs-fulfillment-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--neutral-surface-alt);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.gs-fulfillment-card.is-active .gs-fulfillment-icon {
+  background: var(--primary);
+  color: #FFFFFF;
+}
+
+.gs-fulfillment-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--neutral-border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.gs-fulfillment-card.is-active .gs-fulfillment-check {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #FFFFFF;
+}
+
+.gs-fulfillment-title {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--text-main);
+  display: block;
+  line-height: 1.25;
+}
+
+.gs-fulfillment-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+  display: block;
+}
+
+.gs-fulfillment-meta strong {
+  font-family: var(--font-mono);
+  color: var(--text-main);
+}
+
+/* ── Step 2: Delivery / Pickup / Table Form Fields ── */
+.gs-checkout-fields-card {
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gs-pickup-location-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--neutral-surface-alt);
+  border: 1px solid var(--neutral-border);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.gs-pickup-location-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.gs-pickup-location-copy strong {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--text-main);
+  margin-bottom: 2px;
+}
+
+.gs-checkout-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.gs-checkout-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.gs-checkout-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gs-checkout-label-opt {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+}
+
+.gs-checkout-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.gs-checkout-input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-light);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.gs-checkout-input-wrap:focus-within .gs-checkout-input-icon {
+  color: var(--primary);
+}
+
+.gs-checkout-input {
+  width: 100%;
+  padding: 10px 12px 10px 38px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--neutral-border);
+  background: var(--neutral-bg);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.gs-checkout-input.is-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.gs-checkout-input::placeholder {
+  color: var(--text-light);
+  font-weight: 400;
+}
+
+.gs-checkout-input:focus {
+  border-color: var(--primary);
+  background: var(--neutral-surface);
+  box-shadow: 0 0 0 3px rgba(200, 90, 56, 0.15);
+}
+
+/* ── Contextual Alerts (Error / Cross-City / Min Order) ── */
+.gs-checkout-alert {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.gs-checkout-alert-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.gs-checkout-alert-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gs-checkout-alert-title {
+  font-size: 0.875rem;
+  font-weight: 800;
+  display: block;
+}
+
+.gs-checkout-alert.danger {
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  color: #991B1B;
+}
+
+.gs-checkout-alert.warning {
+  background: #FFFBEB;
+  border: 1px solid #FCD34D;
+  color: #92400E;
+}
+
+.gs-checkout-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--text-main);
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.gs-checkout-checkbox-label input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.gs-checkout-inline-switch-btn {
+  align-self: flex-start;
+  background: var(--neutral-dark);
+  color: #FAF7F2;
+  border: none;
+  border-radius: var(--radius-xs);
+  padding: 6px 12px;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s;
+}
+
+.gs-checkout-inline-switch-btn:hover {
+  background: var(--primary);
+}
+
+/* ── Step 3: Payment Methods Grid ── */
+.gs-payment-methods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 8px;
+}
+
+.gs-pay-method-card {
+  background: var(--neutral-surface);
+  border: 1.5px solid var(--neutral-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
+}
+
+.gs-pay-method-card:hover {
+  border-color: var(--primary-border);
+}
+
+.gs-pay-method-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.gs-pay-method-card.is-active {
+  border-color: var(--neutral-dark);
+  background: var(--neutral-dark);
+  color: #FAF7F2;
+}
+
+.gs-pay-method-icon {
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+}
+
+.gs-pay-method-card.is-active .gs-pay-method-icon {
+  color: var(--tertiary);
+}
+
+.gs-pay-method-name {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.gs-pay-method-card.is-active .gs-pay-method-name {
+  color: #FAF7F2;
+}
+
+.gs-pay-method-sub {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.gs-pay-method-card.is-active .gs-pay-method-sub {
+  color: rgba(250, 247, 242, 0.72);
+}
+
+/* ── Unified Editorial Receipt & 97/3 Fair-Trade Ledger ── */
+.gs-checkout-receipt {
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.gs-receipt-main {
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gs-receipt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.gs-receipt-row strong {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.gs-receipt-row strong.is-free {
+  font-family: inherit;
+  color: var(--secondary);
+}
+
+.gs-receipt-total-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--neutral-border);
+}
+
+.gs-receipt-total-label {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.gs-receipt-total-value {
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.gs-receipt-fairtrade {
+  background: var(--neutral-surface-alt);
+  border-top: 1px dashed var(--neutral-border-strong);
+  padding: 0.75rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.gs-receipt-fairtrade-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--secondary);
+  margin-bottom: 2px;
+}
+
+.gs-receipt-subrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.gs-receipt-subrow strong {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.gs-receipt-subrow.payout strong {
+  color: var(--secondary);
+}
+
+/* ── Sticky Action Footer ── */
+.gs-checkout-footer {
+  background: var(--neutral-surface);
+  border-top: 1px solid var(--neutral-border);
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.gs-checkout-submit-btn {
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--neutral-dark);
+  color: #FAF7F2;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.gs-checkout-submit-btn:hover:not(:disabled) {
+  background: var(--primary);
+  transform: translateY(-1px);
+}
+
+.gs-checkout-submit-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.gs-checkout-submit-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.gs-checkout-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gs-checkout-submit-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gs-checkout-submit-amount {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 800;
+  background: rgba(250, 247, 242, 0.16);
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.gs-checkout-security-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ── WompiCheckout & PaymentStatus State Panels ── */
+.gs-pay-state-panel {
+  padding: 2.25rem 1.75rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  background: var(--neutral-surface);
+  color: var(--text-main);
+}
+
+.gs-pay-state-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+
+.gs-pay-state-icon.primary {
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  color: var(--primary);
+}
+
+.gs-pay-state-icon.success {
+  background: var(--secondary-light);
+  border: 1px solid rgba(46, 109, 78, 0.3);
+  color: var(--secondary);
+}
+
+.gs-pay-state-icon.danger {
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  color: #DC2626;
+}
+
+.gs-pay-state-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.gs-pay-state-desc {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  max-width: 380px;
+}
+
+.gs-pay-state-desc strong {
+  color: var(--text-main);
+  font-family: var(--font-mono);
+}
+
+.gs-pay-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  background: var(--secondary-light);
+  color: var(--secondary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.gs-pay-state-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 300px;
+  margin-top: 0.5rem;
+}
+
+.gs-pay-state-btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.gs-pay-state-btn.primary {
+  background: var(--neutral-dark);
+  color: #FAF7F2;
+  border: none;
+}
+
+.gs-pay-state-btn.primary:hover {
+  background: var(--primary);
+}
+
+.gs-pay-state-btn.outline {
+  background: var(--neutral-surface);
+  color: var(--text-main);
+  border: 1.5px solid var(--neutral-border);
+}
+
+.gs-pay-state-btn.outline:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.gs-pay-state-btn.sandbox {
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+}
+
 /* ── Admin Content Creator Module ──────────────────────── */
 .admin-tab-nav {
   display: flex;
@@ -9293,7 +10280,6 @@ body {
     padding: 0 !important;
   }
 
-  .payment-modal-card,
   .gs-reset-dialog {
     max-width: 100% !important;
     max-height: 92dvh !important;
@@ -9301,10 +10287,28 @@ body {
     padding: 1.35rem 1.15rem calc(1.35rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
+  .payment-modal-card,
   .gf-profile-modal-container {
     max-width: 100% !important;
     max-height: 93dvh !important;
     border-radius: 24px 24px 0 0 !important;
+    padding: 0 !important;
+  }
+
+  .gs-checkout-header {
+    padding: 1rem 1.15rem;
+  }
+
+  .gs-checkout-body {
+    padding: 1rem 1.15rem;
+  }
+
+  .gs-checkout-footer {
+    padding: 0.9rem 1.15rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .gs-payment-methods-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .gf-profile-banner {

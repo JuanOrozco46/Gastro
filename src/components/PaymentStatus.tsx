@@ -91,36 +91,43 @@ export const PaymentStatus: React.FC<PaymentStatusProps> = ({
       case 'pending':
         return (
           <>
-            <Loader2 size={48} className="spin" style={{ color: 'var(--primary)', margin: '0 auto 1rem' }} />
-            <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '0.5rem' }}>Estamos confirmando tu pago...</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              El restaurante ha recibido tu pedido. Estamos a la espera de la confirmación de la pasarela de pagos.
+            <div className="gs-pay-state-icon primary">
+              <Loader2 size={30} className="spin" />
+            </div>
+            <h3 className="gs-pay-state-title">Estamos confirmando tu pago...</h3>
+            <p className="gs-pay-state-desc">
+              El restaurante ha recibido tu pedido. Estamos a la espera de la confirmación oficial de la pasarela.
             </p>
             {import.meta.env.DEV && sandboxUrl && (
-              <button
-                type="button"
-                onClick={() => setStatus('approved')}
-                className="btn btn-outline"
-                style={{ width: '100%', marginBottom: '1rem', borderColor: '#F59E0B', color: '#F59E0B' }}
-              >
-                Simular Aprobación Local (Dev) <ExternalLink size={16} />
-              </button>
+              <div className="gs-pay-state-actions">
+                <button
+                  type="button"
+                  onClick={() => setStatus('approved')}
+                  className="gs-pay-state-btn sandbox"
+                >
+                  Simular aprobación local (Dev) <ExternalLink size={15} />
+                </button>
+              </div>
             )}
           </>
         );
-      
+
       case 'approved':
         return (
           <>
-            <CheckCircle size={48} style={{ color: '#10B981', margin: '0 auto 1rem' }} />
-            <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '0.5rem' }}>¡Pago aprobado!</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Tu transacción ha sido exitosa. La cocina ya está trabajando en tu orden.
+            <div className="gs-pay-state-icon success">
+              <CheckCircle size={32} />
+            </div>
+            <h3 className="gs-pay-state-title">¡Pago aprobado!</h3>
+            <p className="gs-pay-state-desc">
+              Tu transacción fue confirmada con éxito. La cocina ya está preparando tu orden.
             </p>
             {onClose && (
-              <button className="btn btn-primary" onClick={onClose} style={{ width: '100%' }}>
-                Entendido
-              </button>
+              <div className="gs-pay-state-actions">
+                <button type="button" className="gs-pay-state-btn primary" onClick={onClose}>
+                  Entendido
+                </button>
+              </div>
             )}
           </>
         );
@@ -128,40 +135,52 @@ export const PaymentStatus: React.FC<PaymentStatusProps> = ({
       case 'declined':
         return (
           <>
-            <XCircle size={48} style={{ color: '#EF4444', margin: '0 auto 1rem' }} />
-            <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '0.5rem' }}>El pago fue rechazado</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Tu banco o pasarela no ha autorizado esta transacción.
+            <div className="gs-pay-state-icon danger">
+              <XCircle size={32} />
+            </div>
+            <h3 className="gs-pay-state-title">El pago fue rechazado</h3>
+            <p className="gs-pay-state-desc">
+              Tu banco o pasarela no autorizó esta transacción. Puedes intentarlo nuevamente con otro medio.
             </p>
-            {onRetry && (
-              <button className="btn btn-primary" onClick={onRetry} style={{ width: '100%', marginBottom: '0.5rem' }}>
-                <RefreshCw size={16} /> Reintentar Pago
-              </button>
-            )}
-            {onClose && (
-              <button className="btn btn-outline" onClick={onClose} style={{ width: '100%' }}>
-                Cerrar
-              </button>
-            )}
+            <div className="gs-pay-state-actions">
+              {onRetry && (
+                <button type="button" className="gs-pay-state-btn primary" onClick={onRetry}>
+                  <RefreshCw size={16} /> Reintentar pago
+                </button>
+              )}
+              {onClose && (
+                <button type="button" className="gs-pay-state-btn outline" onClick={onClose}>
+                  Cerrar
+                </button>
+              )}
+            </div>
           </>
         );
-      
+
       case 'failed':
       case 'voided':
       case 'refunded':
         return (
           <>
-            <AlertCircle size={48} style={{ color: '#EF4444', margin: '0 auto 1rem' }} />
-            <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '0.5rem' }}>
-              {status === 'failed' ? 'No fue posible procesar el pago' : (status === 'voided' ? 'El pago fue anulado' : 'El pago fue reembolsado')}
+            <div className="gs-pay-state-icon danger">
+              <AlertCircle size={32} />
+            </div>
+            <h3 className="gs-pay-state-title">
+              {status === 'failed'
+                ? 'No fue posible procesar el pago'
+                : status === 'voided'
+                  ? 'El pago fue anulado'
+                  : 'El pago fue reembolsado'}
             </h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Por favor revisa el estado con tu entidad financiera o comunícate con soporte.
+            <p className="gs-pay-state-desc">
+              Por favor revisa el estado con tu entidad financiera o comunícate con soporte si necesitas ayuda.
             </p>
             {onClose && (
-              <button className="btn btn-outline" onClick={onClose} style={{ width: '100%' }}>
-                Cerrar
-              </button>
+              <div className="gs-pay-state-actions">
+                <button type="button" className="gs-pay-state-btn outline" onClick={onClose}>
+                  Cerrar
+                </button>
+              </div>
             )}
           </>
         );
@@ -170,23 +189,14 @@ export const PaymentStatus: React.FC<PaymentStatusProps> = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="card"
-      style={{
-        background: 'var(--glass-dark)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        padding: '2rem',
-        borderRadius: '24px',
-        textAlign: 'center',
-        maxWidth: '400px',
-        margin: '2rem auto'
-      }}
+      className="gs-pay-state-panel"
     >
       {error && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#FCA5A5', padding: '0.75rem', borderRadius: '12px', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-          {error}
+        <div className="gs-checkout-alert danger">
+          <AlertCircle size={16} className="gs-checkout-alert-icon" />
+          <span>{error}</span>
         </div>
       )}
       {renderContent()}

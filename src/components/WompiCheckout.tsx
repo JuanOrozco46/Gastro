@@ -74,54 +74,52 @@ export const WompiCheckout: React.FC<WompiCheckoutProps> = ({ config, onWidgetCl
   }, [config, onWidgetClosed]);
 
   return (
-    <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+    <div className="gs-pay-state-panel">
       {!loadError ? (
         <>
-          <Loader2 size={48} className="spin" style={{ color: '#10B981', margin: '0 auto 1.5rem' }} />
-          <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '0.5rem' }}>
-            Abriendo Pasarela Segura...
+          <div className="gs-pay-state-icon primary">
+            <Loader2 size={30} className="spin" />
+          </div>
+          <h3 className="gs-pay-state-title">
+            Abriendo pasarela segura...
           </h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-            Serás redirigido a Wompi para completar tu pago de forma segura sin compartir datos con nosotros.
+          <p className="gs-pay-state-desc">
+            Serás redirigido a Wompi para completar tu pago de forma segura sin compartir tus datos financieros.
           </p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#10B981', fontSize: '0.8rem', fontWeight: 700, marginBottom: '2rem' }}>
-            <ShieldCheck size={18} />
+          <div className="gs-pay-state-badge">
+            <ShieldCheck size={16} />
             Conexión cifrada de extremo a extremo
           </div>
-          
-          <button 
-            type="button" 
-            onClick={onCancel}
-            className="btn btn-outline"
-            style={{ width: '100%', maxWidth: '280px', margin: '0 auto' }}
-          >
-            Cancelar Pago
-          </button>
+          <div className="gs-pay-state-actions">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="gs-pay-state-btn outline"
+            >
+              Cancelar pago
+            </button>
+          </div>
         </>
       ) : (
         <>
-          <div style={{ 
-            width: '64px', height: '64px', borderRadius: '50%', 
-            background: 'rgba(239, 68, 68, 0.15)', color: '#EF4444',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', 
-            margin: '0 auto 1.5rem' 
-          }}>
-            <X size={32} />
+          <div className="gs-pay-state-icon danger">
+            <X size={30} />
           </div>
-          <h3 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '0.5rem' }}>
+          <h3 className="gs-pay-state-title">
             Error al conectar con Wompi
           </h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-            No pudimos cargar la pasarela de pagos. Por favor, revisa tu conexión a internet o desactiva bloqueadores de anuncios e inténtalo de nuevo.
+          <p className="gs-pay-state-desc">
+            No pudimos cargar la pasarela de pagos. Revisa tu conexión a internet o desactiva bloqueadores de anuncios e inténtalo de nuevo.
           </p>
-          <button 
-            type="button" 
-            onClick={onCancel}
-            className="btn btn-secondary"
-            style={{ width: '100%', maxWidth: '280px', margin: '0 auto' }}
-          >
-            Cerrar
-          </button>
+          <div className="gs-pay-state-actions">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="gs-pay-state-btn primary"
+            >
+              Cerrar
+            </button>
+          </div>
         </>
       )}
     </div>
