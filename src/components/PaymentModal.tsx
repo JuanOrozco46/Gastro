@@ -484,19 +484,32 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                       </span>
                     </div>
                     <div className="gs-checkout-items-list">
-                      {cart.map(item => (
-                        <div key={item.product.id} className="gs-checkout-item-row">
-                          <div className="gs-checkout-item-left">
-                            <span className="gs-checkout-item-qty">{item.quantity}x</span>
-                            <span className="gs-checkout-item-name">
-                              {item.product.image} {item.product.name}
+                      {cart.map(item => {
+                        const hasPhotoUrl = Boolean(
+                          item.product.image &&
+                          (item.product.image.startsWith('http') || item.product.image.startsWith('data:'))
+                        );
+                        return (
+                          <div key={item.product.id} className="gs-checkout-item-row">
+                            <div className="gs-checkout-item-left">
+                              <span className="gs-checkout-item-qty">{item.quantity}x</span>
+                              <span className="gs-checkout-item-thumb">
+                                {hasPhotoUrl ? (
+                                  <img src={item.product.image} alt={item.product.name} />
+                                ) : (
+                                  item.product.emoji || item.product.image || '🍽️'
+                                )}
+                              </span>
+                              <span className="gs-checkout-item-name">
+                                {item.product.name}
+                              </span>
+                            </div>
+                            <span className="gs-checkout-item-price">
+                              ${(item.product.price * item.quantity).toLocaleString('es-CO')}
                             </span>
                           </div>
-                          <span className="gs-checkout-item-price">
-                            ${(item.product.price * item.quantity).toLocaleString('es-CO')}
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
