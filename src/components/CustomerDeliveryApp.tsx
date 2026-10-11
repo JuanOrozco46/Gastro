@@ -4,16 +4,16 @@ import { RestaurantDirectory } from './RestaurantDirectory';
 import { MyOrders } from './MyOrders';
 import { StoriesBar } from './StoriesBar';
 import { FloatingCartButton } from './FloatingCartButton';
-import { LocationSelector } from './LocationSelector';
 import { NotificationBell } from './NotificationBell';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
+import { getPrimarySavedAddress, loadUserAddressBank } from '../utils/addressBank';
 import { motion } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, ShoppingBag, Bike,
   TrendingUp, MapPin, Trash2, Plus, Minus,
   Package, Play, Eye, X, ExternalLink,
   Bookmark, Zap, Search, SlidersHorizontal, CheckCircle2, Building2, Clock, User,
-  AlertCircle, Info, ShieldCheck
+  AlertCircle, Info, ShieldCheck, ChevronDown, LogOut
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { toggleRemoteSave, fetchRemoteSavedPosts } from '../services/supabaseDataService';
@@ -336,11 +336,12 @@ export const CustomerDeliveryApp: React.FC = () => {
     tenants, posts, toggleLikePost, products,
     addToCart, removeFromCart, cart, setCurrentTenantBySlug, orders,
     isCatalogLoading, catalogError, showToast, currentUser, authMode,
-    remotePosts
+    remotePosts, logout
   } = useApp();
 
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalSection, setProfileModalSection] = useState<'identity' | 'addresses'>('identity');
   const [activeTab, setActiveTab] = useState<'feed' | 'directory' | 'orders' | 'support'>('feed');
   const [supportInitialOrder, setSupportInitialOrder] = useState<string | null>(null);
   const [supportInitialTicketId, setSupportInitialTicketId] = useState<string | null>(null);
@@ -358,6 +359,11 @@ export const CustomerDeliveryApp: React.FC = () => {
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'price_low' | 'price_high'>('recent');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  const openProfileModal = useCallback((section: 'identity' | 'addresses' = 'identity') => {
+    setProfileModalSection(section);
+    setIsProfileModalOpen(true);
+  }, []);
+
   // --- Saved posts hydration (persist across filter/sort changes) ---
   useEffect(() => {
     const userId = currentUser?.id;
@@ -369,6 +375,25 @@ export const CustomerDeliveryApp: React.FC = () => {
   }, [currentUser]);
 
   const activeCity = cities.find(c => c.id === selectedCityId) || cities[0];
+  const currentZoneObj = zones.find(z => z.id === selectedZoneId);
+
+  const userAddressBank = useMemo(() => {
+    if (currentUser?.savedAddresses && currentUser.savedAddresses.length > 0) {
+      return currentUser.savedAddresses;
+    }
+    return loadUserAddressBank(currentUser);
+  }, [currentUser]);
+
+  const primarySavedAddress = useMemo(
+    () => getPrimarySavedAddress(userAddressBank),
+    [userAddressBank]
+  );
+
+  const activeAddressHeadline =
+    primarySavedAddress?.address ||
+    currentUser?.defaultAddress ||
+    'Configurar dirección de entrega';
+  const activeAddressLabel = primarySavedAddress?.label || 'Casa';
 
   const tenantMap = useMemo(() => {
     const map = new Map<string, Tenant>();
@@ -417,22 +442,7 @@ export const CustomerDeliveryApp: React.FC = () => {
     }, []);
   }, [activePosts, tenantMap, selectedZoneId, activeCity, cities, zones]);
 
-  const activeTenantsInZoneCount = useMemo(() => {
-    return tenants.filter(t => {
-      if (t.status !== 'active') return false;
-      if (activeCity && t.cityId !== activeCity.id) return false;
-      if (!selectedZoneId) return true;
-      return t.zoneId === selectedZoneId;
-    }).length;
-  }, [tenants, selectedZoneId, activeCity]);
-
   const hasTenantsInActiveCity = activeCity ? tenants.some(t => t.status === 'active' && t.cityId === activeCity.id) : false;
-  const currentZoneObj = zones.find(z => z.id === selectedZoneId);
-  const zoneInfoText = !hasTenantsInActiveCity && activeCity
-    ? `Aún no hay restaurantes aliados activos en ${activeCity.name}.`
-    : !selectedZoneId
-      ? `Descubre lo nuevo cerca de ti en ${activeCity ? activeCity.name : 'tu ciudad'}.`
-      : `Descubre restaurantes y platos en Zona ${currentZoneObj?.name || ''}.`;
 
   const cartTotal = cart.reduce((s, i) => s + (i.product?.price || 0) * i.quantity, 0);
   const cartQty   = cart.reduce((s, i) => s + i.quantity, 0);
@@ -591,12 +601,28 @@ export const CustomerDeliveryApp: React.FC = () => {
   return (
     <div className="tab-content active">
 
-      {/* ── Top Nav Bar ── */}
-      <div className="gf-top-bar">
-        <div className="gf-top-left">
-          <h2 className="gf-page-title">¿Qué se te antoja hoy?</h2>
-          <p className="gf-page-sub">Explora sabores cerca de ti en {activeCity ? activeCity.name : 'tu ciudad'}</p>
-        </div>
+      {/* ── Top Nav Bar (Rappi-style Address Trigger + Navigation + Actions + Logout) ── */}
+      <div className="gf-top-bar gs-customer-top-bar">
+        <button
+          type="button"
+          className="gs-rappi-address-trigger"
+          onClick={() => openProfileModal('addresses')}
+          title="Cambiar dirección de entrega o ciudad principal"
+          aria-label="Cambiar dirección de entrega o ciudad principal"
+        >
+          <span className="gs-rappi-address-icon">
+            <MapPin size={17} />
+          </span>
+          <span className="gs-rappi-address-copy">
+            <span className="gs-rappi-address-street">{activeAddressHeadline}</span>
+            <span className="gs-rappi-address-meta">
+              <strong>{activeAddressLabel}</strong>
+              <span>· {activeCity ? activeCity.name : 'Colombia'}{currentZoneObj ? ` (${currentZoneObj.name})` : ''}</span>
+              <ChevronDown size={14} />
+            </span>
+          </span>
+        </button>
+
         <div className="gf-tab-pills">
           <button className={`gf-tab-pill ${activeTab === 'feed' ? 'active' : ''}`} onClick={() => setActiveTab('feed')}>
             <Zap size={15} /> Feed
@@ -611,46 +637,62 @@ export const CustomerDeliveryApp: React.FC = () => {
           <button className={`gf-tab-pill ${activeTab === 'support' ? 'active' : ''}`} onClick={() => setActiveTab('support')}>
             <MessageCircle size={15} /> Soporte
           </button>
+        </div>
+
+        <div className="gs-top-actions-cluster">
+          <NotificationBell
+            variant="light"
+            onOpenTicket={ticketId => {
+              setSupportInitialTicketId(ticketId);
+              setActiveTab('support');
+            }}
+            onNavigate={dest => {
+              if (dest === 'orders' || dest === 'support' || dest === 'directory') {
+                setActiveTab(dest);
+              }
+            }}
+          />
+
           <button
             type="button"
-            className={`gf-tab-pill ${isProfileModalOpen ? 'active' : ''}`}
-            onClick={() => setIsProfileModalOpen(true)}
-            title="Editar mi perfil, @usuario, foto y dirección"
+            className={`gs-top-profile-btn ${isProfileModalOpen ? 'active' : ''}`}
+            onClick={() => openProfileModal('identity')}
+            title="Editar mi perfil y Banco de Ubicaciones"
+            aria-label="Abrir mi perfil"
           >
-            <User size={15} /> Mi Perfil
+            {currentUser?.avatarUrl ? (
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.name}
+                className="gs-top-profile-avatar"
+              />
+            ) : (
+              <User size={15} />
+            )}
+            <span className="gs-top-profile-label">
+              {currentUser?.username ? `@${currentUser.username}` : 'Mi Perfil'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className="gs-top-logout-btn"
+            onClick={logout}
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+          >
+            <LogOut size={15} />
+            <span className="gs-top-logout-label">Salir</span>
           </button>
         </div>
-        <NotificationBell
-          variant="light"
-          onOpenTicket={ticketId => {
-            setSupportInitialTicketId(ticketId);
-            setActiveTab('support');
-          }}
-          onNavigate={dest => {
-            if (dest === 'orders' || dest === 'support' || dest === 'directory') {
-              setActiveTab(dest);
-            }
-          }}
-        />
       </div>
 
       {activeTab === 'feed' && (
         <>
-          {/* ── Location Selector Bar ── */}
-          <div className="gf-location-section">
-            <LocationSelector variant="full" />
-            <div className="gf-location-meta-bar">
-              <span>{zoneInfoText}</span>
-              <strong>
-                {activeTenantsInZoneCount} local{activeTenantsInZoneCount !== 1 ? 'es' : ''} · {zoneFilteredPosts.length} post{zoneFilteredPosts.length !== 1 ? 's' : ''}
-              </strong>
-            </div>
-          </div>
-
-          {/* ── Dynamic Reels & Stories Bar ── */}
+          {/* ── Dynamic Reels & Stories Bar (Restaurantes de tu ciudad) ── */}
           <StoriesBar onOrderProduct={handleOrder} />
 
-          {/* ── Search & Advanced Filters ── */}
+          {/* ── Search & Advanced Filters (Compact single-row capsule) ── */}
           <div className="gf-search-wrapper">
             {/* Search input row */}
             <div className="gf-search-input-row">
@@ -659,7 +701,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                 <input
                   type="text"
                   className="gf-search-input"
-                  placeholder="Buscar plato, restaurante, tipo de cocina..."
+                  placeholder={`¿Qué quieres pedir hoy en ${activeCity ? activeCity.name : 'tu ciudad'}?`}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -676,7 +718,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                 aria-expanded={showAdvanced}
               >
                 <SlidersHorizontal size={14} />
-                Filtros
+                <span>Filtros</span>
               </button>
             </div>
 
@@ -1143,7 +1185,7 @@ export const CustomerDeliveryApp: React.FC = () => {
         <button
           type="button"
           className={`gf-mobile-nav-item ${isProfileModalOpen ? 'active' : ''}`}
-          onClick={() => setIsProfileModalOpen(true)}
+          onClick={() => openProfileModal('identity')}
         >
           <User size={19} />
           <span>Mi Perfil</span>
@@ -1177,6 +1219,7 @@ export const CustomerDeliveryApp: React.FC = () => {
         {isProfileModalOpen && (
           <UserProfileModal
             isOpen={isProfileModalOpen}
+            initialSection={profileModalSection}
             onClose={() => setIsProfileModalOpen(false)}
           />
         )}

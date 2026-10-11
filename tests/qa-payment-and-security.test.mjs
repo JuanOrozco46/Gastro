@@ -231,4 +231,43 @@ describe('GastroSync QA Hardening — Payment & Security Suite', () => {
     const storiesBar = fs.readFileSync(path.join(ROOT, 'src', 'components', 'StoriesBar.tsx'), 'utf8');
     assert.match(storiesBar, /if \(selectedCityId && tenant\.cityId !== selectedCityId\) return false/);
   });
+
+  it('verifica la experiencia móvil no intrusiva estilo Rappi: barra superior con dirección activa + botón Salir, Historias dinámicas, Banco de Ubicaciones en Perfil/Checkout y persistencia extendida de sesión', () => {
+    const customerApp = fs.readFileSync(path.join(ROOT, 'src', 'components', 'CustomerDeliveryApp.tsx'), 'utf8');
+    assert.equal(
+      customerApp.includes('<LocationSelector'),
+      false,
+      'El Feed del cliente no debe mostrar el bloque intrusivo LocationSelector al entrar'
+    );
+    assert.match(customerApp, /gs-rappi-address-trigger/);
+    assert.match(customerApp, /gs-top-logout-btn/);
+    assert.match(customerApp, /<StoriesBar onOrderProduct=\{handleOrder\} \/>/);
+
+    const headerTsx = fs.readFileSync(path.join(ROOT, 'src', 'components', 'Header.tsx'), 'utf8');
+    assert.match(headerTsx, /userRole === 'login' \|\| userRole === 'client_delivery'/);
+
+    const loginScreen = fs.readFileSync(path.join(ROOT, 'src', 'components', 'LoginScreen.tsx'), 'utf8');
+    assert.match(loginScreen, /preferredCityId/);
+    assert.match(loginScreen, /savedAddresses/);
+
+    const profileModal = fs.readFileSync(path.join(ROOT, 'src', 'components', 'UserProfileModal.tsx'), 'utf8');
+    assert.match(profileModal, /Banco de Ubicaciones y Ciudad Principal/);
+    assert.match(profileModal, /handleAddAddressToBank/);
+
+    const paymentModal = fs.readFileSync(path.join(ROOT, 'src', 'components', 'PaymentModal.tsx'), 'utf8');
+    assert.match(paymentModal, /Tu Banco de Ubicaciones/);
+    assert.match(paymentModal, /Etiqueta para tu Banco de Ubicaciones/);
+
+    const appContext = fs.readFileSync(path.join(ROOT, 'src', 'context', 'AppContext.tsx'), 'utf8');
+    assert.match(appContext, /const activeStories = React\.useMemo<Story\[\]>/);
+    assert.match(appContext, /keepSupabaseSessionAlive\(\)/);
+
+    const sql057 = fs.readFileSync(
+      path.join(ROOT, 'supabase', 'migrations', '057_user_address_bank_and_city.sql'),
+      'utf8'
+    );
+    assert.match(sql057, /preferred_city_id/);
+    assert.match(sql057, /saved_addresses/);
+  });
 });
+

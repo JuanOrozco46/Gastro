@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/useApp';
 import { PaymentSimulatorService } from '../services/paymentService';
-import type { PaymentMethod, OrderFulfillment, CheckoutDetails } from '../types';
+import type { PaymentMethod, OrderFulfillment, CheckoutDetails, SavedDeliveryAddress } from '../types';
 import { calculateOrderFinancialBreakdown, MIN_DIGITAL_PAYMENT_COP } from '../utils/wompiFees';
+import { loadUserAddressBank, sanitizeSavedAddresses } from '../utils/addressBank';
 import { openLegalCenter } from '../utils/legalNavigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -23,7 +24,8 @@ import {
   CreditCard,
   ShieldCheck,
   Lock,
-  Check
+  Check,
+  Plus
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PaymentStatus } from './PaymentStatus';
@@ -41,7 +43,7 @@ interface PaymentModalProps {
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'pickup', prefilledTableId, prefilledTableToken, entryPoint }) => {
-  const { cart, cities, zones, selectedCityId, tenants, currentTenant: contextTenant, currentUser, submitOrderWithPayment, retryRemotePayment, updateUserProfile, authMode, isSubmittingOrder, orderError } = useApp();
+  const { cart, cities, zones, selectedCityId, setSelectedCity, tenants, currentTenant: contextTenant, currentUser, submitOrderWithPayment, retryRemotePayment, updateUserProfile, authMode, isSubmittingOrder, orderError } = useApp();
   const currentTenant = (cart[0]?.product?.tenantId ? tenants.find(t => t.id === cart[0].product.tenantId) : undefined) || contextTenant;
   const tenantCityName = cities.find(c => c.id === currentTenant.cityId)?.name || 'Colombia';
   const tenantZoneName = zones.find(z => z.id === currentTenant.zoneId)?.name;
@@ -59,6 +61,40 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
   const [confirmCrossCity, setConfirmCrossCity] = useState(false);
   const [wompiConfig, setWompiConfig] = useState<WompiCheckoutConfig | null>(null);
   const [pendingPaymentInfo, setPendingPaymentInfo] = useState<{orderId: string, paymentId: string, sandboxUrl?: string} | null>(null);
+
+  // Banco de Ubicaciones del usuario
+  const userSavedAddresses = useMemo<SavedDeliveryAddress[]>(() => {
+    if (!currentUser) return [];
+    const localBank = loadUserAddressBank([currentUser.id, currentUser.email]);
+    const raw = currentUser.savedAddresses?.length ? currentUser.savedAddresses : localBank;
+    const sanitized = sanitizeSavedAddresses(raw, currentUser.preferredCityId || currentTenant.cityId || selectedCityId || 'armenia');
+    if (sanitized.length > 0) return sanitized;
+    if (currentUser.defaultAddress?.trim()) {
+      return [
+        {
+          id: 'addr-default',
+          label: 'Casa',
+          address: currentUser.defaultAddress.trim(),
+          notes: currentUser.defaultDeliveryNotes?.trim() || undefined,
+          cityId: currentUser.preferredCityId || currentTenant.cityId || selectedCityId || 'armenia',
+          zoneId: currentUser.preferredZoneId || null,
+          isPrimary: true,
+          isDefault: true
+        }
+      ];
+    }
+    return [];
+  }, [currentUser, currentTenant.cityId, selectedCityId]);
+
+  const defaultSelectedSavedAddress = useMemo(() => {
+    return (
+      userSavedAddresses.find((a) => a.cityId === currentTenant.cityId && a.isPrimary) ||
+      userSavedAddresses.find((a) => a.cityId === currentTenant.cityId) ||
+      userSavedAddresses.find((a) => a.isPrimary) ||
+      userSavedAddresses[0] ||
+      null
+    );
+  }, [userSavedAddresses, currentTenant.cityId]);
 
   // Available delivery modes for this restaurant
   const allowedModes: OrderFulfillment[] = (currentTenant.deliveryModes && currentTenant.deliveryModes.length > 0)
@@ -79,11 +115,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
 
   const [fulfillment, setFulfillment] = useState<OrderFulfillment>(initialMode);
 
-  // Customer & Delivery Form State (autocompleted from currentUser profile)
+  // Customer & Delivery Form State (autocompleted from currentUser profile & Address Bank)
+  const [selectedAddressId, setSelectedAddressId] = useState<string>(
+    () => defaultSelectedSavedAddress?.id || 'new'
+  );
+  const [newAddressLabel, setNewAddressLabel] = useState<'Casa' | 'Oficina' | 'Apartamento' | 'Pareja'>('Casa');
+  const [saveToAddressBank, setSaveToAddressBank] = useState<boolean>(true);
   const [customerName, setCustomerName] = useState(currentUser?.name || '');
   const [customerPhone, setCustomerPhone] = useState(currentUser?.phone || '');
-  const [deliveryAddress, setDeliveryAddress] = useState(currentUser?.defaultAddress || '');
-  const [deliveryNotes, setDeliveryNotes] = useState(currentUser?.defaultDeliveryNotes || '');
+  const [deliveryAddress, setDeliveryAddress] = useState(
+    defaultSelectedSavedAddress?.address || currentUser?.defaultAddress || ''
+  );
+  const [deliveryNotes, setDeliveryNotes] = useState(
+    defaultSelectedSavedAddress?.notes || currentUser?.defaultDeliveryNotes || ''
+  );
 
   // Table Service Form State
   const initialTableNum = (() => {
@@ -117,8 +162,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       setFulfillment(initialMode);
       if (currentUser?.name) setCustomerName(currentUser.name);
       if (currentUser?.phone) setCustomerPhone(currentUser.phone);
-      if (currentUser?.defaultAddress) setDeliveryAddress(currentUser.defaultAddress);
-      if (currentUser?.defaultDeliveryNotes) setDeliveryNotes(currentUser.defaultDeliveryNotes);
+      if (defaultSelectedSavedAddress) {
+        setSelectedAddressId(defaultSelectedSavedAddress.id);
+        setDeliveryAddress(defaultSelectedSavedAddress.address);
+        setDeliveryNotes(defaultSelectedSavedAddress.notes || '');
+      } else {
+        setSelectedAddressId('new');
+        setDeliveryAddress(currentUser?.defaultAddress || '');
+        setDeliveryNotes(currentUser?.defaultDeliveryNotes || '');
+      }
     }
   }
 
@@ -208,17 +260,65 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
         ? `${baseName} (@${currentUser.username})`
         : baseName;
 
-    // Guardar en segundo plano teléfono / dirección si el usuario los completó o actualizó en el checkout
+    // Determinar etiqueta de la ubicación seleccionada o nueva
+    const matchedSaved = userSavedAddresses.find((a) => a.id === selectedAddressId);
+    const activeAddressLabel = matchedSaved ? matchedSaved.label : newAddressLabel;
+
+    // Guardar en segundo plano teléfono / dirección y actualizar el Banco de Ubicaciones del usuario
     if (currentUser) {
-      const profilePatch: { phone?: string; defaultAddress?: string; defaultDeliveryNotes?: string } = {};
+      const profilePatch: {
+        phone?: string;
+        defaultAddress?: string;
+        defaultDeliveryNotes?: string;
+        preferredCityId?: string;
+        savedAddresses?: SavedDeliveryAddress[];
+      } = {};
       if (customerPhone.trim() && customerPhone.trim() !== currentUser.phone) {
         profilePatch.phone = customerPhone.trim();
       }
-      if (fulfillment === 'restaurant_delivery' && deliveryAddress.trim() && deliveryAddress.trim() !== currentUser.defaultAddress) {
-        profilePatch.defaultAddress = deliveryAddress.trim();
-      }
-      if (fulfillment === 'restaurant_delivery' && deliveryNotes.trim() && deliveryNotes.trim() !== currentUser.defaultDeliveryNotes) {
-        profilePatch.defaultDeliveryNotes = deliveryNotes.trim();
+      if (fulfillment === 'restaurant_delivery' && deliveryAddress.trim()) {
+        const cleanAddr = deliveryAddress.trim();
+        const cleanNotes = deliveryNotes.trim() || undefined;
+        const targetCityId = currentTenant.cityId || selectedCityId || currentUser.preferredCityId || 'armenia';
+
+        profilePatch.defaultAddress = cleanAddr;
+        profilePatch.defaultDeliveryNotes = cleanNotes || '';
+        profilePatch.preferredCityId = targetCityId;
+
+        if (selectedAddressId === 'new' && saveToAddressBank) {
+          const existingSame = userSavedAddresses.find(
+            (a) => a.address.toLowerCase() === cleanAddr.toLowerCase() && a.cityId === targetCityId
+          );
+          if (existingSame) {
+            profilePatch.savedAddresses = userSavedAddresses.map((a) => ({
+              ...a,
+              notes: a.id === existingSame.id ? cleanNotes : a.notes,
+              isPrimary: a.id === existingSame.id
+            }));
+          } else {
+            const createdAddr: SavedDeliveryAddress = {
+              id: `addr-chk-${Date.now()}`,
+              label: newAddressLabel,
+              address: cleanAddr,
+              notes: cleanNotes,
+              cityId: targetCityId,
+              zoneId: currentTenant.zoneId || null,
+              isPrimary: true,
+              createdAt: Date.now()
+            };
+            profilePatch.savedAddresses = [
+              createdAddr,
+              ...userSavedAddresses.map((a) => ({ ...a, isPrimary: false }))
+            ];
+          }
+        } else if (matchedSaved) {
+          profilePatch.savedAddresses = userSavedAddresses.map((a) => ({
+            ...a,
+            address: a.id === matchedSaved.id ? cleanAddr : a.address,
+            notes: a.id === matchedSaved.id ? cleanNotes : a.notes,
+            isPrimary: a.id === matchedSaved.id
+          }));
+        }
       }
       if (Object.keys(profilePatch).length > 0) {
         void updateUserProfile(profilePatch);
@@ -230,7 +330,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       customerName: formattedCustomerName,
       customerPhone: customerPhone.trim(),
       deliveryAddress: fulfillment === 'restaurant_delivery' ? {
-        label: 'Dirección de Entrega',
+        label: activeAddressLabel,
         addressLine: deliveryAddress.trim(),
         notes: deliveryNotes.trim() || undefined
       } : undefined,
@@ -718,6 +818,65 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
 
                   {fulfillment === 'restaurant_delivery' && (
                     <div className="gs-checkout-fields-card">
+                      {/* Banco de Ubicaciones del Usuario */}
+                      {userSavedAddresses.length > 0 && (
+                        <div className="gs-checkout-address-bank">
+                          <div className="gs-checkout-address-bank-head">
+                            <span>Tu Banco de Ubicaciones</span>
+                            <button
+                              type="button"
+                              className={`gs-checkout-new-addr-btn ${selectedAddressId === 'new' ? 'is-active' : ''}`}
+                              onClick={() => {
+                                setSelectedAddressId('new');
+                                setDeliveryAddress('');
+                                setDeliveryNotes('');
+                              }}
+                            >
+                              <Plus size={13} />
+                              <span>Nueva dirección</span>
+                            </button>
+                          </div>
+
+                          <div className="gs-checkout-saved-list" role="radiogroup" aria-label="Seleccionar dirección guardada">
+                            {userSavedAddresses.map((saved) => {
+                              const isChosen = selectedAddressId === saved.id;
+                              const savedCityName = cities.find((c) => c.id === saved.cityId)?.name || tenantCityName;
+                              return (
+                                <button
+                                  key={saved.id}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={isChosen}
+                                  className={`gs-checkout-saved-card ${isChosen ? 'is-active' : ''}`}
+                                  onClick={() => {
+                                    setSelectedAddressId(saved.id);
+                                    setDeliveryAddress(saved.address);
+                                    setDeliveryNotes(saved.notes || '');
+                                    if (saved.cityId && saved.cityId !== selectedCityId) {
+                                      setSelectedCity(saved.cityId);
+                                    }
+                                  }}
+                                >
+                                  <span className="gs-checkout-saved-radio" aria-hidden="true">
+                                    {isChosen && <Check size={11} strokeWidth={3} />}
+                                  </span>
+                                  <div className="gs-checkout-saved-copy">
+                                    <div className="gs-checkout-saved-top">
+                                      <span className="gs-checkout-saved-badge">{saved.label}</span>
+                                      <span className="gs-checkout-saved-city">{savedCityName}</span>
+                                    </div>
+                                    <span className="gs-checkout-saved-street">{saved.address}</span>
+                                    {saved.notes && (
+                                      <span className="gs-checkout-saved-notes">{saved.notes}</span>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="gs-checkout-grid-2">
                         <div className="gs-checkout-field">
                           <label className="gs-checkout-label" htmlFor="checkout-delivery-name">
@@ -754,6 +913,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                           </div>
                         </div>
                       </div>
+
+                      {selectedAddressId === 'new' && (
+                        <div className="gs-checkout-field">
+                          <span className="gs-checkout-label">Etiqueta para tu Banco de Ubicaciones</span>
+                          <div className="gs-address-label-pills" role="group" aria-label="Etiqueta de ubicación">
+                            {(['Casa', 'Oficina', 'Apartamento', 'Pareja'] as const).map((lbl) => (
+                              <button
+                                key={lbl}
+                                type="button"
+                                onClick={() => setNewAddressLabel(lbl)}
+                                className={`gs-address-label-pill ${newAddressLabel === lbl ? 'active' : ''}`}
+                              >
+                                {lbl}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="gs-checkout-field">
                         <label className="gs-checkout-label" htmlFor="checkout-delivery-address">
                           <span>Dirección de entrega en {tenantCityName} *</span>
@@ -764,7 +942,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                             id="checkout-delivery-address"
                             type="text"
                             className="gs-checkout-input"
-                            placeholder="Ej. Cra 14 # 19-20, Barrio Norte"
+                            placeholder="Ej. Calle 2 Norte # 18 - 144, Barrio..."
                             value={deliveryAddress}
                             onChange={e => setDeliveryAddress(e.target.value)}
                             required
@@ -788,6 +966,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                           />
                         </div>
                       </div>
+
+                      {currentUser && selectedAddressId === 'new' && (
+                        <label className="gs-checkout-save-bank-check">
+                          <input
+                            type="checkbox"
+                            checked={saveToAddressBank}
+                            onChange={(e) => setSaveToAddressBank(e.target.checked)}
+                          />
+                          <span>Guardar esta dirección ({newAddressLabel}) en mi banco de ubicaciones</span>
+                        </label>
+                      )}
                     </div>
                   )}
 

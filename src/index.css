@@ -4056,25 +4056,28 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 2px;
-  margin-bottom: 1.5rem;
+  padding-bottom: 4px;
+  margin-bottom: 1.25rem;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .gf-filter-bar::-webkit-scrollbar { display: none; }
 
 .gf-filter-chip {
-  padding: 7px 16px;
-  border-radius: 20px;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 999px;
   border: 1.5px solid var(--neutral-border);
-  background: white;
+  background: var(--neutral-surface);
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 700;
   color: var(--text-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s;
+  overflow: visible;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
 }
 
 .gf-filter-chip:hover {
@@ -4429,12 +4432,20 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 768px) {
+  .gf-search-wrapper {
+    padding: 0.65rem 0.75rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 0.85rem;
+  }
   .gf-search-input-row {
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     gap: 8px;
   }
   .gf-toggle-advanced {
-    width: 100%;
+    width: auto;
+    flex-shrink: 0;
+    padding: 10px 12px;
     justify-content: center;
   }
   .gf-advanced-panel {
@@ -10544,19 +10555,20 @@ body {
   gap: 6px;
   padding: 7px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
-  color: #FAF7F2;
+  border: 1px solid var(--neutral-border-strong);
+  background: var(--neutral-surface-alt);
+  color: var(--text-main);
   font-family: inherit;
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
 .gs-header-legal-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.28);
+  background: var(--primary-light);
+  border-color: var(--primary-border);
+  color: var(--primary);
 }
 
 /* Legal Center Modal */
@@ -11327,4 +11339,717 @@ body {
 .gs-error-boundary__btn--secondary:hover {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+/* =========================================================
+   RAPPI-STYLE CUSTOMER TOP BAR & BANCO DE UBICACIONES
+   ========================================================= */
+
+.gs-customer-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 1.1rem;
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-lg);
+}
+
+.gs-rappi-address-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 340px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-main);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.gs-rappi-address-trigger:hover {
+  background: var(--neutral-surface-alt);
+  border-color: var(--neutral-border);
+}
+
+.gs-rappi-address-trigger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.gs-rappi-address-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gs-rappi-address-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.gs-rappi-address-street {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.gs-rappi-address-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.875rem;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.gs-rappi-address-meta strong {
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.gs-rappi-address-meta svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.gs-top-actions-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.gs-top-profile-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--neutral-border-strong);
+  background: var(--neutral-surface-alt);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.gs-top-profile-btn:hover,
+.gs-top-profile-btn.active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.gs-top-profile-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--primary);
+  flex-shrink: 0;
+}
+
+.gs-top-profile-label {
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gs-top-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(185, 28, 28, 0.28);
+  background: var(--danger-light);
+  color: var(--danger);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
+}
+
+.gs-top-logout-btn:hover {
+  background: rgba(185, 28, 28, 0.14);
+  border-color: var(--danger);
+}
+
+.gs-top-logout-btn:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
+/* Address Label Pills (Login, Profile, Checkout) */
+.gs-address-label-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gs-address-label-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--neutral-border);
+  background: var(--neutral-surface);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.gs-address-label-pill:hover {
+  border-color: var(--primary-border);
+  color: var(--text-main);
+}
+
+.gs-address-label-pill.active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+/* UserProfileModal — Banco de Ubicaciones */
+.gs-address-bank-section {
+  border: 1px solid var(--neutral-border-strong);
+  background: var(--neutral-surface-alt);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gs-address-bank-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gs-address-bank-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.gs-address-bank-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.gs-address-bank-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.gs-address-bank-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.gs-address-bank-add-btn:hover {
+  background: var(--primary);
+  color: #FFFFFF;
+}
+
+.gs-address-bank-city-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.gs-address-bank-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--neutral-border);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.gs-address-bank-count {
+  font-family: var(--font-mono);
+  color: var(--primary);
+  text-transform: none;
+}
+
+.gs-address-bank-empty {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--neutral-border-strong);
+  background: var(--neutral-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.gs-address-bank-empty p {
+  margin: 0;
+}
+
+.gs-address-bank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gs-address-bank-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--neutral-border);
+  background: var(--neutral-surface);
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.gs-address-bank-card.is-primary {
+  border-color: var(--primary);
+  background: #FFFDFB;
+}
+
+.gs-address-bank-select-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.gs-address-bank-radio {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--neutral-surface-alt);
+  border: 1.5px solid var(--neutral-border-strong);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.gs-address-bank-card.is-primary .gs-address-bank-radio {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #FFFFFF;
+}
+
+.gs-address-bank-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gs-address-bank-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gs-address-bank-label {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.gs-address-bank-city-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--neutral-surface-alt);
+  border: 1px solid var(--neutral-border);
+  color: var(--text-muted);
+}
+
+.gs-address-bank-primary-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  color: var(--primary);
+}
+
+.gs-address-bank-street {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.gs-address-bank-notes {
+  font-size: 0.73rem;
+  color: var(--text-muted);
+}
+
+.gs-address-bank-delete-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-xs);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+
+.gs-address-bank-delete-btn:hover {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+.gs-address-bank-form {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--primary-border);
+  background: var(--neutral-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gs-address-bank-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: var(--text-main);
+}
+
+.gs-address-bank-close-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: var(--neutral-surface-alt);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.gs-address-bank-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.gs-address-bank-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.gs-address-bank-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--primary);
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.gs-address-bank-save-btn:hover {
+  background: var(--primary-hover);
+}
+
+/* PaymentModal — Selector del Banco de Ubicaciones */
+.gs-checkout-address-bank {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--neutral-border-strong);
+  background: var(--neutral-surface-alt);
+}
+
+.gs-checkout-address-bank-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gs-checkout-address-bank-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-main);
+}
+
+.gs-checkout-new-addr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--neutral-border-strong);
+  background: var(--neutral-surface);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.gs-checkout-new-addr-btn:hover,
+.gs-checkout-new-addr-btn.active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.gs-checkout-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gs-checkout-saved-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--neutral-border);
+  background: var(--neutral-surface);
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.gs-checkout-saved-card:hover {
+  border-color: var(--primary-border);
+}
+
+.gs-checkout-saved-card.selected,
+.gs-checkout-saved-card.is-active {
+  border-color: var(--primary);
+  background: #FFFDFB;
+}
+
+.gs-checkout-saved-radio {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--neutral-surface-alt);
+  border: 1.5px solid var(--neutral-border-strong);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.gs-checkout-saved-card.selected .gs-checkout-saved-radio,
+.gs-checkout-saved-card.is-active .gs-checkout-saved-radio {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #FFFFFF;
+}
+
+.gs-checkout-saved-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gs-checkout-saved-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gs-checkout-saved-label,
+.gs-checkout-saved-badge {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.gs-checkout-saved-city {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.gs-checkout-saved-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.gs-checkout-saved-street {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.gs-checkout-saved-notes {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.gs-checkout-new-address-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.gs-checkout-save-bank-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.gs-checkout-save-bank-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  .gs-customer-top-bar {
+    padding: 8px 10px;
+    margin-bottom: 0.85rem;
+    border-radius: var(--radius-md);
+    gap: 8px;
+  }
+
+  .gs-rappi-address-trigger {
+    flex: 1;
+    max-width: none;
+    padding: 4px 6px;
+  }
+
+  .gs-rappi-address-street {
+    max-width: 185px;
+    font-size: 0.72rem;
+  }
+
+  .gs-rappi-address-meta {
+    font-size: 0.82rem;
+  }
+
+  .gs-top-profile-btn {
+    padding: 6px 8px;
+  }
+
+  .gs-top-profile-label {
+    display: none;
+  }
+
+  .gs-top-logout-btn {
+    padding: 6px 10px;
+    font-size: 0.74rem;
+  }
 }

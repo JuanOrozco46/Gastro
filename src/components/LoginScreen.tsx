@@ -132,8 +132,12 @@ function RegisterSectionHead({
 }
 
 export const LoginScreen: React.FC = () => {
-  const { authMode, loginWithCredentials, loginWithGoogle, registerAccount, sendPasswordReset } = useApp();
+  const { authMode, cities, selectedCityId, loginWithCredentials, loginWithGoogle, registerAccount, sendPasswordReset } = useApp();
   const [tab, setTab] = useState<AuthTab>('login');
+
+  const activeCities = useMemo(() => cities.filter(c => c.isActive), [cities]);
+  const [preferredCityId, setPreferredCityId] = useState<string>(() => selectedCityId || activeCities[0]?.id || '00000000-0000-0000-0000-000000000001');
+  const [addressLabel, setAddressLabel] = useState<'Casa' | 'Oficina' | 'Apartamento' | 'Pareja'>('Casa');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -144,7 +148,7 @@ export const LoginScreen: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [defaultAddress, setDefaultAddress] = useState('');
   const [defaultDeliveryNotes, setDefaultDeliveryNotes] = useState('');
-  const [showOptionalAddress, setShowOptionalAddress] = useState(false);
+  const [showOptionalAddress, setShowOptionalAddress] = useState(true);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   const [isCompressingAvatar, setIsCompressingAvatar] = useState(false);
@@ -439,11 +443,27 @@ export const LoginScreen: React.FC = () => {
           setLoginError('Correo o contraseña incorrectos.');
         }
       } else {
+        const cleanAddr = defaultAddress.trim();
+        const cleanNotes = defaultDeliveryNotes.trim();
+        const initialSaved = cleanAddr
+          ? [{
+              id: `addr-reg-${Date.now()}`,
+              label: addressLabel,
+              address: cleanAddr,
+              notes: cleanNotes || undefined,
+              cityId: preferredCityId,
+              zoneId: null,
+              isPrimary: true,
+              createdAt: Date.now()
+            }]
+          : [];
         const res = await registerAccount(name.trim(), email, password, 'client_delivery', {
           username: normalizeUsername(username),
           phone: phone.trim(),
-          defaultAddress: defaultAddress.trim() || undefined,
-          defaultDeliveryNotes: defaultDeliveryNotes.trim() || undefined,
+          defaultAddress: cleanAddr || undefined,
+          defaultDeliveryNotes: cleanNotes || undefined,
+          preferredCityId,
+          savedAddresses: initialSaved,
           avatarFile,
           avatarDataUrl: avatarPreview || undefined
         });
@@ -972,41 +992,64 @@ export const LoginScreen: React.FC = () => {
                 </div>
               </div>
 
-              {/* ── SECCIÓN 2: Contacto y Entrega Opcional ── */}
+              {/* ── SECCIÓN 2: Contacto, Ciudad Principal y Banco de Ubicaciones ── */}
               <div className="gs-register-ledger-section">
                 <RegisterSectionHead
                   step={2}
                   done={registerProgress.step2Done}
-                  title="Contacto y entregas"
-                  desc="Tu WhatsApp para notificaciones del pedido; la dirección puedes guardarla ahora o en tu primer domicilio"
+                  title="Ciudad principal y ubicación de entregas"
+                  desc="Con tu ciudad y dirección habitual te mostramos automáticamente las cocinas de tu zona al entrar"
                 />
 
                 <div className="pam-grid-1">
-                  <div className="auth-field">
-                    <label htmlFor="auth-phone" className="auth-label">Teléfono / WhatsApp de contacto *</label>
-                    <div className="auth-input-wrap">
-                      <div className="auth-field-icon">
-                        <Phone size={17} />
+                  <div className="pam-grid-2">
+                    <div className="auth-field">
+                      <label htmlFor="auth-phone" className="auth-label">Teléfono / WhatsApp de contacto *</label>
+                      <div className="auth-input-wrap">
+                        <div className="auth-field-icon">
+                          <Phone size={17} />
+                        </div>
+                        <input
+                          id="auth-phone"
+                          type="tel"
+                          autoComplete="tel"
+                          placeholder="Ej. +57 300 123 4567"
+                          value={phone}
+                          onChange={handlePhoneChange}
+                          onBlur={handlePhoneBlur}
+                          aria-invalid={!!fieldErrors.phone}
+                          aria-describedby={fieldErrors.phone ? 'auth-phone-error' : undefined}
+                          className={`auth-input ${fieldErrors.phone ? 'auth-input-error' : ''}`}
+                          required
+                        />
                       </div>
-                      <input
-                        id="auth-phone"
-                        type="tel"
-                        autoComplete="tel"
-                        placeholder="Ej. +57 300 123 4567"
-                        value={phone}
-                        onChange={handlePhoneChange}
-                        onBlur={handlePhoneBlur}
-                        aria-invalid={!!fieldErrors.phone}
-                        aria-describedby={fieldErrors.phone ? 'auth-phone-error' : undefined}
-                        className={`auth-input ${fieldErrors.phone ? 'auth-input-error' : ''}`}
-                        required
-                      />
+                      {fieldErrors.phone && (
+                        <div id="auth-phone-error" role="alert" className="auth-field-error">
+                          {fieldErrors.phone}
+                        </div>
+                      )}
                     </div>
-                    {fieldErrors.phone && (
-                      <div id="auth-phone-error" role="alert" className="auth-field-error">
-                        {fieldErrors.phone}
+
+                    <div className="auth-field">
+                      <label htmlFor="auth-city" className="auth-label">Ciudad principal de entrega *</label>
+                      <div className="auth-input-wrap">
+                        <div className="auth-field-icon">
+                          <MapPin size={17} />
+                        </div>
+                        <select
+                          id="auth-city"
+                          value={preferredCityId}
+                          onChange={(e) => setPreferredCityId(e.target.value)}
+                          className="auth-input"
+                        >
+                          {activeCities.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   {!showOptionalAddress && !defaultAddress ? (
@@ -1016,14 +1059,14 @@ export const LoginScreen: React.FC = () => {
                       className="gs-optional-address-toggle"
                     >
                       <MapPin size={15} />
-                      <span>+ Agregar dirección habitual de entrega ahora (opcional)</span>
+                      <span>+ Agregar dirección a mi banco de ubicaciones (opcional)</span>
                     </button>
                   ) : (
                     <div className="gs-optional-address-fields">
                       <div className="auth-field">
                         <div className="auth-label-row">
                           <label htmlFor="auth-address" className="auth-label">
-                            Dirección habitual de entrega (Opcional)
+                            Dirección principal en tu Banco de Ubicaciones
                           </label>
                           {!defaultAddress && (
                             <button
@@ -1031,9 +1074,21 @@ export const LoginScreen: React.FC = () => {
                               onClick={() => setShowOptionalAddress(false)}
                               className="forgot-link"
                             >
-                              Omitir por ahora
+                              Configurar después
                             </button>
                           )}
+                        </div>
+                        <div className="gs-address-label-pills" role="group" aria-label="Etiqueta de ubicación">
+                          {(['Casa', 'Oficina', 'Apartamento', 'Pareja'] as const).map((lbl) => (
+                            <button
+                              key={lbl}
+                              type="button"
+                              onClick={() => setAddressLabel(lbl)}
+                              className={`gs-address-label-pill ${addressLabel === lbl ? 'active' : ''}`}
+                            >
+                              {lbl}
+                            </button>
+                          ))}
                         </div>
                         <div className="auth-input-wrap">
                           <div className="auth-field-icon">
@@ -1043,7 +1098,7 @@ export const LoginScreen: React.FC = () => {
                             id="auth-address"
                             type="text"
                             autoComplete="street-address"
-                            placeholder="Ej. Cra 14 # 19-20, Apto 302, Barrio..."
+                            placeholder="Ej. Calle 2 Norte # 18 - 144, Barrio..."
                             value={defaultAddress}
                             onChange={handleAddressChange}
                             onBlur={handleAddressBlur}

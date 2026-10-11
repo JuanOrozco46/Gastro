@@ -6,18 +6,18 @@ import { UserProfileModal } from './UserProfileModal';
 import { openLegalCenter } from '../utils/legalNavigation';
 
 const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  client_delivery: { label: 'Cliente', icon: <Bike size={13} />, color: '#FF5533' },
-  admin: { label: 'Admin Restaurante', icon: <BarChart3 size={13} />, color: '#10B981' },
-  kitchen: { label: 'Cocina KDS', icon: <ChefHat size={13} />, color: '#F59E0B' },
-  table_qr: { label: 'Mesa QR', icon: <QrCode size={13} />, color: '#38bdf8' },
-  platform_admin: { label: 'Plataforma', icon: <ShieldCheck size={13} />, color: '#8B5CF6' },
+  client_delivery: { label: 'Cliente', icon: <Bike size={13} />, color: 'var(--primary)' },
+  admin: { label: 'Admin Restaurante', icon: <BarChart3 size={13} />, color: 'var(--secondary)' },
+  kitchen: { label: 'Cocina KDS', icon: <ChefHat size={13} />, color: 'var(--tertiary)' },
+  table_qr: { label: 'Mesa QR', icon: <QrCode size={13} />, color: 'var(--primary)' },
+  platform_admin: { label: 'Plataforma', icon: <ShieldCheck size={13} />, color: 'var(--text-main)' },
 };
 
 export const Header: React.FC = () => {
   const { userRole, currentUser, currentTenant, cities, selectedCityId, logout } = useApp();
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  if (userRole === 'login') return null;
+  if (userRole === 'login' || userRole === 'client_delivery') return null;
 
   const roleInfo = ROLE_CONFIG[userRole] || ROLE_CONFIG.client_delivery;
   const activeCityId =
@@ -43,7 +43,7 @@ export const Header: React.FC = () => {
               <div className="logo-dot" />
             </div>
             <div className="logo-text">
-              <h1 style={{ fontFamily: 'Outfit, sans-serif' }}>GastroSync</h1>
+              <h1 style={{ fontFamily: 'var(--font-display)' }}>GastroSync</h1>
               <p>{activeCityName ? `${activeCityName}, Colombia` : 'Colombia'}</p>
             </div>
           </div>
@@ -56,7 +56,7 @@ export const Header: React.FC = () => {
             title="Editar mi perfil, @usuario, foto y dirección de entrega"
             style={{
               cursor: 'pointer',
-              border: '1px solid rgba(212, 163, 89, 0.35)',
+              border: '1px solid var(--primary-border)',
               paddingLeft: currentUser?.avatarUrl ? '6px' : undefined
             }}
           >
@@ -69,23 +69,23 @@ export const Header: React.FC = () => {
                   height: '24px',
                   borderRadius: '50%',
                   objectFit: 'cover',
-                  border: '1.5px solid #d4a359'
+                  border: '1.5px solid var(--primary)'
                 }}
               />
             ) : (
               <User size={15} style={{ color: 'var(--primary)' }} />
             )}
-            <span className="header-user-name" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
+            <span className="header-user-name" style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>
               {currentUser?.name || 'Usuario'}
             </span>
             {currentUser?.username ? (
               <span
                 className="header-user-handle"
                 style={{
-                  fontSize: '0.72rem',
+                  fontSize: '0.75rem',
                   fontWeight: 700,
-                  color: '#f3d29c',
-                  background: 'rgba(212, 163, 89, 0.18)',
+                  color: 'var(--primary)',
+                  background: 'var(--primary-light)',
                   padding: '1px 7px',
                   borderRadius: '999px'
                 }}
@@ -96,13 +96,13 @@ export const Header: React.FC = () => {
               <span
                 className="header-user-handle"
                 style={{
-                  fontSize: '0.68rem',
+                  fontSize: '0.75rem',
                   fontWeight: 800,
-                  color: '#f3d29c',
-                  background: 'rgba(212, 163, 89, 0.16)',
+                  color: 'var(--primary)',
+                  background: 'var(--primary-light)',
                   padding: '2px 7px',
                   borderRadius: '999px',
-                  border: '1px dashed rgba(212, 163, 89, 0.45)'
+                  border: '1px dashed var(--primary-border)'
                 }}
               >
                 Editar @perfil
@@ -128,8 +128,8 @@ export const Header: React.FC = () => {
           {/* Tenant Name (if restaurant staff/owner) */}
           {currentUser?.tenantId && currentTenant && (
             <div className="gf-glass-pill header-tenant-pill" style={{ gap: '6px' }}>
-              <span style={{ fontSize: '0.85rem' }}>{currentTenant.logoEmoji || '🍽️'}</span>
-              <span className="header-tenant-name" style={{ fontSize: '0.78rem', fontWeight: 700, color: 'white' }}>
+              <span style={{ fontSize: '0.875rem' }}>{currentTenant.logoEmoji || '🍽️'}</span>
+              <span className="header-tenant-name" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)' }}>
                 {currentTenant.name}
               </span>
             </div>

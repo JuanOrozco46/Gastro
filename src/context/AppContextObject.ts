@@ -55,6 +55,9 @@ export interface AppContextType {
       phone?: string;
       defaultAddress?: string;
       defaultDeliveryNotes?: string;
+      preferredCityId?: string;
+      preferredZoneId?: string | null;
+      savedAddresses?: import('../types').SavedDeliveryAddress[];
       avatarUrl?: string;
     },
     avatarFile?: File | null

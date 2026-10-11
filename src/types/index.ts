@@ -42,6 +42,26 @@ export type UserRole = 'login' | 'client_delivery' | 'kitchen' | 'admin' | 'tabl
 
 export type BusinessUserRole = 'customer' | 'restaurant_owner' | 'restaurant_staff' | 'platform_admin';
 
+export interface SavedDeliveryAddress {
+  id: string;
+  /** Etiqueta de la ubicación (ej. "Casa", "Oficina", "Apartamento", "Pareja") */
+  label: string;
+  /** Dirección exacta (ej. "Calle 2 Norte # 18 - 144") */
+  address: string;
+  /** ID de la ciudad asociada a esta dirección */
+  cityId: string;
+  /** ID de la zona asociada (opcional) */
+  zoneId?: string | null;
+  /** Notas de entrega para el repartidor (ej. "Apto 302, timbrar en portería") */
+  notes?: string;
+  /** Indica si es la dirección activa por defecto del usuario */
+  isDefault?: boolean;
+  /** Alias de isDefault para indicar si es la ubicación principal activa */
+  isPrimary?: boolean;
+  /** Timestamp de creación */
+  createdAt?: number;
+}
+
 export interface UserAccount {
   id?: string;
   email: string;
@@ -56,6 +76,12 @@ export interface UserAccount {
   defaultAddress?: string;
   /** Notas de entrega habituales (ej. Apto, portería) */
   defaultDeliveryNotes?: string;
+  /** Ciudad principal de entregas del usuario */
+  preferredCityId?: string;
+  /** Zona principal de entregas del usuario */
+  preferredZoneId?: string | null;
+  /** Banco de ubicaciones frecuentes guardadas por el usuario */
+  savedAddresses?: SavedDeliveryAddress[];
   role: UserRole;
   businessRole?: BusinessUserRole;
   tenantId?: string;
@@ -67,6 +93,10 @@ export interface UserRegistrationOptions {
   phone?: string;
   defaultAddress?: string;
   defaultDeliveryNotes?: string;
+  preferredCityId?: string;
+  preferredZoneId?: string | null;
+  addressLabel?: string;
+  savedAddresses?: SavedDeliveryAddress[];
   avatarFile?: File | null;
   avatarDataUrl?: string;
 }

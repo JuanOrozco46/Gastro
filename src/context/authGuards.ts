@@ -1,4 +1,5 @@
 import type { UserRole, BusinessUserRole, UserAccount, ProvisionedOwnerAccount } from '../types';
+import { loadUserAddressBank, sanitizeSavedAddresses } from '../utils/addressBank';
 
 // Internal typed authorization helpers
 export const isRestaurantOwner = (user: UserAccount | null): boolean => {
@@ -100,15 +101,29 @@ export const validateCachedSession = (): UserAccount | null => {
       return null;
     }
 
+    const userId = typeof obj.id === 'string' ? obj.id : undefined;
+    const email = obj.email.trim().toLowerCase();
+    const preferredCityId = typeof obj.preferredCityId === 'string' && obj.preferredCityId.trim()
+      ? obj.preferredCityId.trim().toLowerCase()
+      : undefined;
+    const preferredZoneId = typeof obj.preferredZoneId === 'string' && obj.preferredZoneId.trim()
+      ? obj.preferredZoneId.trim().toLowerCase()
+      : null;
+    const localBank = loadUserAddressBank([userId, email]);
+    const savedAddresses = sanitizeSavedAddresses(obj.savedAddresses || localBank, preferredCityId || 'armenia');
+
     return {
-      id: typeof obj.id === 'string' ? obj.id : undefined,
+      id: userId,
       name: obj.name.trim(),
-      email: obj.email.trim().toLowerCase(),
+      email,
       username: typeof obj.username === 'string' && obj.username.trim() ? obj.username.trim() : undefined,
       avatarUrl: typeof obj.avatarUrl === 'string' && obj.avatarUrl.trim() ? obj.avatarUrl.trim() : undefined,
       phone: typeof obj.phone === 'string' && obj.phone.trim() ? obj.phone.trim() : undefined,
       defaultAddress: typeof obj.defaultAddress === 'string' && obj.defaultAddress.trim() ? obj.defaultAddress.trim() : undefined,
       defaultDeliveryNotes: typeof obj.defaultDeliveryNotes === 'string' && obj.defaultDeliveryNotes.trim() ? obj.defaultDeliveryNotes.trim() : undefined,
+      preferredCityId: preferredCityId || savedAddresses.find((a) => a.isPrimary)?.cityId,
+      preferredZoneId,
+      savedAddresses,
       role: obj.role as UserRole,
       businessRole: obj.businessRole as BusinessUserRole | undefined,
       tenantId: obj.tenantId as string | undefined
@@ -118,4 +133,5 @@ export const validateCachedSession = (): UserAccount | null => {
     return null;
   }
 };
+
 

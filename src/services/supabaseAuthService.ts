@@ -1,7 +1,8 @@
 export { isSupabaseConfigured } from '../lib/supabase';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { UserAccount, UserRegistrationOptions } from '../types';
+import type { SavedDeliveryAddress, UserAccount, UserRegistrationOptions } from '../types';
 import { normalizeUsername } from '../utils/formValidation';
+import { loadUserAddressBank, sanitizeSavedAddresses, saveUserAddressBank } from '../utils/addressBank';
 
 export type SupabaseAuthMode = 'remote' | 'demo';
 export type AuthUser = UserAccount;
@@ -24,6 +25,9 @@ interface CachedProfileExtras {
   phone?: string;
   defaultAddress?: string;
   defaultDeliveryNotes?: string;
+  preferredCityId?: string;
+  preferredZoneId?: string | null;
+  savedAddresses?: SavedDeliveryAddress[];
   role?: UserAccount['role'];
   businessRole?: UserAccount['businessRole'];
   tenantId?: string;
@@ -148,8 +152,26 @@ export function translateAuthError(errMessage: string): string {
  */
 export async function resolveSupabaseUserProfile(userId: string, email: string, needsPasswordSet?: boolean): Promise<UserAccount> {
   const cached = getLocalProfileCache(userId) || getLocalProfileCache(email);
+  const localBank = loadUserAddressBank([userId, email]);
 
   if (!isSupabaseConfigured || !supabase) {
+    const fallbackCityId = cached?.preferredCityId || localBank.find((a) => a.isPrimary)?.cityId || 'armenia';
+    const fallbackAddresses = cached?.savedAddresses?.length
+      ? sanitizeSavedAddresses(cached.savedAddresses, fallbackCityId)
+      : localBank.length > 0
+        ? localBank
+        : cached?.defaultAddress
+          ? [{
+              id: 'addr-default',
+              label: 'Casa' as const,
+              address: cached.defaultAddress,
+              notes: cached.defaultDeliveryNotes,
+              cityId: fallbackCityId,
+              zoneId: cached.preferredZoneId || null,
+              isPrimary: true,
+              createdAt: Date.now()
+            }]
+          : [];
     return {
       id: userId,
       email,
@@ -157,8 +179,11 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
       username: cached?.username,
       avatarUrl: cached?.avatarUrl,
       phone: cached?.phone,
-      defaultAddress: cached?.defaultAddress,
-      defaultDeliveryNotes: cached?.defaultDeliveryNotes,
+      defaultAddress: cached?.defaultAddress || fallbackAddresses[0]?.address,
+      defaultDeliveryNotes: cached?.defaultDeliveryNotes || fallbackAddresses[0]?.notes,
+      preferredCityId: fallbackCityId,
+      preferredZoneId: cached?.preferredZoneId || fallbackAddresses[0]?.zoneId || null,
+      savedAddresses: fallbackAddresses,
       role: 'client_delivery',
       businessRole: 'customer',
       needsPasswordSet
@@ -188,7 +213,7 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
       // Continuar con las consultas directas si el RPC no está disponible
     }
 
-    // 1. Obtener perfil general (con columnas extendidas de las migraciones 015 y 042)
+    // 1. Obtener perfil general (con columnas extendidas de las migraciones 015, 042 y 057)
     let profile: {
       full_name?: string;
       platform_role?: string;
@@ -199,27 +224,39 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
       phone?: string | null;
       default_address?: string | null;
       default_delivery_notes?: string | null;
+      preferred_city_id?: string | null;
+      saved_addresses?: unknown;
     } | null = null;
 
-    const { data: extProfile, error: extErr } = await supabase
+    const { data: fullProfile, error: fullErr } = await supabase
       .from('profiles')
-      .select('full_name, platform_role, business_role, tenant_id, username, avatar_url, phone, default_address, default_delivery_notes')
+      .select('full_name, platform_role, business_role, tenant_id, username, avatar_url, phone, default_address, default_delivery_notes, preferred_city_id, saved_addresses')
       .eq('id', userId)
       .maybeSingle();
 
-    if (!extErr) {
-      profile = extProfile;
+    if (!fullErr) {
+      profile = fullProfile;
     } else {
-      const { data: basicProfile, error: basicErr } = await supabase
+      const { data: extProfile, error: extErr } = await supabase
         .from('profiles')
-        .select('full_name, platform_role, business_role, tenant_id')
+        .select('full_name, platform_role, business_role, tenant_id, username, avatar_url, phone, default_address, default_delivery_notes')
         .eq('id', userId)
         .maybeSingle();
 
-      if (basicErr && !rpcMemberInfo) {
-        throw new Error(`Error de red o base de datos al consultar el perfil: ${basicErr.message}`);
+      if (!extErr) {
+        profile = extProfile;
+      } else {
+        const { data: basicProfile, error: basicErr } = await supabase
+          .from('profiles')
+          .select('full_name, platform_role, business_role, tenant_id')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (basicErr && !rpcMemberInfo) {
+          throw new Error(`Error de red o base de datos al consultar el perfil: ${basicErr.message}`);
+        }
+        profile = basicProfile;
       }
-      profile = basicProfile;
     }
 
     const rawProfileName = profile?.full_name && !profile.full_name.includes('@') ? profile.full_name : undefined;
@@ -237,13 +274,56 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
     const defaultAddress = profile?.default_address || (typeof meta.default_address === 'string' ? meta.default_address : undefined) || cached?.defaultAddress;
     const defaultDeliveryNotes = profile?.default_delivery_notes || (typeof meta.default_delivery_notes === 'string' ? meta.default_delivery_notes : undefined) || cached?.defaultDeliveryNotes;
 
+    const rawPreferredCityId =
+      profile?.preferred_city_id ||
+      (typeof meta.preferred_city_id === 'string' ? meta.preferred_city_id : undefined) ||
+      cached?.preferredCityId ||
+      localBank.find((a) => a.isPrimary)?.cityId;
+    const rawPreferredZoneId =
+      (typeof meta.preferred_zone_id === 'string' ? meta.preferred_zone_id : undefined) ||
+      cached?.preferredZoneId ||
+      localBank.find((a) => a.isPrimary)?.zoneId ||
+      null;
+
+    const rawSavedAddresses = sanitizeSavedAddresses(
+      profile?.saved_addresses || meta.saved_addresses || cached?.savedAddresses || localBank,
+      rawPreferredCityId || 'armenia'
+    );
+
+    const savedAddresses: SavedDeliveryAddress[] =
+      rawSavedAddresses.length > 0
+        ? rawSavedAddresses
+        : defaultAddress
+          ? [{
+              id: 'addr-default',
+              label: 'Casa',
+              address: defaultAddress,
+              notes: defaultDeliveryNotes || undefined,
+              cityId: rawPreferredCityId || 'armenia',
+              zoneId: rawPreferredZoneId || null,
+              isPrimary: true,
+              createdAt: Date.now()
+            }]
+          : [];
+
+    const primaryAddr = savedAddresses.find((a) => a.isPrimary) || savedAddresses[0];
+    const preferredCityId = rawPreferredCityId || primaryAddr?.cityId || undefined;
+    const preferredZoneId = rawPreferredZoneId || primaryAddr?.zoneId || null;
+
+    if (savedAddresses.length > 0) {
+      saveUserAddressBank([userId, email], savedAddresses);
+    }
+
     const commonExtras = {
       name: fullName,
       username: username || undefined,
       avatarUrl: avatarUrl || undefined,
       phone: phone || undefined,
-      defaultAddress: defaultAddress || undefined,
-      defaultDeliveryNotes: defaultDeliveryNotes || undefined
+      defaultAddress: defaultAddress || primaryAddr?.address || undefined,
+      defaultDeliveryNotes: defaultDeliveryNotes || primaryAddr?.notes || undefined,
+      preferredCityId: preferredCityId || undefined,
+      preferredZoneId: preferredZoneId || null,
+      savedAddresses
     };
 
     const persistAndReturn = (resolved: UserAccount): UserAccount => {
@@ -370,6 +450,9 @@ export async function resolveSupabaseUserProfile(userId: string, email: string, 
         phone: cached.phone,
         defaultAddress: cached.defaultAddress,
         defaultDeliveryNotes: cached.defaultDeliveryNotes,
+        preferredCityId: cached.preferredCityId,
+        preferredZoneId: cached.preferredZoneId,
+        savedAddresses: cached.savedAddresses || localBank,
         role: cached.role,
         businessRole: cached.businessRole || 'customer',
         tenantId: cached.tenantId,
@@ -433,6 +516,22 @@ export async function signUpWithSupabase(
     const cleanPhone = options?.phone?.trim() || undefined;
     const cleanAddress = options?.defaultAddress?.trim() || undefined;
     const cleanNotes = options?.defaultDeliveryNotes?.trim() || undefined;
+    const cleanCityId = options?.preferredCityId?.trim().toLowerCase() || 'armenia';
+    const cleanZoneId = options?.preferredZoneId?.trim().toLowerCase() || null;
+    const initialSavedAddresses = options?.savedAddresses?.length
+      ? sanitizeSavedAddresses(options.savedAddresses, cleanCityId)
+      : cleanAddress
+        ? [{
+            id: `addr-reg-${Date.now()}`,
+            label: 'Casa' as const,
+            address: cleanAddress,
+            notes: cleanNotes,
+            cityId: cleanCityId,
+            zoneId: cleanZoneId,
+            isPrimary: true,
+            createdAt: Date.now()
+          }]
+        : [];
     let finalAvatarUrl = options?.avatarDataUrl || undefined;
 
     // Verificar disponibilidad del @username si se especificó
@@ -461,7 +560,10 @@ export async function signUpWithSupabase(
           avatar_url: finalAvatarUrl || null,
           phone: cleanPhone || null,
           default_address: cleanAddress || null,
-          default_delivery_notes: cleanNotes || null
+          default_delivery_notes: cleanNotes || null,
+          preferred_city_id: cleanCityId,
+          preferred_zone_id: cleanZoneId,
+          saved_addresses: initialSavedAddresses
         }
       }
     });
@@ -487,6 +589,8 @@ export async function signUpWithSupabase(
       phone: cleanPhone || null,
       default_address: cleanAddress || null,
       default_delivery_notes: cleanNotes || null,
+      preferred_city_id: cleanCityId,
+      saved_addresses: initialSavedAddresses,
       platform_role: 'customer'
     });
 
@@ -495,14 +599,30 @@ export async function signUpWithSupabase(
       if (upsertErr.message.toLowerCase().includes('idx_profiles_username_lower_unique') || upsertErr.message.toLowerCase().includes('profiles_username')) {
         return { success: false, error: translateAuthError(upsertErr.message) };
       }
-      const { error: fallbackErr } = await supabase.from('profiles').upsert({
+      const { error: fallbackExtErr } = await supabase.from('profiles').upsert({
         id: data.user.id,
         full_name: cleanName,
+        username: cleanUsername || null,
+        avatar_url: finalAvatarUrl || null,
+        phone: cleanPhone || null,
+        default_address: cleanAddress || null,
+        default_delivery_notes: cleanNotes || null,
         platform_role: 'customer'
       });
-      if (fallbackErr) {
-        console.warn('⚠️ Error también en upsert base de profiles:', fallbackErr.message);
+      if (fallbackExtErr) {
+        const { error: fallbackErr } = await supabase.from('profiles').upsert({
+          id: data.user.id,
+          full_name: cleanName,
+          platform_role: 'customer'
+        });
+        if (fallbackErr) {
+          console.warn('⚠️ Error también en upsert base de profiles:', fallbackErr.message);
+        }
       }
+    }
+
+    if (initialSavedAddresses.length > 0) {
+      saveUserAddressBank([data.user.id, normalizedEmail], initialSavedAddresses);
     }
 
     saveLocalProfileCache([data.user.id, normalizedEmail], {
@@ -511,7 +631,10 @@ export async function signUpWithSupabase(
       avatarUrl: finalAvatarUrl,
       phone: cleanPhone,
       defaultAddress: cleanAddress,
-      defaultDeliveryNotes: cleanNotes
+      defaultDeliveryNotes: cleanNotes,
+      preferredCityId: cleanCityId,
+      preferredZoneId: cleanZoneId,
+      savedAddresses: initialSavedAddresses
     });
 
     const userAccount: UserAccount = data.session
@@ -525,6 +648,9 @@ export async function signUpWithSupabase(
           phone: cleanPhone,
           defaultAddress: cleanAddress,
           defaultDeliveryNotes: cleanNotes,
+          preferredCityId: cleanCityId,
+          preferredZoneId: cleanZoneId,
+          savedAddresses: initialSavedAddresses,
           role: 'client_delivery',
           businessRole: 'customer'
         };
@@ -542,7 +668,7 @@ export async function signUpWithSupabase(
 }
 
 /**
- * Actualiza los datos de perfil del usuario (@username, avatar, teléfono, dirección habitual).
+ * Actualiza los datos de perfil del usuario (@username, avatar, teléfono, dirección habitual, banco de ubicaciones y ciudad principal).
  */
 export async function updateSupabaseUserProfile(
   userId: string,
@@ -553,12 +679,22 @@ export async function updateSupabaseUserProfile(
     phone?: string;
     defaultAddress?: string;
     defaultDeliveryNotes?: string;
+    preferredCityId?: string;
+    preferredZoneId?: string | null;
+    savedAddresses?: SavedDeliveryAddress[];
     avatarUrl?: string;
   },
   avatarFile?: File | null
 ): Promise<{ success: boolean; avatarUrl?: string; error?: string }> {
   const cleanUsername = updates.username !== undefined ? normalizeUsername(updates.username) : undefined;
+  const sanitizedAddresses = updates.savedAddresses !== undefined
+    ? sanitizeSavedAddresses(updates.savedAddresses, updates.preferredCityId || 'armenia')
+    : undefined;
   let finalAvatarUrl = updates.avatarUrl;
+
+  if (sanitizedAddresses !== undefined) {
+    saveUserAddressBank([userId, email], sanitizedAddresses);
+  }
 
   if (isSupabaseConfigured && supabase && userId) {
     try {
@@ -585,21 +721,38 @@ export async function updateSupabaseUserProfile(
         }
       }
 
-      const dbPayload: Record<string, unknown> = {
+      const baseDbPayload: Record<string, unknown> = {
         updated_at: new Date().toISOString()
       };
-      if (updates.name !== undefined) dbPayload.full_name = updates.name.trim();
-      if (cleanUsername !== undefined) dbPayload.username = cleanUsername || null;
-      if (finalAvatarUrl !== undefined) dbPayload.avatar_url = finalAvatarUrl || null;
-      if (updates.phone !== undefined) dbPayload.phone = updates.phone.trim() || null;
-      if (updates.defaultAddress !== undefined) dbPayload.default_address = updates.defaultAddress.trim() || null;
-      if (updates.defaultDeliveryNotes !== undefined) dbPayload.default_delivery_notes = updates.defaultDeliveryNotes.trim() || null;
+      if (updates.name !== undefined) baseDbPayload.full_name = updates.name.trim();
+      if (cleanUsername !== undefined) baseDbPayload.username = cleanUsername || null;
+      if (finalAvatarUrl !== undefined) baseDbPayload.avatar_url = finalAvatarUrl || null;
+      if (updates.phone !== undefined) baseDbPayload.phone = updates.phone.trim() || null;
+      if (updates.defaultAddress !== undefined) baseDbPayload.default_address = updates.defaultAddress.trim() || null;
+      if (updates.defaultDeliveryNotes !== undefined) baseDbPayload.default_delivery_notes = updates.defaultDeliveryNotes.trim() || null;
 
-      const { data: updatedRows, error } = await supabase
+      const extendedDbPayload: Record<string, unknown> = {
+        ...baseDbPayload,
+        ...(updates.preferredCityId !== undefined ? { preferred_city_id: updates.preferredCityId.trim().toLowerCase() } : {}),
+        ...(sanitizedAddresses !== undefined ? { saved_addresses: sanitizedAddresses } : {})
+      };
+
+      let { data: updatedRows, error } = await supabase
         .from('profiles')
-        .update(dbPayload)
+        .update(extendedDbPayload)
         .eq('id', userId)
         .select('id');
+
+      // Fallback si las columnas preferred_city_id / saved_addresses de la migración 057 aún no existen
+      if (error && (error.message.includes('preferred_city_id') || error.message.includes('saved_addresses'))) {
+        const fallbackUpdate = await supabase
+          .from('profiles')
+          .update(baseDbPayload)
+          .eq('id', userId)
+          .select('id');
+        updatedRows = fallbackUpdate.data;
+        error = fallbackUpdate.error;
+      }
 
       if (error) {
         return { success: false, error: translateAuthError(error.message) };
@@ -612,7 +765,7 @@ export async function updateSupabaseUserProfile(
             id: userId,
             full_name: updates.name?.trim() || email.split('@')[0],
             platform_role: 'customer',
-            ...dbPayload
+            ...baseDbPayload
           });
         if (upsertErr) {
           return { success: false, error: translateAuthError(upsertErr.message) };
@@ -638,7 +791,10 @@ export async function updateSupabaseUserProfile(
           ...(finalAvatarUrl !== undefined ? { avatar_url: finalAvatarUrl || null } : {}),
           ...(updates.phone !== undefined ? { phone: updates.phone.trim() || null } : {}),
           ...(updates.defaultAddress !== undefined ? { default_address: updates.defaultAddress.trim() || null } : {}),
-          ...(updates.defaultDeliveryNotes !== undefined ? { default_delivery_notes: updates.defaultDeliveryNotes.trim() || null } : {})
+          ...(updates.defaultDeliveryNotes !== undefined ? { default_delivery_notes: updates.defaultDeliveryNotes.trim() || null } : {}),
+          ...(updates.preferredCityId !== undefined ? { preferred_city_id: updates.preferredCityId.trim().toLowerCase() } : {}),
+          ...(updates.preferredZoneId !== undefined ? { preferred_zone_id: updates.preferredZoneId } : {}),
+          ...(sanitizedAddresses !== undefined ? { saved_addresses: sanitizedAddresses } : {})
         }
       });
     } catch (err: unknown) {
@@ -653,7 +809,10 @@ export async function updateSupabaseUserProfile(
     ...(finalAvatarUrl !== undefined ? { avatarUrl: finalAvatarUrl } : {}),
     ...(updates.phone !== undefined ? { phone: updates.phone.trim() } : {}),
     ...(updates.defaultAddress !== undefined ? { defaultAddress: updates.defaultAddress.trim() } : {}),
-    ...(updates.defaultDeliveryNotes !== undefined ? { defaultDeliveryNotes: updates.defaultDeliveryNotes.trim() } : {})
+    ...(updates.defaultDeliveryNotes !== undefined ? { defaultDeliveryNotes: updates.defaultDeliveryNotes.trim() } : {}),
+    ...(updates.preferredCityId !== undefined ? { preferredCityId: updates.preferredCityId.trim().toLowerCase() } : {}),
+    ...(updates.preferredZoneId !== undefined ? { preferredZoneId: updates.preferredZoneId } : {}),
+    ...(sanitizedAddresses !== undefined ? { savedAddresses: sanitizedAddresses } : {})
   });
 
   return { success: true, avatarUrl: finalAvatarUrl };
@@ -752,11 +911,71 @@ export async function signOutFromSupabase(): Promise<void> {
 export async function getCurrentSupabaseSession() {
   if (!isSupabaseConfigured || !supabase) return { data: { session: null } };
   try {
-    return await supabase.auth.getSession();
+    const response = await supabase.auth.getSession();
+    const session = response.data.session;
+    if (session?.expires_at) {
+      const expiresInMs = session.expires_at * 1000 - Date.now();
+      // Si el token expira en menos de 15 minutos, renovarlo proactivamente para extender la sesión al máximo
+      if (expiresInMs < 15 * 60 * 1000) {
+        const refreshed = await supabase.auth.refreshSession();
+        if (!refreshed.error && refreshed.data.session) {
+          return { data: { session: refreshed.data.session } };
+        }
+      }
+    }
+    return response;
   } catch (err: unknown) {
     console.warn('⚠️ Error al obtener sesión actual:', err);
     return { data: { session: null } };
   }
+}
+
+/**
+ * Mantiene el token de sesión de Supabase activo el mayor tiempo posible (especialmente en móviles
+ * cuando el navegador pasa a segundo plano y vuelve al primer plano).
+ */
+export function keepSupabaseSessionAlive(): () => void {
+  const client = supabase;
+  if (!isSupabaseConfigured || !client || typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const refreshIfNeeded = async () => {
+    try {
+      const { data } = await client.auth.getSession();
+      const session = data.session;
+      if (!session) return;
+      const expiresInMs = (session.expires_at ? session.expires_at * 1000 : 0) - Date.now();
+      if (expiresInMs < 20 * 60 * 1000) {
+        await client.auth.refreshSession();
+      }
+    } catch {
+      // Silenciar fallos de red temporales; el próximo ciclo o reconexión lo reintentará
+    }
+  };
+
+  const handleVisibilityChange = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      void refreshIfNeeded();
+    }
+  };
+
+  const handleFocus = () => {
+    void refreshIfNeeded();
+  };
+
+  const intervalId = window.setInterval(() => {
+    void refreshIfNeeded();
+  }, 10 * 60 * 1000); // Revisar cada 10 minutos
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('focus', handleFocus);
+
+  return () => {
+    window.clearInterval(intervalId);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('focus', handleFocus);
+  };
 }
 
 export function subscribeToSupabaseAuthChanges(callback: (event: string, session: import('@supabase/supabase-js').Session | null) => void) {
@@ -765,3 +984,4 @@ export function subscribeToSupabaseAuthChanges(callback: (event: string, session
   }
   return supabase.auth.onAuthStateChange(callback);
 }
+

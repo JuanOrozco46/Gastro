@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import type { Product, Order, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, UserAccount, UserRegistrationOptions, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount } from '../types';
+import type { Product, Order, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, StoryItem, UserAccount, UserRegistrationOptions, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount, City, SavedDeliveryAddress } from '../types';
 import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { normalizeUsername } from '../utils/formValidation';
+import { sanitizeSavedAddresses, saveUserAddressBank } from '../utils/addressBank';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant, fetchRestaurantMembers as fetchRemoteMembers, inviteRestaurantStaff as inviteRemoteStaff, resendStaffInvitation as resendRemoteInvitation, suspendRestaurantMember as suspendRemoteMember, reactivateRestaurantMember as reactivateRemoteMember, revokeRestaurantMember as revokeRemoteMember, acceptRestaurantInvitation as acceptRemoteInvitation, deleteMyUserAccountRemote, deactivateAndPurgeRestaurantRemote } from '../services/supabaseDataService';
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
-import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession, resendVerificationEmailAuth, updateSupabaseUserProfile, saveLocalProfileCache } from '../services/supabaseAuthService';
+import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession, keepSupabaseSessionAlive, resendVerificationEmailAuth, updateSupabaseUserProfile, saveLocalProfileCache } from '../services/supabaseAuthService';
 import { DEMO_LOGIN_ENABLED } from './demoGate';
 import { DEFAULT_CITIES, DEFAULT_ZONES, EMPTY_TENANT, DEFAULT_TENANTS, DEFAULT_PRODUCTS, DEFAULT_POSTS, DEFAULT_STORIES, DEFAULT_ORDERS, DEFAULT_TRANSACTIONS, DEFAULT_DRIVERS } from './defaultData';
 import { useLocationSlice } from './useLocationSlice';
@@ -15,6 +16,22 @@ import { useToastSlice } from './useToastSlice';
 import { useCartSlice } from './useCartSlice';
 import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment, confirmCashPayment as confirmCashPaymentRemote } from '../services/supabaseOrderService';
 import { isRestaurantOwner, isRestaurantStaff, isPlatformAdmin, hasOwnershipOfTenant, validateAndGetProvisionedAccounts, validateCachedSession } from './authGuards';
+
+function resolveMatchingCityId(rawCityRef: string | undefined, availableCities: City[]): string | null {
+  if (!rawCityRef || !rawCityRef.trim()) return null;
+  const norm = rawCityRef.trim().toLowerCase();
+  const match = availableCities.find((c) => {
+    const slug = (c.slug || '').toLowerCase();
+    return (
+      c.isActive &&
+      (c.id.toLowerCase() === norm ||
+        slug === norm ||
+        slug.startsWith(`${norm}-`) ||
+        c.name.toLowerCase() === norm)
+    );
+  });
+  return match ? match.id : null;
+}
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const location = useLocationSlice();
@@ -188,6 +205,12 @@ const location = useLocationSlice();
     }
   });
 
+  // Mantener viva la sesión JWT de Supabase el mayor tiempo posible (especialmente en móvil)
+  useEffect(() => {
+    if (authMode !== 'remote') return;
+    return keepSupabaseSessionAlive();
+  }, [authMode]);
+
   // Carga inicial de datos desde Supabase
   useEffect(() => {
     if (authMode === 'remote') {
@@ -249,8 +272,20 @@ const location = useLocationSlice();
 
           const activeRemoteTenants = liveTenants.filter(t => t.status === 'active');
 
-          // Validate selected city ID exists; only fall back to a city with tenants if the user hasn't explicitly chosen one
+          // Priorizar la ciudad asignada al usuario o su dirección principal
+          const preferredUserCityRef =
+            userAccount?.preferredCityId ||
+            userAccount?.savedAddresses?.find((a) => a.isPrimary)?.cityId ||
+            initialSession?.preferredCityId ||
+            initialSession?.savedAddresses?.find((a) => a.isPrimary)?.cityId;
+          const resolvedUserCityId = resolveMatchingCityId(preferredUserCityRef, activeCities);
+
           setSelectedCityIdState(prev => {
+            if (resolvedUserCityId) {
+              try { localStorage.setItem('gs_selected_city_v1', resolvedUserCityId); } catch { /* ignore */ }
+              return resolvedUserCityId;
+            }
+
             let hasSavedCity = false;
             try {
               hasSavedCity = Boolean(localStorage.getItem('gs_selected_city_v1'));
@@ -295,8 +330,9 @@ const location = useLocationSlice();
             }
             setCurrentUser(userAccount);
             setUserRole(userAccount.role);
-          } else if (!sessionResponse.data.session?.user) {
-            await signOutFromSupabase();
+            try {
+              localStorage.setItem('gs_demo_session_v1', JSON.stringify(userAccount));
+            } catch {}
           }
         } catch (err) {
           if (!isSubscribed) return;
@@ -355,6 +391,9 @@ const location = useLocationSlice();
 
           setCurrentUser(userAccount);
           setUserRole(userAccount.role);
+          try {
+            localStorage.setItem('gs_demo_session_v1', JSON.stringify(userAccount));
+          } catch {}
           
           if (window.location.pathname.startsWith('/auth/callback')) {
             window.history.replaceState({}, document.title, '/');
@@ -366,6 +405,7 @@ const location = useLocationSlice();
           setOrders([]);
           setTransactions([]);
           try {
+            localStorage.removeItem('gs_demo_session_v1');
             localStorage.removeItem('gs_orders_v5');
             localStorage.removeItem('gs_transactions_v5');
           } catch {}
@@ -377,7 +417,7 @@ const location = useLocationSlice();
         subscription.unsubscribe();
       };
     }
-  }, [authMode, setCities, setZones, setSelectedCityIdState, setSelectedZoneIdState]);
+  }, [authMode, initialSession, setCities, setZones, setSelectedCityIdState, setSelectedZoneIdState]);
 
   const [drivers, setDrivers] = useState<Driver[]>(DEFAULT_DRIVERS);
   const [equityWeight, setEquityWeight] = useState<number>(0.5);
@@ -575,10 +615,19 @@ const location = useLocationSlice();
       setUserRole(res.user.role);
       setEmailVerificationState('confirmed');
 
+      const userCityId = resolveMatchingCityId(
+        res.user.preferredCityId || res.user.savedAddresses?.find((a) => a.isPrimary)?.cityId,
+        cities
+      );
+      if (userCityId) {
+        setSelectedCity(userCityId);
+      }
+
       if (res.user.tenantId) {
         const tenantMatch = updatedTenants.find(t => t.id === res.user!.tenantId);
         if (tenantMatch) setCurrentTenant(tenantMatch);
       }
+      try { localStorage.setItem('gs_demo_session_v1', JSON.stringify(res.user)); } catch {}
       showToast(`👋 ¡Bienvenid@, ${res.user.name}!`);
       return { success: true };
     }
@@ -603,6 +652,22 @@ const location = useLocationSlice();
     const cleanPhone = options?.phone?.trim() || undefined;
     const cleanAddress = options?.defaultAddress?.trim() || undefined;
     const cleanNotes = options?.defaultDeliveryNotes?.trim() || undefined;
+    const cleanCityId = options?.preferredCityId?.trim() || selectedCityId || cities[0]?.id || 'armenia';
+    const cleanZoneId = options?.preferredZoneId?.trim() || null;
+    const initialSavedAddresses = options?.savedAddresses?.length
+      ? sanitizeSavedAddresses(options.savedAddresses, cleanCityId)
+      : cleanAddress
+        ? [{
+            id: `addr-reg-${Date.now()}`,
+            label: 'Casa' as const,
+            address: cleanAddress,
+            notes: cleanNotes,
+            cityId: cleanCityId,
+            zoneId: cleanZoneId,
+            isPrimary: true,
+            createdAt: Date.now()
+          }]
+        : [];
     const avatarUrl = options?.avatarDataUrl || undefined;
 
     if (authMode === 'demo') {
@@ -616,11 +681,21 @@ const location = useLocationSlice();
         phone: cleanPhone,
         defaultAddress: cleanAddress,
         defaultDeliveryNotes: cleanNotes,
+        preferredCityId: cleanCityId,
+        preferredZoneId: cleanZoneId,
+        savedAddresses: initialSavedAddresses,
         role: 'client_delivery',
         businessRole: 'customer'
       };
       setCurrentUser(userAccount);
       setUserRole('client_delivery');
+      const matchedCityId = resolveMatchingCityId(cleanCityId, cities);
+      if (matchedCityId) {
+        setSelectedCity(matchedCityId);
+      }
+      if (initialSavedAddresses.length > 0) {
+        saveUserAddressBank([userAccount.id || '', normalizedEmail], initialSavedAddresses);
+      }
       try { localStorage.setItem('gs_demo_session_v1', JSON.stringify(userAccount)); } catch {}
       saveLocalProfileCache([userAccount.id || '', normalizedEmail], {
         name: userAccount.name,
@@ -628,14 +703,29 @@ const location = useLocationSlice();
         avatarUrl,
         phone: cleanPhone,
         defaultAddress: cleanAddress,
-        defaultDeliveryNotes: cleanNotes
+        defaultDeliveryNotes: cleanNotes,
+        preferredCityId: cleanCityId,
+        preferredZoneId: cleanZoneId,
+        savedAddresses: initialSavedAddresses
       });
       showToast(`🎉 ¡Cuenta creada exitosamente para @${cleanUsername || userAccount.name}!`);
       return { success: true };
     }
 
-    const res = await signUpWithSupabase(email, pass, name, options);
+    const res = await signUpWithSupabase(email, pass, name, {
+      ...options,
+      preferredCityId: cleanCityId,
+      preferredZoneId: cleanZoneId,
+      savedAddresses: initialSavedAddresses
+    });
     if (res.success && res.user) {
+      const matchedCityId = resolveMatchingCityId(
+        res.user.preferredCityId || cleanCityId,
+        cities
+      );
+      if (matchedCityId) {
+        setSelectedCity(matchedCityId);
+      }
       if (res.emailConfirmed) {
         if (res.user.tenantId) {
           const liveTenants = await fetchLiveTenants();
@@ -650,6 +740,7 @@ const location = useLocationSlice();
         setCurrentUser(res.user);
         setUserRole(res.user.role);
         setEmailVerificationState('confirmed');
+        try { localStorage.setItem('gs_demo_session_v1', JSON.stringify(res.user)); } catch {}
         showToast(`🎉 ¡Cuenta creada exitosamente para ${res.user.username ? `@${res.user.username}` : res.user.name}!`);
       } else {
         setEmailVerificationState('pending');
@@ -688,6 +779,9 @@ const location = useLocationSlice();
       phone?: string;
       defaultAddress?: string;
       defaultDeliveryNotes?: string;
+      preferredCityId?: string;
+      preferredZoneId?: string | null;
+      savedAddresses?: SavedDeliveryAddress[];
       avatarUrl?: string;
     },
     avatarFile?: File | null
@@ -708,21 +802,45 @@ const location = useLocationSlice();
       return { success: false, error: res.error || 'No se pudo actualizar el perfil.' };
     }
 
+    const nextSavedAddresses = updates.savedAddresses !== undefined
+      ? sanitizeSavedAddresses(updates.savedAddresses, updates.preferredCityId || currentUser.preferredCityId || selectedCityId)
+      : currentUser.savedAddresses;
+    const primarySaved = nextSavedAddresses?.find((a) => a.isPrimary) || nextSavedAddresses?.[0];
+    const nextPreferredCityId = updates.preferredCityId !== undefined
+      ? updates.preferredCityId
+      : primarySaved?.cityId || currentUser.preferredCityId;
+    const nextPreferredZoneId = updates.preferredZoneId !== undefined
+      ? updates.preferredZoneId
+      : primarySaved?.zoneId !== undefined
+        ? primarySaved.zoneId
+        : currentUser.preferredZoneId;
+
     const nextUser: UserAccount = {
       ...currentUser,
       name: updates.name !== undefined ? updates.name.trim() : currentUser.name,
       username: cleanUsername || undefined,
       avatarUrl: res.avatarUrl !== undefined ? res.avatarUrl : currentUser.avatarUrl,
       phone: updates.phone !== undefined ? (updates.phone.trim() || undefined) : currentUser.phone,
-      defaultAddress: updates.defaultAddress !== undefined ? (updates.defaultAddress.trim() || undefined) : currentUser.defaultAddress,
-      defaultDeliveryNotes: updates.defaultDeliveryNotes !== undefined ? (updates.defaultDeliveryNotes.trim() || undefined) : currentUser.defaultDeliveryNotes
+      defaultAddress: updates.defaultAddress !== undefined
+        ? (updates.defaultAddress.trim() || undefined)
+        : primarySaved?.address || currentUser.defaultAddress,
+      defaultDeliveryNotes: updates.defaultDeliveryNotes !== undefined
+        ? (updates.defaultDeliveryNotes.trim() || undefined)
+        : primarySaved?.notes || currentUser.defaultDeliveryNotes,
+      preferredCityId: nextPreferredCityId,
+      preferredZoneId: nextPreferredZoneId,
+      savedAddresses: nextSavedAddresses
     };
 
     setCurrentUser(nextUser);
-    try {
-      if (authMode === 'demo') {
-        localStorage.setItem('gs_demo_session_v1', JSON.stringify(nextUser));
+    if (nextPreferredCityId) {
+      const matchedCityId = resolveMatchingCityId(nextPreferredCityId, cities);
+      if (matchedCityId && matchedCityId !== selectedCityId) {
+        setSelectedCity(matchedCityId);
       }
+    }
+    try {
+      localStorage.setItem('gs_demo_session_v1', JSON.stringify(nextUser));
     } catch {}
 
     // Actualizar comentarios propios en memoria para reflejar el nuevo @ y foto al instante
@@ -2257,6 +2375,86 @@ const location = useLocationSlice();
   const activeTenants = authMode === 'remote' ? remoteTenants : tenants;
   const activeProducts = authMode === 'remote' ? remoteProducts : products;
   const activePosts = authMode === 'remote' ? remotePosts : posts;
+
+  const activeStories = React.useMemo<Story[]>(() => {
+    const dynamicStories: Story[] = [];
+    const seenTenantIds = new Set<string>();
+
+    for (const tenant of activeTenants) {
+      if (tenant.status !== 'active') continue;
+      const tenantPosts = activePosts.filter((p) => p.tenantId === tenant.id);
+      const tenantProducts = activeProducts.filter((pr) => pr.tenantId === tenant.id && pr.available);
+
+      const items: StoryItem[] = [];
+      for (const p of tenantPosts.slice(0, 5)) {
+        items.push({
+          id: `story_post_${p.id}`,
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          tenantEmoji: tenant.logoEmoji || '🍽️',
+          image: p.image || tenant.logoUrl || tenant.bannerUrl || '',
+          mediaUrl: p.mediaType === 'video' ? p.mediaUrl : undefined,
+          legacyExternalYoutubeId: p.legacyExternalYoutubeId,
+          dishName: p.dishName || tenant.name,
+          price: p.price || 0,
+          productId: p.productId || '0',
+          timeAgo: p.timeAgo || 'Hoy'
+        });
+      }
+
+      if (items.length === 0) {
+        for (const pr of tenantProducts.slice(0, 3)) {
+          items.push({
+            id: `story_prod_${pr.id}`,
+            tenantId: tenant.id,
+            tenantName: tenant.name,
+            tenantEmoji: tenant.logoEmoji || pr.emoji || '🍽️',
+            image: pr.image || tenant.bannerUrl || tenant.logoUrl || '',
+            dishName: pr.name,
+            price: pr.price,
+            productId: pr.id,
+            timeAgo: 'Disponible hoy'
+          });
+        }
+      }
+
+      if (items.length === 0 && (tenant.bannerUrl || tenant.logoUrl)) {
+        items.push({
+          id: `story_welcome_${tenant.id}`,
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          tenantEmoji: tenant.logoEmoji || '🍽️',
+          image: tenant.bannerUrl || tenant.logoUrl || '',
+          dishName: tenant.name,
+          price: 0,
+          productId: '0',
+          timeAgo: tenant.isOpen ? 'Abierto ahora' : 'Vitrina'
+        });
+      }
+
+      if (items.length > 0) {
+        seenTenantIds.add(tenant.id);
+        dynamicStories.push({
+          id: `story_tenant_${tenant.id}`,
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          emoji: tenant.logoEmoji || '🍽️',
+          title: tenant.category || 'Cocina en vivo',
+          isLive: Boolean(tenant.isOpen),
+          items
+        });
+      }
+    }
+
+    for (const fallbackStory of stories) {
+      if (!seenTenantIds.has(fallbackStory.tenantId)) {
+        dynamicStories.push(fallbackStory);
+      }
+    }
+
+    return dynamicStories;
+  }, [activeTenants, activePosts, activeProducts, stories]);
+
   const scopedOrders = React.useMemo(() => {
     if (!currentUser) return [];
     if (
@@ -2451,7 +2649,7 @@ const location = useLocationSlice();
     orders: scopedOrders,
     transactions,
     posts: activePosts,
-    stories,
+    stories: activeStories,
     cart,
     drivers,
     equityWeight,
@@ -2493,7 +2691,7 @@ const location = useLocationSlice();
     scopedOrders,
     transactions,
     activePosts,
-    stories,
+    activeStories,
     cart,
     drivers,
     equityWeight,
