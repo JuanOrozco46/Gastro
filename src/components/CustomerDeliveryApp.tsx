@@ -624,18 +624,36 @@ export const CustomerDeliveryApp: React.FC = () => {
         </button>
 
         <div className="gf-tab-pills">
-          <button className={`gf-tab-pill ${activeTab === 'feed' ? 'active' : ''}`} onClick={() => setActiveTab('feed')}>
+          <button className={`gf-tab-pill ${activeTab === 'feed' && !isProfileModalOpen ? 'active' : ''}`} onClick={() => setActiveTab('feed')}>
             <Zap size={15} /> Feed
           </button>
-          <button className={`gf-tab-pill ${activeTab === 'directory' ? 'active' : ''}`} onClick={() => setActiveTab('directory')}>
+          <button className={`gf-tab-pill ${activeTab === 'directory' && !isProfileModalOpen ? 'active' : ''}`} onClick={() => setActiveTab('directory')}>
             <MapPin size={15} /> Locales
           </button>
-          <button className={`gf-tab-pill ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
+          <button className={`gf-tab-pill ${activeTab === 'orders' && !isProfileModalOpen ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
             <Package size={15} /> Pedidos
             {activeOrdersCount > 0 && <span className="tab-orders-badge">{activeOrdersCount}</span>}
           </button>
-          <button className={`gf-tab-pill ${activeTab === 'support' ? 'active' : ''}`} onClick={() => setActiveTab('support')}>
+          <button className={`gf-tab-pill ${activeTab === 'support' && !isProfileModalOpen ? 'active' : ''}`} onClick={() => setActiveTab('support')}>
             <MessageCircle size={15} /> Soporte
+          </button>
+          <button
+            type="button"
+            className={`gf-tab-pill gs-desktop-profile-pill ${isProfileModalOpen ? 'active' : ''}`}
+            onClick={() => openProfileModal('identity')}
+            title="Editar mi perfil y Banco de Ubicaciones"
+            aria-label="Abrir mi perfil"
+          >
+            {currentUser?.avatarUrl ? (
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.name}
+                className="gs-top-profile-avatar"
+              />
+            ) : (
+              <User size={15} />
+            )}
+            <span>{currentUser?.username ? `@${currentUser.username}` : 'Mi Perfil'}</span>
           </button>
         </div>
 
@@ -652,27 +670,6 @@ export const CustomerDeliveryApp: React.FC = () => {
               }
             }}
           />
-
-          <button
-            type="button"
-            className={`gs-top-profile-btn ${isProfileModalOpen ? 'active' : ''}`}
-            onClick={() => openProfileModal('identity')}
-            title="Editar mi perfil y Banco de Ubicaciones"
-            aria-label="Abrir mi perfil"
-          >
-            {currentUser?.avatarUrl ? (
-              <img
-                src={currentUser.avatarUrl}
-                alt={currentUser.name}
-                className="gs-top-profile-avatar"
-              />
-            ) : (
-              <User size={15} />
-            )}
-            <span className="gs-top-profile-label">
-              {currentUser?.username ? `@${currentUser.username}` : 'Mi Perfil'}
-            </span>
-          </button>
 
           <button
             type="button"

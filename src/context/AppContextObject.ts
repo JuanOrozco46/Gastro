@@ -73,6 +73,17 @@ export interface AppContextType {
   deleteComment: (postId: string, commentId: string) => void;
   createPost: (postData: Omit<Post, 'id' | 'likes' | 'isLiked' | 'commentsCount' | 'viewCount' | 'ordersFromPost' | 'timeAgo'>) => Promise<boolean> | void;
   deletePost: (postId: string) => Promise<void> | void;
+  createStoryItem: (storyData: {
+    tenantId: string;
+    dishName: string;
+    price: number;
+    productId?: string;
+    image: string;
+    mediaType?: 'photo' | 'video';
+    mediaUrl?: string;
+    caption?: string;
+  }) => Promise<boolean>;
+  deleteStoryItem: (storyItemId: string) => Promise<void>;
   addDriver: (driver: Omit<Driver, 'id' | 'tenantId' | 'status'>) => void;
   deleteProduct: (productId: string) => Promise<void>;
   setEquityWeight: (weight: number) => void;

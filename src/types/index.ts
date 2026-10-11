@@ -354,11 +354,14 @@ export interface StoryItem {
   tenantEmoji: string;
   image: string;
   mediaUrl?: string;
+  mediaType?: 'photo' | 'video';
+  caption?: string;
   legacyExternalYoutubeId?: string;
   dishName: string;
   price: number;
   productId: string;
   timeAgo: string;
+  createdAt?: number;
   seen?: boolean;
 }
 

@@ -83,6 +83,9 @@ export const RestaurantAdmin: React.FC = () => {
     posts,
     createPost,
     deletePost,
+    stories,
+    createStoryItem,
+    deleteStoryItem,
     orders
   } = useApp();
 
@@ -99,6 +102,9 @@ export const RestaurantAdmin: React.FC = () => {
   const [driverVehicle, setDriverVehicle] = useState('🏍️ Moto 125cc / 150cc');
   const [driverPhone, setDriverPhone] = useState('');
 
+  // Content Studio mode ('feed' = Publicar en el Feed | 'story' = Subir Historia 24h)
+  const [contentPublishMode, setContentPublishMode] = useState<'feed' | 'story'>('feed');
+
   // Content creation (Post) form state
   const [postDishName, setPostDishName] = useState('');
   const [postDishEmoji, setPostDishEmoji] = useState('🍕');
@@ -114,6 +120,17 @@ export const RestaurantAdmin: React.FC = () => {
   const [postProductId, setPostProductId] = useState('');
   const [postMediaWidth, setPostMediaWidth] = useState<number | undefined>();
   const [postMediaHeight, setPostMediaHeight] = useState<number | undefined>();
+
+  // Story creation (24h Story) form state
+  const [storyProductId, setStoryProductId] = useState('');
+  const [storyDishName, setStoryDishName] = useState('');
+  const [storyPrice, setStoryPrice] = useState('25000');
+  const [storyCaption, setStoryCaption] = useState('');
+  const [storyMediaType, setStoryMediaType] = useState<'photo' | 'video'>('photo');
+  const [storyMediaUrl, setStoryMediaUrl] = useState('');
+  const [storyFormError, setStoryFormError] = useState<string | null>(null);
+  const [isSubmittingStory, setIsSubmittingStory] = useState(false);
+  const [isDeletingStory, setIsDeletingStory] = useState<string | null>(null);
 
   if (!operatingTenant) {
     return (
@@ -133,6 +150,8 @@ export const RestaurantAdmin: React.FC = () => {
 
   const tenantProducts = products.filter(p => p.tenantId === operatingTenant.id && !p.isArchived);
   const tenantPosts = posts.filter(p => p.tenantId === operatingTenant.id);
+  const tenantStoryGroup = stories.find(s => s.tenantId === operatingTenant.id);
+  const tenantStoryItems = tenantStoryGroup ? tenantStoryGroup.items : [];
   const tenantDrivers = drivers.filter(d => d.tenantId === operatingTenant.id);
   const tenantOrders = orders
     .filter(o => o.tenantId === operatingTenant.id)
@@ -227,6 +246,52 @@ export const RestaurantAdmin: React.FC = () => {
     }
   };
 
+  const handleCreateStorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStoryFormError(null);
+
+    if (!storyMediaUrl) {
+      setStoryFormError(
+        storyMediaType === 'video'
+          ? 'Sube un video vertical para tu historia (máx. 8 MB).'
+          : 'Sube una fotografía vertical o de plato para tu historia.'
+      );
+      return;
+    }
+
+    const parsedPrice = parseFloat(storyPrice || '0');
+    if (storyDishName.trim() && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) {
+      setStoryFormError('Ingresa un precio válido en pesos (COP).');
+      return;
+    }
+
+    const existingProduct = storyProductId
+      ? tenantProducts.find(p => p.id === storyProductId)
+      : storyDishName.trim()
+        ? tenantProducts.find(p => p.name.toLowerCase().includes(storyDishName.trim().toLowerCase()))
+        : undefined;
+
+    setIsSubmittingStory(true);
+    const ok = await createStoryItem({
+      tenantId: operatingTenant.id,
+      dishName: storyDishName.trim() || existingProduct?.name || operatingTenant.name,
+      price: existingProduct ? existingProduct.price : Math.max(0, Math.round(parsedPrice || 0)),
+      productId: existingProduct?.id || '0',
+      image: storyMediaType === 'photo' ? storyMediaUrl : (operatingTenant.bannerUrl || operatingTenant.logoUrl || storyMediaUrl),
+      mediaType: storyMediaType,
+      mediaUrl: storyMediaUrl,
+      caption: storyCaption.trim() || undefined
+    });
+    setIsSubmittingStory(false);
+
+    if (ok) {
+      setStoryMediaUrl('');
+      setStoryCaption('');
+      setStoryDishName('');
+      setStoryProductId('');
+    }
+  };
+
   const applyStoryPreset = (type: string) => {
     if (type === 'artesanal') {
       setPostDesc(
@@ -248,6 +313,7 @@ export const RestaurantAdmin: React.FC = () => {
 
   const postStep1Done = Boolean(postDishName.trim() && Number(postPrice) > 0);
   const postStep2Done = Boolean(postMediaUrl && postDesc.trim());
+  const storyStep1Done = Boolean(storyMediaUrl);
   const driverStepDone = Boolean(driverName.trim() && driverPhone.trim());
 
   return (
@@ -452,11 +518,11 @@ export const RestaurantAdmin: React.FC = () => {
       {/* ── TAB: COMANDAS KDS & PEDIDOS EN TIEMPO REAL ── */}
       {activeTab === 'orders' && <KdsBoard tenant={operatingTenant} showMenuSidebar={false} />}
 
-      {/* ── TAB: PUBLICADOR DE CONTENIDO (FOTOS Y REELS) ── */}
+      {/* ── TAB: PUBLICADOR DE CONTENIDO (FOTOS, REELS E HISTORIAS 24H) ── */}
       {activeTab === 'content' && (
         <div className="grid-2" style={{ gridTemplateColumns: '1.35fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
           <div className="rpa-card">
-            <div className="rpa-card-header">
+            <div className="rpa-card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
               <div className="rpa-card-header-left">
                 <div className="rpa-card-icon">
                   <Sparkles size={22} />
@@ -465,73 +531,248 @@ export const RestaurantAdmin: React.FC = () => {
                   <span className="pam-eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>
                     <Sparkles size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Estudio Creativo del Restaurante
                   </span>
-                  <h3 className="rpa-card-title">Publicar Foto o Reel en el Feed</h3>
+                  <h3 className="rpa-card-title">
+                    {contentPublishMode === 'story'
+                      ? 'Subir Historia 24h al Carrusel Superior'
+                      : 'Publicar Foto o Reel en el Feed'}
+                  </h3>
                   <p className="rpa-card-subtitle">
-                    Tus publicaciones aparecen ante los clientes cercanos a <strong>{operatingTenant.address}</strong>.
+                    {contentPublishMode === 'story'
+                      ? `Destaca promociones del día o platos recién salidos en la barra de Historias de ${operatingTenant.name}.`
+                      : `Tus publicaciones aparecen ante los clientes cercanos a ${operatingTenant.address}.`}
                   </p>
                 </div>
               </div>
+
+              {/* Selector de Modo: Feed vs Historias 24h */}
+              <div
+                className="gs-admin-content-mode-switch"
+                role="tablist"
+                aria-label="Seleccionar tipo de publicación"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={contentPublishMode === 'feed'}
+                  className={`gs-admin-content-mode-btn ${contentPublishMode === 'feed' ? 'active' : ''}`}
+                  onClick={() => setContentPublishMode('feed')}
+                >
+                  <Film size={15} />
+                  <span>Publicación Feed</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={contentPublishMode === 'story'}
+                  className={`gs-admin-content-mode-btn ${contentPublishMode === 'story' ? 'active' : ''}`}
+                  onClick={() => setContentPublishMode('story')}
+                >
+                  <Sparkles size={15} />
+                  <span>Subir Historia (24h)</span>
+                  <span className="gs-admin-story-count-pill">{tenantStoryItems.length}</span>
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleCreatePostSubmit} noValidate>
-              <div className="rpa-card-body">
-                {postFormError && (
-                  <div className="pam-callout error">
-                    <AlertCircle size={18} />
-                    <span>{postFormError}</span>
-                  </div>
-                )}
-
-                {/* Paso 1: Plato, Precio y Formato */}
-                <section className="pam-section">
-                  <div className="pam-section-head">
-                    <div className={`pam-step ${postStep1Done ? 'done' : ''}`}>
-                      {postStep1Done ? <Check size={15} strokeWidth={3} /> : 1}
+            {contentPublishMode === 'feed' ? (
+              <form onSubmit={handleCreatePostSubmit} noValidate>
+                <div className="rpa-card-body">
+                  {postFormError && (
+                    <div className="pam-callout error">
+                      <AlertCircle size={18} />
+                      <span>{postFormError}</span>
                     </div>
-                    <div>
-                      <h4>1. Plato Destacado y Formato Visual</h4>
-                      <p>Vincula un plato de tu menú para que los clientes puedan pedirlo con 1 clic.</p>
-                    </div>
-                  </div>
+                  )}
 
-                  <div className="pam-grid">
+                  {/* Paso 1: Plato, Precio y Formato */}
+                  <section className="pam-section">
+                    <div className="pam-section-head">
+                      <div className={`pam-step ${postStep1Done ? 'done' : ''}`}>
+                        {postStep1Done ? <Check size={15} strokeWidth={3} /> : 1}
+                      </div>
+                      <div>
+                        <h4>1. Plato Destacado y Formato Visual</h4>
+                        <p>Vincula un plato de tu menú para que los clientes puedan pedirlo con 1 clic.</p>
+                      </div>
+                    </div>
+
+                    <div className="pam-grid">
+                      <div className="pam-field">
+                        <label>
+                          Vincular / Nombre del Plato <em>*</em>
+                        </label>
+                        {tenantProducts.length > 0 && (
+                          <div className="pam-input-wrap" style={{ marginBottom: '6px' }}>
+                            <Utensils size={16} className="pam-icon" />
+                            <select
+                              className="pam-input"
+                              value={postProductId}
+                              onChange={e => {
+                                const selected = tenantProducts.find(p => p.id === e.target.value);
+                                setPostProductId(e.target.value);
+                                if (selected) {
+                                  setPostDishName(selected.name);
+                                  setPostPrice(selected.price.toString());
+                                  setPostDishEmoji(selected.emoji);
+                                }
+                              }}
+                            >
+                              <option value="">✨ Escribir plato nuevo o seleccionar del menú...</option>
+                              {tenantProducts.map(p => (
+                                <option key={p.id} value={p.id}>
+                                  {p.emoji} {p.name} - ${p.price.toLocaleString('es-CO')}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        <div className="pam-input-wrap">
+                          <Utensils size={16} className="pam-icon" />
+                          <input
+                            type="text"
+                            className="pam-input"
+                            placeholder="Nombre del plato (ej. Pizza Napolitana Trufada)"
+                            value={postDishName}
+                            onChange={e => setPostDishName(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pam-field">
+                        <label>
+                          Emoji y Precio en Menú <em>*</em>
+                        </label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            type="text"
+                            className="pam-input no-icon"
+                            value={postDishEmoji}
+                            onChange={e => setPostDishEmoji(e.target.value)}
+                            maxLength={2}
+                            style={{ width: '58px', textAlign: 'center', fontSize: '1.1rem' }}
+                          />
+                          <div className="pam-input-wrap" style={{ flex: 1 }}>
+                            <DollarSign size={16} className="pam-icon" />
+                            <input
+                              type="number"
+                              className="pam-input with-suffix"
+                              value={postPrice}
+                              onChange={e => setPostPrice(e.target.value)}
+                              required
+                            />
+                            <span className="pam-suffix">COP</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pam-field pam-span-2">
+                        <label>
+                          Formato de la Publicación <em>*</em>
+                        </label>
+                        <div className="pam-modes" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                          <button
+                            type="button"
+                            className={`pam-mode ${postMediaType === 'video' ? 'active' : ''}`}
+                            onClick={() => setPostMediaType('video')}
+                          >
+                            <div className="pam-mode-icon">
+                              <Film size={20} />
+                            </div>
+                            <div className="pam-mode-check">
+                              {postMediaType === 'video' && <Check size={12} strokeWidth={3} />}
+                            </div>
+                            <strong>Video Corto (Reel)</strong>
+                            <span>Ideal para mostrar preparación y textura</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`pam-mode ${postMediaType === 'photo' ? 'active' : ''}`}
+                            onClick={() => setPostMediaType('photo')}
+                          >
+                            <div className="pam-mode-icon">
+                              <ImageIcon size={20} />
+                            </div>
+                            <div className="pam-mode-check">
+                              {postMediaType === 'photo' && <Check size={12} strokeWidth={3} />}
+                            </div>
+                            <strong>Fotografía de Alta Calidad</strong>
+                            <span>Compresión inteligente en formato WebP</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Paso 2: Archivo Multimedia y Storytelling */}
+                  <section className="pam-section">
+                    <div className="pam-section-head">
+                      <div className={`pam-step ${postStep2Done ? 'done' : ''}`}>
+                        {postStep2Done ? <Check size={15} strokeWidth={3} /> : 2}
+                      </div>
+                      <div>
+                        <h4>2. Archivo Visual, Copywriting y Hashtags</h4>
+                        <p>Sube el contenido y usa las plantillas rápidas para redactar una descripción irresistible.</p>
+                      </div>
+                    </div>
+
+                    <FileUploadInput
+                      label={postMediaType === 'video' ? 'Archivo de Video (Reel)' : 'Fotografía del Plato'}
+                      accept={postMediaType === 'video' ? 'video' : 'image'}
+                      value={postMediaUrl}
+                      onChange={(val, type, w, h) => {
+                        setPostMediaUrl(val);
+                        setPostMediaType(type);
+                        setPostMediaWidth(w);
+                        setPostMediaHeight(h);
+                      }}
+                      folder="posts"
+                      tenantId={operatingTenant.id}
+                      maxSizeMB={8}
+                    />
+
                     <div className="pam-field">
                       <label>
-                        Vincular / Nombre del Plato <em>*</em>
+                        💡 Plantillas Rápidas de Copywriting <span className="pam-opt">1 clic</span>
                       </label>
-                      {tenantProducts.length > 0 && (
-                        <div className="pam-input-wrap" style={{ marginBottom: '6px' }}>
-                          <Utensils size={16} className="pam-icon" />
-                          <select
-                            className="pam-input"
-                            value={postProductId}
-                            onChange={e => {
-                              const selected = tenantProducts.find(p => p.id === e.target.value);
-                              setPostProductId(e.target.value);
-                              if (selected) {
-                                setPostDishName(selected.name);
-                                setPostPrice(selected.price.toString());
-                                setPostDishEmoji(selected.emoji);
-                              }
-                            }}
-                          >
-                            <option value="">✨ Escribir plato nuevo o seleccionar del menú...</option>
-                            {tenantProducts.map(p => (
-                              <option key={p.id} value={p.id}>
-                                {p.emoji} {p.name} - ${p.price.toLocaleString('es-CO')}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                      <div className="pam-chips">
+                        <button
+                          type="button"
+                          className="pam-chip"
+                          onClick={() => applyStoryPreset('artesanal')}
+                        >
+                          🌾 Preparación Artesanal
+                        </button>
+                        <button
+                          type="button"
+                          className="pam-chip"
+                          onClick={() => applyStoryPreset('promocion')}
+                        >
+                          🔥 Especial del Día
+                        </button>
+                        <button
+                          type="button"
+                          className="pam-chip"
+                          onClick={() => applyStoryPreset('secreto')}
+                        >
+                          ❤️ Receta de la Casa
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pam-field">
+                      <label>
+                        Descripción / Storytelling del Plato <em>*</em>
+                      </label>
                       <div className="pam-input-wrap">
-                        <Utensils size={16} className="pam-icon" />
-                        <input
-                          type="text"
+                        <FileText size={16} className="pam-icon top" />
+                        <textarea
+                          rows={3}
                           className="pam-input"
-                          placeholder="Nombre del plato (ej. Pizza Napolitana Trufada)"
-                          value={postDishName}
-                          onChange={e => setPostDishName(e.target.value)}
+                          placeholder="Describe los ingredientes, aroma y por qué deben probarlo hoy..."
+                          value={postDesc}
+                          onChange={e => setPostDesc(e.target.value)}
                           required
                         />
                       </div>
@@ -539,179 +780,240 @@ export const RestaurantAdmin: React.FC = () => {
 
                     <div className="pam-field">
                       <label>
-                        Emoji y Precio en Menú <em>*</em>
+                        Hashtags <span className="pam-opt">Separados por espacio</span>
                       </label>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div className="pam-input-wrap">
+                        <Hash size={16} className="pam-icon" />
                         <input
                           type="text"
-                          className="pam-input no-icon"
-                          value={postDishEmoji}
-                          onChange={e => setPostDishEmoji(e.target.value)}
-                          maxLength={2}
-                          style={{ width: '58px', textAlign: 'center', fontSize: '1.1rem' }}
+                          className="pam-input"
+                          value={postHashtags}
+                          onChange={e => setPostHashtags(e.target.value)}
                         />
-                        <div className="pam-input-wrap" style={{ flex: 1 }}>
-                          <DollarSign size={16} className="pam-icon" />
-                          <input
-                            type="number"
-                            className="pam-input with-suffix"
-                            value={postPrice}
-                            onChange={e => setPostPrice(e.target.value)}
-                            required
-                          />
-                          <span className="pam-suffix">COP</span>
-                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="pam-footer">
+                  <div className="pam-footer-hint">
+                    Se publicará en el feed de <strong>{operatingTenant.name}</strong>
+                  </div>
+                  <div className="pam-footer-actions">
+                    <button
+                      type="submit"
+                      className="pam-btn-primary"
+                      disabled={isSubmittingPost}
+                    >
+                      <Sparkles size={16} />
+                      <span>{isSubmittingPost ? 'Publicando...' : 'Publicar en el Feed'}</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleCreateStorySubmit} noValidate>
+                <div className="rpa-card-body">
+                  {storyFormError && (
+                    <div className="pam-callout error">
+                      <AlertCircle size={18} />
+                      <span>{storyFormError}</span>
+                    </div>
+                  )}
+
+                  {/* Paso 1 de Historia: Archivo Vertical y Formato */}
+                  <section className="pam-section">
+                    <div className="pam-section-head">
+                      <div className={`pam-step ${storyStep1Done ? 'done' : ''}`}>
+                        {storyStep1Done ? <Check size={15} strokeWidth={3} /> : 1}
+                      </div>
+                      <div>
+                        <h4>1. Contenido Visual para tu Historia (Formato 9:16)</h4>
+                        <p>Aparecerá con anillo encendido en la barra superior de Historias de tu ciudad.</p>
                       </div>
                     </div>
 
-                    <div className="pam-field pam-span-2">
+                    <div className="pam-field">
                       <label>
-                        Formato de la Publicación <em>*</em>
+                        Tipo de Historia <em>*</em>
                       </label>
                       <div className="pam-modes" style={{ gridTemplateColumns: '1fr 1fr' }}>
                         <button
                           type="button"
-                          className={`pam-mode ${postMediaType === 'video' ? 'active' : ''}`}
-                          onClick={() => setPostMediaType('video')}
-                        >
-                          <div className="pam-mode-icon">
-                            <Film size={20} />
-                          </div>
-                          <div className="pam-mode-check">
-                            {postMediaType === 'video' && <Check size={12} strokeWidth={3} />}
-                          </div>
-                          <strong>Video Corto (Reel)</strong>
-                          <span>Ideal para mostrar preparación y textura</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`pam-mode ${postMediaType === 'photo' ? 'active' : ''}`}
-                          onClick={() => setPostMediaType('photo')}
+                          className={`pam-mode ${storyMediaType === 'photo' ? 'active' : ''}`}
+                          onClick={() => setStoryMediaType('photo')}
                         >
                           <div className="pam-mode-icon">
                             <ImageIcon size={20} />
                           </div>
                           <div className="pam-mode-check">
-                            {postMediaType === 'photo' && <Check size={12} strokeWidth={3} />}
+                            {storyMediaType === 'photo' && <Check size={12} strokeWidth={3} />}
                           </div>
-                          <strong>Fotografía de Alta Calidad</strong>
-                          <span>Compresión inteligente en formato WebP</span>
+                          <strong>Foto Instantánea (6s)</strong>
+                          <span>Plato del día, ambiente o promoción flash</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`pam-mode ${storyMediaType === 'video' ? 'active' : ''}`}
+                          onClick={() => setStoryMediaType('video')}
+                        >
+                          <div className="pam-mode-icon">
+                            <Film size={20} />
+                          </div>
+                          <div className="pam-mode-check">
+                            {storyMediaType === 'video' && <Check size={12} strokeWidth={3} />}
+                          </div>
+                          <strong>Video en Cocina (Story)</strong>
+                          <span>Sonido real, emplatado o fuego en vivo</span>
                         </button>
                       </div>
                     </div>
-                  </div>
-                </section>
 
-                {/* Paso 2: Archivo Multimedia y Storytelling */}
-                <section className="pam-section">
-                  <div className="pam-section-head">
-                    <div className={`pam-step ${postStep2Done ? 'done' : ''}`}>
-                      {postStep2Done ? <Check size={15} strokeWidth={3} /> : 2}
+                    <FileUploadInput
+                      label={storyMediaType === 'video' ? 'Video Vertical para Historia' : 'Fotografía para Historia'}
+                      accept={storyMediaType === 'video' ? 'video' : 'image'}
+                      value={storyMediaUrl}
+                      onChange={(val, type) => {
+                        setStoryMediaUrl(val);
+                        setStoryMediaType(type);
+                      }}
+                      folder="posts"
+                      tenantId={operatingTenant.id}
+                      maxSizeMB={8}
+                    />
+                  </section>
+
+                  {/* Paso 2 de Historia: Vincular Plato para Compra en 1 Clic + Texto Rápido */}
+                  <section className="pam-section">
+                    <div className="pam-section-head">
+                      <div className="pam-step done">2</div>
+                      <div>
+                        <h4>2. Plato Vinculado para Pedido en 1 Clic y Mensaje</h4>
+                        <p>Los clientes verán el botón «Pedir Ahora» directamente dentro de tu historia.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4>2. Archivo Visual, Copywriting y Hashtags</h4>
-                      <p>Sube el contenido y usa las plantillas rápidas para redactar una descripción irresistible.</p>
+
+                    <div className="pam-grid">
+                      <div className="pam-field">
+                        <label>
+                          Vincular Plato del Menú <span className="pam-opt">Recomendado</span>
+                        </label>
+                        {tenantProducts.length > 0 && (
+                          <div className="pam-input-wrap" style={{ marginBottom: '6px' }}>
+                            <Utensils size={16} className="pam-icon" />
+                            <select
+                              className="pam-input"
+                              value={storyProductId}
+                              onChange={e => {
+                                const selected = tenantProducts.find(p => p.id === e.target.value);
+                                setStoryProductId(e.target.value);
+                                if (selected) {
+                                  setStoryDishName(selected.name);
+                                  setStoryPrice(selected.price.toString());
+                                }
+                              }}
+                            >
+                              <option value="">✨ Seleccionar plato del menú para compra rápida...</option>
+                              {tenantProducts.map(p => (
+                                <option key={p.id} value={p.id}>
+                                  {p.emoji} {p.name} - ${p.price.toLocaleString('es-CO')}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        <div className="pam-input-wrap">
+                          <Utensils size={16} className="pam-icon" />
+                          <input
+                            type="text"
+                            className="pam-input"
+                            placeholder={`Título en la historia (ej. ${operatingTenant.name} Especial)`}
+                            value={storyDishName}
+                            onChange={e => setStoryDishName(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pam-field">
+                        <label>
+                          Precio en Botón de Compra <span className="pam-opt">COP</span>
+                        </label>
+                        <div className="pam-input-wrap">
+                          <DollarSign size={16} className="pam-icon" />
+                          <input
+                            type="number"
+                            className="pam-input with-suffix"
+                            value={storyPrice}
+                            onChange={e => setStoryPrice(e.target.value)}
+                          />
+                          <span className="pam-suffix">COP</span>
+                        </div>
+                      </div>
+
+                      <div className="pam-field pam-span-2">
+                        <label>
+                          Mensaje Corto sobre la Historia <span className="pam-opt">Opcional</span>
+                        </label>
+                        <div className="pam-chips" style={{ marginBottom: '8px' }}>
+                          <button
+                            type="button"
+                            className="pam-chip"
+                            onClick={() => setStoryCaption('🔥 Recién salido de cocina · Pídelo caliente ahora')}
+                          >
+                            🔥 Recién salido
+                          </button>
+                          <button
+                            type="button"
+                            className="pam-chip"
+                            onClick={() => setStoryCaption('⚡ Unidades limitadas por hoy · Domicilio directo')}
+                          >
+                            ⚡ Unidades limitadas
+                          </button>
+                          <button
+                            type="button"
+                            className="pam-chip"
+                            onClick={() => setStoryCaption('✨ Especial del Chef · Sin tarifas ocultas')}
+                          >
+                            ✨ Especial del Chef
+                          </button>
+                        </div>
+                        <div className="pam-input-wrap">
+                          <FileText size={16} className="pam-icon" />
+                          <input
+                            type="text"
+                            className="pam-input"
+                            maxLength={110}
+                            placeholder="Ej. ¡Acabamos de hornear nueva tanda! Pide en 1 clic abajo..."
+                            value={storyCaption}
+                            onChange={e => setStoryCaption(e.target.value)}
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-
-                  <FileUploadInput
-                    label={postMediaType === 'video' ? 'Archivo de Video (Reel)' : 'Fotografía del Plato'}
-                    accept={postMediaType === 'video' ? 'video' : 'image'}
-                    value={postMediaUrl}
-                    onChange={(val, type, w, h) => {
-                      setPostMediaUrl(val);
-                      setPostMediaType(type);
-                      setPostMediaWidth(w);
-                      setPostMediaHeight(h);
-                    }}
-                    folder="posts"
-                    tenantId={operatingTenant.id}
-                    maxSizeMB={8}
-                  />
-
-                  <div className="pam-field">
-                    <label>
-                      💡 Plantillas Rápidas de Copywriting <span className="pam-opt">1 clic</span>
-                    </label>
-                    <div className="pam-chips">
-                      <button
-                        type="button"
-                        className="pam-chip"
-                        onClick={() => applyStoryPreset('artesanal')}
-                      >
-                        🌾 Preparación Artesanal
-                      </button>
-                      <button
-                        type="button"
-                        className="pam-chip"
-                        onClick={() => applyStoryPreset('promocion')}
-                      >
-                        🔥 Especial del Día
-                      </button>
-                      <button
-                        type="button"
-                        className="pam-chip"
-                        onClick={() => applyStoryPreset('secreto')}
-                      >
-                        ❤️ Receta de la Casa
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pam-field">
-                    <label>
-                      Descripción / Storytelling del Plato <em>*</em>
-                    </label>
-                    <div className="pam-input-wrap">
-                      <FileText size={16} className="pam-icon top" />
-                      <textarea
-                        rows={3}
-                        className="pam-input"
-                        placeholder="Describe los ingredientes, aroma y por qué deben probarlo hoy..."
-                        value={postDesc}
-                        onChange={e => setPostDesc(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pam-field">
-                    <label>
-                      Hashtags <span className="pam-opt">Separados por espacio</span>
-                    </label>
-                    <div className="pam-input-wrap">
-                      <Hash size={16} className="pam-icon" />
-                      <input
-                        type="text"
-                        className="pam-input"
-                        value={postHashtags}
-                        onChange={e => setPostHashtags(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </section>
-              </div>
-
-              <div className="pam-footer">
-                <div className="pam-footer-hint">
-                  Se publicará en el feed de <strong>{operatingTenant.name}</strong>
+                  </section>
                 </div>
-                <div className="pam-footer-actions">
-                  <button
-                    type="submit"
-                    className="pam-btn-primary"
-                    disabled={isSubmittingPost}
-                  >
-                    <Sparkles size={16} />
-                    <span>{isSubmittingPost ? 'Publicando...' : 'Publicar en el Feed'}</span>
-                  </button>
+
+                <div className="pam-footer">
+                  <div className="pam-footer-hint">
+                    Visible por <strong>24 horas</strong> en el carrusel de Historias de tu ciudad
+                  </div>
+                  <div className="pam-footer-actions">
+                    <button
+                      type="submit"
+                      className="pam-btn-primary"
+                      disabled={isSubmittingStory}
+                    >
+                      <Sparkles size={16} />
+                      <span>{isSubmittingStory ? 'Subiendo historia...' : 'Subir a Historias (24h)'}</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </form>
+              </form>
+            )}
           </div>
 
-          {/* Columna Derecha: Vista Previa & Publicaciones Activas */}
+          {/* Columna Derecha: Vista Previa, Historias Activas (24h) & Publicaciones del Feed */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="rpa-card">
               <div className="rpa-card-header">
@@ -721,119 +1023,275 @@ export const RestaurantAdmin: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="rpa-card-title" style={{ fontSize: '1.08rem' }}>
-                      Vista Previa en Vivo
+                      {contentPublishMode === 'story' ? 'Vista Previa de Historia (9:16)' : 'Vista Previa en Vivo'}
                     </h3>
-                    <p className="rpa-card-subtitle">Así lucirá tu publicación en el feed</p>
+                    <p className="rpa-card-subtitle">
+                      {contentPublishMode === 'story'
+                        ? 'Así verán los clientes tu historia a pantalla completa'
+                        : 'Así lucirá tu publicación en el feed'}
+                    </p>
                   </div>
                 </div>
-                <span className="rpa-badge success">En Vivo</span>
+                <span className="rpa-badge success">
+                  {contentPublishMode === 'story' ? 'Story 24h' : 'En Vivo'}
+                </span>
               </div>
 
               <div className="rpa-card-body">
-                <div className="pam-section">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ fontSize: '1.5rem' }}>{operatingTenant.logoEmoji || '🍽️'}</div>
-                    <div>
-                      <strong style={{ color: 'var(--text-main)', display: 'block', fontSize: '0.9rem' }}>
-                        {operatingTenant.name}
-                      </strong>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>
-                        {operatingTenant.category} · {operatingTenant.address}
-                      </span>
+                {contentPublishMode === 'story' ? (
+                  <div className="gs-admin-story-preview-frame">
+                    <div className="gs-admin-story-preview-progress">
+                      <span className="gs-admin-story-preview-bar" />
                     </div>
-                  </div>
+                    <div className="gs-admin-story-preview-header">
+                      <span className="gs-admin-story-preview-emoji">
+                        {operatingTenant.logoEmoji || '🍽️'}
+                      </span>
+                      <div>
+                        <strong>{operatingTenant.name}</strong>
+                        <span>Hace un momento · EN VIVO</span>
+                      </div>
+                    </div>
 
-                  <h4 style={{ margin: '4px 0 0', color: 'var(--text-main)', fontSize: '0.96rem', fontWeight: 800 }}>
-                    {postDishEmoji} {postDishName || 'Nombre de tu plato'}
-                  </h4>
-
-                  <div
-                    style={{
-                      height: '185px',
-                      borderRadius: '14px',
-                      overflow: 'hidden',
-                      position: 'relative',
-                      background: '#181411',
-                      border: '1px solid var(--neutral-border)'
-                    }}
-                  >
-                    {postMediaUrl ? (
-                      postMediaType === 'video' ? (
-                        <video
-                          src={postMediaUrl}
-                          muted
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
+                    <div className="gs-admin-story-preview-media">
+                      {storyMediaUrl ? (
+                        storyMediaType === 'video' ? (
+                          <video
+                            src={storyMediaUrl}
+                            muted
+                            autoPlay
+                            loop
+                            playsInline
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <img
+                            src={storyMediaUrl}
+                            alt="Story Preview"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        )
                       ) : (
-                        <img
-                          src={postMediaUrl}
-                          alt="Preview"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      )
-                    ) : (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          height: '100%',
-                          color: 'rgba(255,255,255,0.65)',
-                          fontSize: '0.82rem',
-                          padding: '1rem',
-                          textAlign: 'center'
-                        }}
-                      >
-                        Sube una foto o video a la izquierda para previsualizar
+                        <div className="gs-admin-story-preview-empty">
+                          <Sparkles size={24} />
+                          <span>Sube una foto o video vertical para previsualizar tu Historia 24h</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {storyCaption && (
+                      <div className="gs-admin-story-preview-caption">
+                        {storyCaption}
                       </div>
                     )}
-                    {postMediaType === 'video' && postMediaUrl && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          background: 'rgba(0,0,0,0.25)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
+
+                    <div className="gs-admin-story-preview-cta">
+                      <div>
+                        <span>Plato destacado en esta historia</span>
+                        <strong>{storyDishName || operatingTenant.name}</strong>
+                        <em>${parseFloat(storyPrice || '0').toLocaleString('es-CO')} COP</em>
+                      </div>
+                      <span className="gs-admin-story-preview-btn">Pedir Ahora</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pam-section">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ fontSize: '1.5rem' }}>{operatingTenant.logoEmoji || '🍽️'}</div>
+                      <div>
+                        <strong style={{ color: 'var(--text-main)', display: 'block', fontSize: '0.9rem' }}>
+                          {operatingTenant.name}
+                        </strong>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>
+                          {operatingTenant.category} · {operatingTenant.address}
+                        </span>
+                      </div>
+                    </div>
+
+                    <h4 style={{ margin: '4px 0 0', color: 'var(--text-main)', fontSize: '0.96rem', fontWeight: 800 }}>
+                      {postDishEmoji} {postDishName || 'Nombre de tu plato'}
+                    </h4>
+
+                    <div
+                      style={{
+                        height: '185px',
+                        borderRadius: '14px',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        background: '#181411',
+                        border: '1px solid var(--neutral-border)'
+                      }}
+                    >
+                      {postMediaUrl ? (
+                        postMediaType === 'video' ? (
+                          <video
+                            src={postMediaUrl}
+                            muted
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <img
+                            src={postMediaUrl}
+                            alt="Preview"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        )
+                      ) : (
                         <div
                           style={{
-                            width: '42px',
-                            height: '42px',
-                            borderRadius: '50%',
-                            background: 'var(--primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            height: '100%',
+                            color: 'rgba(255,255,255,0.65)',
+                            fontSize: '0.82rem',
+                            padding: '1rem',
+                            textAlign: 'center'
+                          }}
+                        >
+                          Sube una foto o video a la izquierda para previsualizar
+                        </div>
+                      )}
+                      {postMediaType === 'video' && postMediaUrl && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'rgba(0,0,0,0.25)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
                           }}
                         >
-                          <Play size={18} fill="white" color="white" />
+                          <div
+                            style={{
+                              width: '42px',
+                              height: '42px',
+                              borderRadius: '50%',
+                              background: 'var(--primary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <Play size={18} fill="white" color="white" />
+                          </div>
                         </div>
+                      )}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '10px',
+                          right: '10px',
+                          background: 'rgba(20, 18, 16, 0.88)',
+                          padding: '5px 12px',
+                          borderRadius: '10px',
+                          color: '#FFFFFF',
+                          fontWeight: 900,
+                          fontSize: '0.86rem'
+                        }}
+                      >
+                        ${parseFloat(postPrice || '0').toLocaleString('es-CO')} COP
                       </div>
-                    )}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: '10px',
-                        right: '10px',
-                        background: 'rgba(20, 18, 16, 0.88)',
-                        padding: '5px 12px',
-                        borderRadius: '10px',
-                        color: '#FFFFFF',
-                        fontWeight: 900,
-                        fontSize: '0.86rem'
-                      }}
-                    >
-                      ${parseFloat(postPrice || '0').toLocaleString('es-CO')} COP
                     </div>
-                  </div>
 
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.45 }}>
-                    {postDesc || 'Aquí aparecerá la descripción tentadora de tu plato...'}
-                  </p>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.45 }}>
+                      {postDesc || 'Aquí aparecerá la descripción tentadora de tu plato...'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Historias Activas (24h) */}
+            <div className="rpa-card">
+              <div className="rpa-card-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 className="rpa-card-title" style={{ fontSize: '1.08rem' }}>
+                    🔥 Historias Activas 24h ({tenantStoryItems.length})
+                  </h3>
+                  <p className="rpa-card-subtitle">Diapositivas visibles en el anillo superior de tu restaurante</p>
                 </div>
+                {contentPublishMode !== 'story' && (
+                  <button
+                    type="button"
+                    className="pam-chip"
+                    onClick={() => setContentPublishMode('story')}
+                  >
+                    <Plus size={13} /> Subir Historia
+                  </button>
+                )}
+              </div>
+
+              <div className="rpa-card-body">
+                {tenantStoryItems.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', margin: 0, padding: '1rem' }}>
+                    No tienes historias activas en este momento. ¡Usa la pestaña «Subir Historia (24h)» para destacar un plato!
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {tenantStoryItems.map((storyItem, idx) => (
+                      <div key={storyItem.id} className="rpa-item-card" style={{ padding: '10px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                          <div style={{ position: 'relative', width: '44px', height: '56px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--primary)' }}>
+                            <img
+                              src={storyItem.image}
+                              alt={storyItem.dishName}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: '2px',
+                                left: '4px',
+                                fontSize: '0.62rem',
+                                fontWeight: 900,
+                                color: '#FFF',
+                                textShadow: '0 1px 3px rgba(0,0,0,0.8)'
+                              }}
+                            >
+                              #{idx + 1}
+                            </span>
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <strong style={{ color: 'var(--text-main)', fontSize: '0.88rem', display: 'block' }}>
+                              {storyItem.dishName}
+                            </strong>
+                            {storyItem.caption && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '240px' }}>
+                                {storyItem.caption}
+                              </span>
+                            )}
+                            <div style={{ display: 'flex', gap: '10px', fontSize: '0.73rem', color: 'var(--primary)', fontWeight: 700, marginTop: '2px' }}>
+                              <span>{storyItem.timeAgo}</span>
+                              {storyItem.price > 0 && (
+                                <span>· ${storyItem.price.toLocaleString('es-CO')} COP</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="rpa-icon-btn danger"
+                          disabled={isDeletingStory === storyItem.id}
+                          onClick={async () => {
+                            setIsDeletingStory(storyItem.id);
+                            await deleteStoryItem(storyItem.id);
+                            setIsDeletingStory(null);
+                          }}
+                          title="Retirar de Historias activas"
+                        >
+                          {isDeletingStory === storyItem.id ? (
+                            <Loader2 size={14} className="spin" />
+                          ) : (
+                            <Trash2 size={15} />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

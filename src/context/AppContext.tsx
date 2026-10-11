@@ -132,6 +132,43 @@ const location = useLocationSlice();
 
   const [stories] = useState<Story[]>(DEFAULT_STORIES);
 
+  const [customStoryItems, setCustomStoryItems] = useState<StoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('gs_restaurant_stories_v1');
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      const now = Date.now();
+      const ttlMs = 24 * 60 * 60 * 1000;
+      return parsed.filter((item: StoryItem) => !item.createdAt || now - item.createdAt < ttlMs);
+    } catch {
+      return [];
+    }
+  });
+
+  const [hiddenStoryItemIds, setHiddenStoryItemIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('gs_hidden_story_items_v1');
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gs_restaurant_stories_v1', JSON.stringify(customStoryItems.slice(0, 60)));
+    } catch {}
+  }, [customStoryItems]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gs_hidden_story_items_v1', JSON.stringify(hiddenStoryItemIds.slice(0, 200)));
+    } catch {}
+  }, [hiddenStoryItemIds]);
+
   const [restaurantApplications, setRestaurantApplications] = useState<RestaurantApplication[]>(() => {
     try {
       const saved = localStorage.getItem('gs_restaurant_applications_v1');
@@ -1833,6 +1870,87 @@ const location = useLocationSlice();
     showToast('🗑️ Publicación eliminada correctamente');
   };
 
+  const createStoryItem = async (storyData: {
+    tenantId: string;
+    dishName: string;
+    price: number;
+    productId?: string;
+    image: string;
+    mediaType?: 'photo' | 'video';
+    mediaUrl?: string;
+    caption?: string;
+  }): Promise<boolean> => {
+    const targetTenantId = storyData.tenantId || currentUser?.tenantId;
+    if ((!isRestaurantOwner(currentUser) && !isRestaurantStaff(currentUser) && !isPlatformAdmin(currentUser)) || !targetTenantId) {
+      showToast('⚠️ No tienes autorización para subir historias.');
+      return false;
+    }
+    const sourceTenants = authMode === 'remote' ? remoteTenants : tenants;
+    const targetTenant = sourceTenants.find(t => t.id === targetTenantId) || tenants.find(t => t.id === targetTenantId);
+    if (!targetTenant) {
+      showToast('⚠️ Restaurante no encontrado.');
+      return false;
+    }
+
+    const mediaType = storyData.mediaType || 'photo';
+    const mediaSource = storyData.mediaUrl || storyData.image || '';
+    const imagePreview = mediaType === 'photo'
+      ? mediaSource
+      : (storyData.image || targetTenant.bannerUrl || targetTenant.logoUrl || mediaSource);
+
+    if (!imagePreview && !mediaSource) {
+      showToast('⚠️ Sube una foto o video para tu historia.');
+      return false;
+    }
+
+    const newStoryItem: StoryItem = {
+      id: `story_custom_${Date.now()}`,
+      tenantId: targetTenant.id,
+      tenantName: targetTenant.name,
+      tenantEmoji: targetTenant.logoEmoji || '🍽️',
+      image: imagePreview,
+      mediaUrl: mediaType === 'video' ? mediaSource : undefined,
+      mediaType,
+      caption: storyData.caption?.trim() || undefined,
+      dishName: storyData.dishName?.trim() || targetTenant.name,
+      price: Number(storyData.price) || 0,
+      productId: storyData.productId || '0',
+      timeAgo: 'Hace un momento',
+      createdAt: Date.now()
+    };
+
+    setCustomStoryItems(prev => [newStoryItem, ...prev]);
+
+    if (authMode === 'remote') {
+      try {
+        await createLivePost(
+          targetTenant.id,
+          newStoryItem.dishName,
+          newStoryItem.caption || `Historia 24h de ${targetTenant.name}`,
+          newStoryItem.price,
+          mediaSource || imagePreview,
+          mediaType,
+          newStoryItem.productId && newStoryItem.productId !== '0' ? newStoryItem.productId : undefined,
+          1080,
+          1920,
+          ['#story24h']
+        );
+      } catch (err) {
+        console.warn('No se pudo replicar la historia en posts remotos, conservada localmente:', err);
+      }
+    }
+
+    showToast('🔥 ¡Historia activa por 24h en el carrusel superior!');
+    return true;
+  };
+
+  const deleteStoryItem = async (storyItemId: string): Promise<void> => {
+    if (!storyItemId) return;
+    setCustomStoryItems(prev => prev.filter(item => item.id !== storyItemId));
+    setHiddenStoryItemIds(prev => (prev.includes(storyItemId) ? prev : [...prev, storyItemId]));
+    showToast('🗑️ Historia retirada del carrusel activo');
+  };
+
   const addDriver = (driverData: Omit<Driver, 'id' | 'tenantId' | 'status'>) => {
     if (!isRestaurantOwner(currentUser) || !currentUser?.tenantId) {
       showToast('⚠️ No tienes autorización para registrar repartidores.');
@@ -2379,37 +2497,56 @@ const location = useLocationSlice();
   const activeStories = React.useMemo<Story[]>(() => {
     const dynamicStories: Story[] = [];
     const seenTenantIds = new Set<string>();
+    const hiddenSet = new Set(hiddenStoryItemIds);
 
     for (const tenant of activeTenants) {
       if (tenant.status !== 'active') continue;
+      const tenantCustomStories = customStoryItems.filter(
+        (item) => item.tenantId === tenant.id && !hiddenSet.has(item.id)
+      );
       const tenantPosts = activePosts.filter((p) => p.tenantId === tenant.id);
       const tenantProducts = activeProducts.filter((pr) => pr.tenantId === tenant.id && pr.available);
 
-      const items: StoryItem[] = [];
-      for (const p of tenantPosts.slice(0, 5)) {
+      const items: StoryItem[] = [...tenantCustomStories];
+      const existingMediaSet = new Set(
+        tenantCustomStories.map((s) => `${s.dishName}|${s.mediaUrl || s.image}`)
+      );
+
+      for (const p of tenantPosts.slice(0, 6)) {
+        const postStoryId = `story_post_${p.id}`;
+        if (hiddenSet.has(postStoryId)) continue;
+        const mediaSignature = `${p.dishName || tenant.name}|${(p.mediaType === 'video' ? p.mediaUrl : p.image) || ''}`;
+        if (existingMediaSet.has(mediaSignature)) continue;
+
         items.push({
-          id: `story_post_${p.id}`,
+          id: postStoryId,
           tenantId: tenant.id,
           tenantName: tenant.name,
           tenantEmoji: tenant.logoEmoji || '🍽️',
           image: p.image || tenant.logoUrl || tenant.bannerUrl || '',
           mediaUrl: p.mediaType === 'video' ? p.mediaUrl : undefined,
+          mediaType: p.mediaType || 'photo',
+          caption: p.hashtags?.includes('#story24h') ? p.desc : undefined,
           legacyExternalYoutubeId: p.legacyExternalYoutubeId,
           dishName: p.dishName || tenant.name,
           price: p.price || 0,
           productId: p.productId || '0',
-          timeAgo: p.timeAgo || 'Hoy'
+          timeAgo: p.timeAgo || 'Hoy',
+          createdAt: p.createdAt
         });
       }
 
       if (items.length === 0) {
         for (const pr of tenantProducts.slice(0, 3)) {
+          const prodStoryId = `story_prod_${pr.id}`;
+          if (hiddenSet.has(prodStoryId)) continue;
           items.push({
-            id: `story_prod_${pr.id}`,
+            id: prodStoryId,
             tenantId: tenant.id,
             tenantName: tenant.name,
             tenantEmoji: tenant.logoEmoji || pr.emoji || '🍽️',
             image: pr.image || tenant.bannerUrl || tenant.logoUrl || '',
+            mediaType: 'photo',
             dishName: pr.name,
             price: pr.price,
             productId: pr.id,
@@ -2419,17 +2556,21 @@ const location = useLocationSlice();
       }
 
       if (items.length === 0 && (tenant.bannerUrl || tenant.logoUrl)) {
-        items.push({
-          id: `story_welcome_${tenant.id}`,
-          tenantId: tenant.id,
-          tenantName: tenant.name,
-          tenantEmoji: tenant.logoEmoji || '🍽️',
-          image: tenant.bannerUrl || tenant.logoUrl || '',
-          dishName: tenant.name,
-          price: 0,
-          productId: '0',
-          timeAgo: tenant.isOpen ? 'Abierto ahora' : 'Vitrina'
-        });
+        const welcomeStoryId = `story_welcome_${tenant.id}`;
+        if (!hiddenSet.has(welcomeStoryId)) {
+          items.push({
+            id: welcomeStoryId,
+            tenantId: tenant.id,
+            tenantName: tenant.name,
+            tenantEmoji: tenant.logoEmoji || '🍽️',
+            image: tenant.bannerUrl || tenant.logoUrl || '',
+            mediaType: 'photo',
+            dishName: tenant.name,
+            price: 0,
+            productId: '0',
+            timeAgo: tenant.isOpen ? 'Abierto ahora' : 'Vitrina'
+          });
+        }
       }
 
       if (items.length > 0) {
@@ -2440,7 +2581,7 @@ const location = useLocationSlice();
           tenantName: tenant.name,
           emoji: tenant.logoEmoji || '🍽️',
           title: tenant.category || 'Cocina en vivo',
-          isLive: Boolean(tenant.isOpen),
+          isLive: Boolean(tenant.isOpen) || tenantCustomStories.length > 0,
           items
         });
       }
@@ -2448,12 +2589,18 @@ const location = useLocationSlice();
 
     for (const fallbackStory of stories) {
       if (!seenTenantIds.has(fallbackStory.tenantId)) {
-        dynamicStories.push(fallbackStory);
+        const filteredFallbackItems = fallbackStory.items.filter((it) => !hiddenSet.has(it.id));
+        if (filteredFallbackItems.length > 0) {
+          dynamicStories.push({
+            ...fallbackStory,
+            items: filteredFallbackItems
+          });
+        }
       }
     }
 
     return dynamicStories;
-  }, [activeTenants, activePosts, activeProducts, stories]);
+  }, [activeTenants, activePosts, activeProducts, stories, customStoryItems, hiddenStoryItemIds]);
 
   const scopedOrders = React.useMemo(() => {
     if (!currentUser) return [];
@@ -2494,6 +2641,8 @@ const location = useLocationSlice();
     addComment,
     createPost,
     deletePost,
+    createStoryItem,
+    deleteStoryItem,
     addDriver,
     deleteProduct,
     updateEquityWeight,
@@ -2545,6 +2694,8 @@ const location = useLocationSlice();
       addComment,
       createPost,
       deletePost,
+      createStoryItem,
+      deleteStoryItem,
       addDriver,
       deleteProduct,
       updateEquityWeight,
@@ -2596,6 +2747,8 @@ const location = useLocationSlice();
     addComment: ((...args) => handlersRef.current.addComment(...args)) as typeof addComment,
     createPost: ((...args) => handlersRef.current.createPost(...args)) as typeof createPost,
     deletePost: ((...args) => handlersRef.current.deletePost(...args)) as typeof deletePost,
+    createStoryItem: ((...args) => handlersRef.current.createStoryItem(...args)) as typeof createStoryItem,
+    deleteStoryItem: ((...args) => handlersRef.current.deleteStoryItem(...args)) as typeof deleteStoryItem,
     addDriver: ((...args) => handlersRef.current.addDriver(...args)) as typeof addDriver,
     deleteProduct: ((...args) => handlersRef.current.deleteProduct(...args)) as typeof deleteProduct,
     setEquityWeight: ((...args) => handlersRef.current.updateEquityWeight(...args)) as typeof updateEquityWeight,

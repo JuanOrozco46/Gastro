@@ -269,5 +269,30 @@ describe('GastroSync QA Hardening — Payment & Security Suite', () => {
     assert.match(sql057, /preferred_city_id/);
     assert.match(sql057, /saved_addresses/);
   });
+
+  it('verifica la publicación de Historias 24h en el panel del restaurante, eliminación del botón de perfil duplicado arriba en móvil y barra de progreso/transiciones animadas en StoriesBar', () => {
+    const restaurantAdmin = fs.readFileSync(path.join(ROOT, 'src', 'components', 'RestaurantAdmin.tsx'), 'utf8');
+    assert.match(restaurantAdmin, /contentPublishMode/);
+    assert.match(restaurantAdmin, /handleCreateStorySubmit/);
+    assert.match(restaurantAdmin, /createStoryItem/);
+    assert.match(restaurantAdmin, /deleteStoryItem/);
+    assert.match(restaurantAdmin, /Historias Activas 24h/);
+
+    const customerApp = fs.readFileSync(path.join(ROOT, 'src', 'components', 'CustomerDeliveryApp.tsx'), 'utf8');
+    assert.equal(
+      customerApp.includes('gs-top-profile-btn'),
+      false,
+      'No debe existir un botón de perfil duplicado en la barra superior móvil (.gs-top-actions-cluster)'
+    );
+    assert.match(customerApp, /gs-desktop-profile-pill/);
+
+    const storiesBar = fs.readFileSync(path.join(ROOT, 'src', 'components', 'StoriesBar.tsx'), 'utf8');
+    assert.match(storiesBar, /gf-story-progress-fill/);
+    assert.match(storiesBar, /scaleX\(\$\{fillPct \/ 100\}\)/);
+    assert.match(storiesBar, /gf-story-slide-stage/);
+    assert.match(storiesBar, /tenantTransition/);
+    assert.match(storiesBar, /window\.requestAnimationFrame/);
+  });
 });
+
 
