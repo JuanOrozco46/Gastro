@@ -209,4 +209,26 @@ describe('GastroSync QA Hardening — Payment & Security Suite', () => {
     const vercelConfig = fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8');
     assert.match(vercelConfig, /\/\(\(\?!assets\/\)\.\*\)/);
   });
+
+  it('verifica que el Feed, Tendencias, Stories y Directorio filtran estrictamente por la ciudad seleccionada sin mostrar publicaciones de otras ciudades', () => {
+    const customerApp = fs.readFileSync(path.join(ROOT, 'src', 'components', 'CustomerDeliveryApp.tsx'), 'utf8');
+    assert.equal(
+      customerApp.includes('if (city && hasTenantsInCity && tenant.cityId !== city.id)'),
+      false,
+      'CustomerDeliveryApp no debe omitir el filtro de ciudad cuando una ciudad no tiene restaurantes'
+    );
+    assert.match(customerApp, /if \(city && tenant\.cityId !== city\.id\)/);
+    assert.match(customerApp, /\) : !hasTenantsInActiveCity \? \(/);
+
+    const directory = fs.readFileSync(path.join(ROOT, 'src', 'components', 'RestaurantDirectory.tsx'), 'utf8');
+    assert.equal(
+      directory.includes('if (activeCity && hasTenantsInActiveCity && t.cityId !== activeCity.id)'),
+      false,
+      'RestaurantDirectory no debe mostrar restaurantes de otra ciudad cuando la ciudad seleccionada está vacía'
+    );
+    assert.match(directory, /if \(activeCity && t\.cityId !== activeCity\.id\) return false/);
+
+    const storiesBar = fs.readFileSync(path.join(ROOT, 'src', 'components', 'StoriesBar.tsx'), 'utf8');
+    assert.match(storiesBar, /if \(selectedCityId && tenant\.cityId !== selectedCityId\) return false/);
+  });
 });

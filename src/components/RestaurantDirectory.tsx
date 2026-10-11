@@ -36,22 +36,25 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
   const [brokenLogos, setBrokenLogos] = useState<Record<string, boolean>>({});
   const [brokenBanners, setBrokenBanners] = useState<Record<string, boolean>>({});
 
-  // Extract unique categories from tenants
+  // Restaurantes activos únicamente de la ciudad seleccionada
+  const cityTenants = useMemo(() => {
+    return tenants.filter(t => {
+      if (t.status !== 'active') return false;
+      if (activeCity && t.cityId !== activeCity.id) return false;
+      return true;
+    });
+  }, [tenants, activeCity]);
+
+  // Extract unique categories from tenants in the selected city
   const categories = useMemo(() => {
-    const set = new Set(tenants.map(t => t.category));
+    const set = new Set(cityTenants.map(t => t.category));
     return ['Todas', ...Array.from(set)];
-  }, [tenants]);
+  }, [cityTenants]);
 
   // Filter & Sort logic
   const filteredTenants = useMemo(() => {
-    const hasTenantsInActiveCity = activeCity
-      ? tenants.some(t => t.status === 'active' && t.cityId === activeCity.id)
-      : false;
-
-    return tenants
+    return cityTenants
       .filter(t => {
-        if (t.status !== 'active') return false;
-        if (activeCity && hasTenantsInActiveCity && t.cityId !== activeCity.id) return false;
         const zoneFilter = selectedZone || selectedZoneId;
         if (zoneFilter && zoneFilter !== 'all' && t.zoneId !== zoneFilter) {
           return false;
@@ -76,9 +79,9 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
         }
         if (searchQuery.trim() !== '') {
           const q = searchQuery.toLowerCase();
-          const activeCity = cities.find(c => c.id === t.cityId);
+          const tCity = cities.find(c => c.id === t.cityId);
           const zoneName = zones.find(z => z.id === t.zoneId)?.name.toLowerCase() || '';
-          const cityName = activeCity?.name.toLowerCase() || '';
+          const cityName = tCity?.name.toLowerCase() || '';
 
           const matchName = t.name.toLowerCase().includes(q);
           const matchCategory = t.category.toLowerCase().includes(q);
@@ -112,12 +115,12 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
         }
         return 0;
       });
-  }, [tenants, products, selectedCategory, onlyOpen, minRating45, onlyFreeDelivery, onlyTableService, priceRange, searchQuery, sortBy, selectedZone, selectedZoneId, activeCity, cities, zones]);
+  }, [cityTenants, products, selectedCategory, onlyOpen, minRating45, onlyFreeDelivery, onlyTableService, priceRange, searchQuery, sortBy, selectedZone, selectedZoneId, cities, zones]);
 
-  // Tenant featured hero
+  // Tenant featured hero (only from active city)
   const featuredTenant = useMemo(() => {
-    return tenants.find(t => t.status === 'active' && t.isOpen && t.rating >= 4.8) || tenants.find(t => t.status === 'active');
-  }, [tenants]);
+    return cityTenants.find(t => t.isOpen && t.rating >= 4.8) || cityTenants[0] || null;
+  }, [cityTenants]);
 
   // Get products for modal tenant
   const modalProducts = useMemo(() => {
@@ -155,7 +158,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
           </p>
           <div className="directory-hero-stats">
             <div className="hero-stat-item">
-              <span className="stat-value">{tenants.length}</span>
+              <span className="stat-value">{cityTenants.length}</span>
               <span className="stat-label">Restaurantes</span>
             </div>
             <div className="hero-stat-divider" />
@@ -404,12 +407,14 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
           </h3>
           <p style={{ fontSize: '0.92rem' }}>{catalogError}</p>
         </div>
-      ) : tenants.length === 0 ? (
+      ) : cityTenants.length === 0 ? (
         <div className="directory-empty-state" style={{ background: 'var(--glass-light)', borderColor: 'var(--primary-glass-border)', color: 'var(--text-muted)', padding: '3.5rem 2rem' }}>
           <Store size={52} className="empty-icon" style={{ color: 'var(--primary)' }} />
-          <h3 style={{ color: 'white', marginTop: '1rem', fontWeight: 900 }}>Aún no hay restaurantes registrados</h3>
+          <h3 style={{ color: 'white', marginTop: '1rem', fontWeight: 900 }}>
+            Aún no hay restaurantes registrados en {activeCity ? activeCity.name : 'esta ciudad'}
+          </h3>
           <p style={{ maxWidth: '460px', margin: '0.5rem auto 1.5rem', lineHeight: 1.5 }}>
-            ¡Sé el primero en registrar tu restaurante! Empieza a recibir pedidos directos y gestiona tu menú digital.
+            ¡Sé el primero en registrar tu restaurante en {activeCity ? activeCity.name : 'tu ciudad'}! Empieza a recibir pedidos directos y gestiona tu menú digital.
           </p>
           <button
             className="btn btn-primary"

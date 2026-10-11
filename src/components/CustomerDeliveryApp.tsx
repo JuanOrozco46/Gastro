@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, lazy, Suspense, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useMemo, Suspense, useEffect, useRef } from 'react';
 import { useApp } from '../context/useApp';
 import { RestaurantDirectory } from './RestaurantDirectory';
 import { MyOrders } from './MyOrders';
@@ -6,6 +6,7 @@ import { StoriesBar } from './StoriesBar';
 import { FloatingCartButton } from './FloatingCartButton';
 import { LocationSelector } from './LocationSelector';
 import { NotificationBell } from './NotificationBell';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { motion } from 'framer-motion';
 import {
   Heart, MessageCircle, Share2, ShoppingBag, Bike,
@@ -18,12 +19,12 @@ import { AnimatePresence } from 'framer-motion';
 import { toggleRemoteSave, fetchRemoteSavedPosts } from '../services/supabaseDataService';
 import type { Post, Tenant, Product } from '../types';
 
-const PaymentModal = lazy(() => import('./PaymentModal').then(m => ({ default: m.PaymentModal })));
-const SupportCenter = lazy(() => import('./SupportCenter').then(m => ({ default: m.SupportCenter })));
-const CartModal = lazy(() => import('./CartModal').then(m => ({ default: m.CartModal })));
-const RestaurantProfileModal = lazy(() => import('./RestaurantProfileModal').then(m => ({ default: m.RestaurantProfileModal })));
-const CommentsModal = lazy(() => import('./CommentsModal').then(m => ({ default: m.CommentsModal })));
-const UserProfileModal = lazy(() => import('./UserProfileModal').then(m => ({ default: m.UserProfileModal })));
+const PaymentModal = lazyWithRetry(() => import('./PaymentModal').then(m => ({ default: m.PaymentModal })));
+const SupportCenter = lazyWithRetry(() => import('./SupportCenter').then(m => ({ default: m.SupportCenter })));
+const CartModal = lazyWithRetry(() => import('./CartModal').then(m => ({ default: m.CartModal })));
+const RestaurantProfileModal = lazyWithRetry(() => import('./RestaurantProfileModal').then(m => ({ default: m.RestaurantProfileModal })));
+const CommentsModal = lazyWithRetry(() => import('./CommentsModal').then(m => ({ default: m.CommentsModal })));
+const UserProfileModal = lazyWithRetry(() => import('./UserProfileModal').then(m => ({ default: m.UserProfileModal })));
 
 const FallbackLoader: React.FC<{ message: string }> = ({ message }) => (
   <div className="gf-fallback-loader">
@@ -382,46 +383,44 @@ export const CustomerDeliveryApp: React.FC = () => {
   const activePosts = authMode === 'remote' ? remotePosts : posts;
 
   const zoneFilteredPosts = useMemo(() => {
-      const city = activeCity ?? cities.find(c => c.isActive) ?? cities[0] ?? { id: 'fallback-city', name: 'Fallback', slug: 'fallback', countryCode: 'CO', currencyCode: 'COP', isActive: true };
-      const hasTenantsInCity = Array.from(tenantMap.values()).some(t => t.status === 'active' && t.cityId === city.id);
+    const city = activeCity ?? cities.find(c => c.isActive) ?? cities[0] ?? { id: 'fallback-city', name: 'Fallback', slug: 'fallback', countryCode: 'CO', currencyCode: 'COP', isActive: true };
 
-      return activePosts.reduce<Post[]>((acc, post) => {
-        const tenant = tenantMap.get(post.tenantId);
-        if (!tenant || tenant.status !== 'active') {
-          return acc;
-        }
-        if (city && hasTenantsInCity && tenant.cityId !== city.id) {
-          return acc;
-        }
-        if (selectedZoneId && tenant.zoneId !== selectedZoneId) {
-          return acc;
-        }
-        const tCityName = cities.find(c => c.id === tenant.cityId)?.name;
-        const tZoneName = zones.find(z => z.id === tenant.zoneId)?.name;
-        const enrichedLocation = [
-          tCityName,
-          tZoneName ? `Zona ${tZoneName}` : null,
-          tenant.address
-        ]
-          .filter(Boolean)
-          .join(' · ');
-
-        acc.push({
-          ...post,
-          tenantName: tenant.name,
-          tenantCategory: tenant.category,
-          tenantLogoEmoji: tenant.logoEmoji || '🍽️',
-          tenantAddress: enrichedLocation || post.tenantAddress
-        });
+    return activePosts.reduce<Post[]>((acc, post) => {
+      const tenant = tenantMap.get(post.tenantId);
+      if (!tenant || tenant.status !== 'active') {
         return acc;
-      }, []);
-    }, [activePosts, tenantMap, selectedZoneId, activeCity, cities, zones]);
+      }
+      if (city && tenant.cityId !== city.id) {
+        return acc;
+      }
+      if (selectedZoneId && tenant.zoneId !== selectedZoneId) {
+        return acc;
+      }
+      const tCityName = cities.find(c => c.id === tenant.cityId)?.name;
+      const tZoneName = zones.find(z => z.id === tenant.zoneId)?.name;
+      const enrichedLocation = [
+        tCityName,
+        tZoneName ? `Zona ${tZoneName}` : null,
+        tenant.address
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
+      acc.push({
+        ...post,
+        tenantName: tenant.name,
+        tenantCategory: tenant.category,
+        tenantLogoEmoji: tenant.logoEmoji || '🍽️',
+        tenantAddress: enrichedLocation || post.tenantAddress
+      });
+      return acc;
+    }, []);
+  }, [activePosts, tenantMap, selectedZoneId, activeCity, cities, zones]);
 
   const activeTenantsInZoneCount = useMemo(() => {
-    const hasTenantsInCity = activeCity ? tenants.some(t => t.status === 'active' && t.cityId === activeCity.id) : false;
     return tenants.filter(t => {
       if (t.status !== 'active') return false;
-      if (activeCity && hasTenantsInCity && t.cityId !== activeCity.id) return false;
+      if (activeCity && t.cityId !== activeCity.id) return false;
       if (!selectedZoneId) return true;
       return t.zoneId === selectedZoneId;
     }).length;
@@ -430,7 +429,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const hasTenantsInActiveCity = activeCity ? tenants.some(t => t.status === 'active' && t.cityId === activeCity.id) : false;
   const currentZoneObj = zones.find(z => z.id === selectedZoneId);
   const zoneInfoText = !hasTenantsInActiveCity && activeCity
-    ? `Aún no hay locales activos en ${activeCity.name}. Explorando catálogo nacional de Colombia.`
+    ? `Aún no hay restaurantes aliados activos en ${activeCity.name}.`
     : !selectedZoneId
       ? `Descubre lo nuevo cerca de ti en ${activeCity ? activeCity.name : 'tu ciudad'}.`
       : `Descubre restaurantes y platos en Zona ${currentZoneObj?.name || ''}.`;
@@ -789,7 +788,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                   <h3 className="gf-state-title">Oops, algo salió mal</h3>
                   <p className="gf-state-desc">{catalogError}</p>
                 </div>
-              ) : tenants.length === 0 ? (
+              ) : !hasTenantsInActiveCity ? (
                 <div className="gf-state-panel">
                   <div className="gf-state-icon-wrap">
                     <Building2 size={26} />
@@ -798,7 +797,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                     Pronto en GastroSync {activeCity ? activeCity.name : ''}
                   </h3>
                   <p className="gf-state-desc">
-                    Aún no hay restaurantes aliados activos en esta zona. Pronto podrás descubrir los mejores sabores de {activeCity ? activeCity.name : 'tu ciudad'} aquí.
+                    Aún no hay restaurantes aliados activos en {activeCity ? activeCity.name : 'esta ciudad'}. Pronto podrás descubrir los mejores sabores locales aquí.
                   </p>
                   <p className="gf-state-desc">
                     ¿Tienes un restaurante o negocio gastronómico en {activeCity ? activeCity.name : 'tu ciudad'}?
@@ -944,23 +943,25 @@ export const CustomerDeliveryApp: React.FC = () => {
               </div>
 
               {/* Trending */}
-              <div className="gf-trending-card">
-                <div className="gf-card-section-title"><TrendingUp size={15} /> En Tendencia</div>
-                {activePosts.slice().sort((a, b) => b.likes - a.likes).slice(0, 4).map((p, i) => (
-                  <div key={p.id} className="gf-trending-row">
-                    <span className="gf-trend-rank">#{i + 1}</span>
-                    <span className="gf-trend-emoji">{p.dishEmoji}</span>
-                    <div className="gf-trend-info">
-                      <span className="gf-trend-name">{p.dishName}</span>
-                      <span className="gf-trend-by">{p.tenantName}</span>
+              {zoneFilteredPosts.length > 0 && (
+                <div className="gf-trending-card">
+                  <div className="gf-card-section-title"><TrendingUp size={15} /> En Tendencia</div>
+                  {zoneFilteredPosts.slice().sort((a, b) => b.likes - a.likes).slice(0, 4).map((p, i) => (
+                    <div key={p.id} className="gf-trending-row">
+                      <span className="gf-trend-rank">#{i + 1}</span>
+                      <span className="gf-trend-emoji">{p.dishEmoji}</span>
+                      <div className="gf-trend-info">
+                        <span className="gf-trend-name">{p.dishName}</span>
+                        <span className="gf-trend-by">{p.tenantName}</span>
+                      </div>
+                      <span className="gf-trend-likes">
+                        <Heart size={11} fill="currentColor" />
+                        {fmt(p.likes)}
+                      </span>
                     </div>
-                    <span className="gf-trend-likes">
-                      <Heart size={11} fill="currentColor" />
-                      {fmt(p.likes)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               {/* No ads banner */}
               <div className="gf-no-ads-card">

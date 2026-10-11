@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../context/useApp';
 import type { Story, StoryItem } from '../types';
 import { X, ChevronLeft, ChevronRight, Zap, Flame } from 'lucide-react';
@@ -9,8 +9,18 @@ interface StoriesBarProps {
 }
 
 export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
-  const { stories, tenants } = useApp();
+  const { stories, tenants, selectedCityId, selectedZoneId } = useApp();
   const [activeStory, setActiveStory] = useState<{ story: Story; itemIndex: number } | null>(null);
+
+  const cityFilteredStories = useMemo(() => {
+    return (stories || []).filter(story => {
+      const tenant = tenants.find(t => t.id === story.tenantId || t.slug === story.tenantId);
+      if (!tenant || tenant.status !== 'active') return false;
+      if (selectedCityId && tenant.cityId !== selectedCityId) return false;
+      if (selectedZoneId && tenant.zoneId !== selectedZoneId) return false;
+      return true;
+    });
+  }, [stories, tenants, selectedCityId, selectedZoneId]);
 
   // Tenant slug map lookup
   const getSlug = (tenantId: string) => {
@@ -26,14 +36,14 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
       setActiveStory({ story, itemIndex: itemIndex + 1 });
     } else {
       // Move to next story if available
-      const currentIndex = stories.findIndex(s => s.id === story.id);
-      if (currentIndex < stories.length - 1) {
-        setActiveStory({ story: stories[currentIndex + 1], itemIndex: 0 });
+      const currentIndex = cityFilteredStories.findIndex(s => s.id === story.id);
+      if (currentIndex < cityFilteredStories.length - 1) {
+        setActiveStory({ story: cityFilteredStories[currentIndex + 1], itemIndex: 0 });
       } else {
         setActiveStory(null);
       }
     }
-  }, [activeStory, stories]);
+  }, [activeStory, cityFilteredStories]);
 
   const handlePrevItem = () => {
     if (!activeStory) return;
@@ -41,9 +51,9 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
     if (itemIndex > 0) {
       setActiveStory({ story, itemIndex: itemIndex - 1 });
     } else {
-      const currentIndex = stories.findIndex(s => s.id === story.id);
+      const currentIndex = cityFilteredStories.findIndex(s => s.id === story.id);
       if (currentIndex > 0) {
-        const prevStory = stories[currentIndex - 1];
+        const prevStory = cityFilteredStories[currentIndex - 1];
         const prevItems = prevStory.items || [];
         setActiveStory({ story: prevStory, itemIndex: Math.max(0, prevItems.length - 1) });
       }
@@ -59,7 +69,7 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
     return () => clearTimeout(timer);
   }, [activeStory, handleNextItem]);
 
-  if (!stories || stories.length === 0) return null;
+  if (!cityFilteredStories || cityFilteredStories.length === 0) return null;
 
   return (
     <>
@@ -73,7 +83,7 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
         </div>
 
         <div className="gf-stories-scroll">
-          {stories.map((story, idx) => {
+          {cityFilteredStories.map((story, idx) => {
             const items = story.items || [];
             const firstItem = items[0];
             return (

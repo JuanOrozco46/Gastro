@@ -249,12 +249,20 @@ const location = useLocationSlice();
 
           const activeRemoteTenants = liveTenants.filter(t => t.status === 'active');
 
-          // Validate selected city ID exists and has active tenants if any exist
+          // Validate selected city ID exists; only fall back to a city with tenants if the user hasn't explicitly chosen one
           setSelectedCityIdState(prev => {
+            let hasSavedCity = false;
+            try {
+              hasSavedCity = Boolean(localStorage.getItem('gs_selected_city_v1'));
+            } catch { /* ignore */ }
+
             const exists = activeCities.some(c => c.id === prev && c.isActive);
+            if (exists && hasSavedCity) return prev;
+
             const hasTenantsInPrevCity =
               activeRemoteTenants.length === 0 || activeRemoteTenants.some(t => t.cityId === prev);
             if (exists && hasTenantsInPrevCity) return prev;
+
             const cityWithTenants = activeRemoteTenants[0]?.cityId;
             const fallback =
               (cityWithTenants && activeCities.some(c => c.id === cityWithTenants) ? cityWithTenants : null) ||
@@ -264,13 +272,11 @@ const location = useLocationSlice();
             return fallback;
           });
 
-          // Validate selected zone ID exists and belongs to city (and doesn't hide all active tenants)
+          // Validate selected zone ID exists and is active
           setSelectedZoneIdState(prev => {
             if (!prev) return null;
             const exists = activeZones.some(z => z.id === prev && z.isActive);
-            const hasTenantsInZone =
-              activeRemoteTenants.length === 0 || activeRemoteTenants.some(t => t.zoneId === prev);
-            if (exists && hasTenantsInZone) return prev;
+            if (exists) return prev;
             try { localStorage.removeItem('gs_selected_zone_v1'); } catch { /* ignore */ }
             return null;
           });
