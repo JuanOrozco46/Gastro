@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import type { Product, Order, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, StoryItem, UserAccount, UserRegistrationOptions, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount, City, SavedDeliveryAddress } from '../types';
+import type { Product, Order, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, StoryItem, UserAccount, UserRegistrationOptions, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount, City, SavedDeliveryAddress, RestaurantMember } from '../types';
 import { AppContext } from './AppContextObject';
 
 import { getValidOrderTransitions } from '../utils/tenantHelpers';
 import { normalizeUsername } from '../utils/formValidation';
 import { sanitizeSavedAddresses, saveUserAddressBank } from '../utils/addressBank';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant, fetchRestaurantMembers as fetchRemoteMembers, inviteRestaurantStaff as inviteRemoteStaff, resendStaffInvitation as resendRemoteInvitation, suspendRestaurantMember as suspendRemoteMember, reactivateRestaurantMember as reactivateRemoteMember, revokeRestaurantMember as revokeRemoteMember, acceptRestaurantInvitation as acceptRemoteInvitation, deleteMyUserAccountRemote, deactivateAndPurgeRestaurantRemote } from '../services/supabaseDataService';
+import { fetchLiveTenants, fetchLiveCities, fetchLiveZones, fetchLiveProducts, fetchLivePosts, submitLiveApplication, uploadApplicationAssets, fetchLiveApplications, updateLiveApplicationStatus, createLiveProduct, updateLiveProduct, deleteLiveProduct, createLivePost, deleteLivePost, updateLiveRestaurantOpenStatus, toggleRemoteLike, addRemoteComment, deleteRemoteComment, updateRemoteTenant, fetchRestaurantMembers as fetchRemoteMembers, inviteRestaurantStaff as inviteRemoteStaff, resendStaffInvitation as resendRemoteInvitation, suspendRestaurantMember as suspendRemoteMember, reactivateRestaurantMember as reactivateRemoteMember, revokeRestaurantMember as revokeRemoteMember, acceptRestaurantInvitation as acceptRemoteInvitation, deleteMyUserAccountRemote, deactivateAndPurgeRestaurantRemote, fetchRestaurantDrivers, createRestaurantDriver, deleteRestaurantDriver, assignRemoteOrderDriver, updateRemoteOrderKdsItems } from '../services/supabaseDataService';
 import type { ApplicationAssetFiles } from '../services/supabaseDataService';
 import { signInWithSupabase, signUpWithSupabase, signInWithGoogleOAuth, sendPasswordResetEmail, signOutFromSupabase, resolveSupabaseUserProfile, subscribeToSupabaseAuthChanges, getCurrentSupabaseSession, keepSupabaseSessionAlive, resendVerificationEmailAuth, updateSupabaseUserProfile, saveLocalProfileCache } from '../services/supabaseAuthService';
 import { DEMO_LOGIN_ENABLED } from './demoGate';
@@ -84,7 +84,7 @@ const location = useLocationSlice();
     }
   });
 
-  const [initialSession] = useState<UserAccount | null>(() => validateCachedSession());
+  const [initialSession] = useState<UserAccount | null>(() => validateCachedSession(authMode));
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(initialSession);
   
   const [emailVerificationState, setEmailVerificationState] = useState<import('../types').EmailVerificationState>('not_required');
@@ -261,22 +261,27 @@ const location = useLocationSlice();
           if (sessionResponse.data.session?.user) {
             const user = sessionResponse.data.session.user;
             if (user.email_confirmed_at) {
+              const isResetPath = typeof window !== 'undefined' && window.location.pathname.startsWith('/reset-password');
               userAccount = await resolveSupabaseUserProfile(
                 user.id,
                 user.email || '',
-                user.user_metadata?.needs_password_set
+                Boolean(user.user_metadata?.needs_password_set || isResetPath)
               );
               setEmailVerificationState('confirmed');
             } else {
               setEmailVerificationState('pending');
               setPendingVerificationEmail(user.email || null);
             }
-          } else if (sessionResponse.data.session === null && supabase) {
-            // Check if there's a user without a session (e.g. unverified)
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user && !user.email_confirmed_at) {
-              setEmailVerificationState('pending');
-              setPendingVerificationEmail(user.email || null);
+          } else if (sessionResponse.data.session === null) {
+            setCurrentUser(null);
+            setUserRole(typeof window !== 'undefined' && window.location.pathname.startsWith('/mesa/') ? 'table_qr' : 'login');
+            try { localStorage.removeItem('gs_demo_session_v1'); } catch {}
+            if (supabase) {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user && !user.email_confirmed_at) {
+                setEmailVerificationState('pending');
+                setPendingVerificationEmail(user.email || null);
+              }
             }
           }
 
@@ -367,9 +372,6 @@ const location = useLocationSlice();
             }
             setCurrentUser(userAccount);
             setUserRole(userAccount.role);
-            try {
-              localStorage.setItem('gs_demo_session_v1', JSON.stringify(userAccount));
-            } catch {}
           }
         } catch (err) {
           if (!isSubscribed) return;
@@ -397,11 +399,14 @@ const location = useLocationSlice();
           }
 
           setEmailVerificationState('confirmed');
+          const isPasswordRecovery =
+            event === 'PASSWORD_RECOVERY' ||
+            (typeof window !== 'undefined' && window.location.pathname.startsWith('/reset-password'));
           // 1. Resolver el perfil (y aprovisionar el restaurante en BD si es un restaurante nuevo)
           const userAccount = await resolveSupabaseUserProfile(
             session.user.id,
             session.user.email || '',
-            session.user.user_metadata?.needs_password_set
+            Boolean(session.user.user_metadata?.needs_password_set || isPasswordRecovery)
           );
 
           // 2. Recargar catálogo en vivo ANTES de cambiar la vista para que el restaurante recién creado ya esté en `tenants`
@@ -428,9 +433,6 @@ const location = useLocationSlice();
 
           setCurrentUser(userAccount);
           setUserRole(userAccount.role);
-          try {
-            localStorage.setItem('gs_demo_session_v1', JSON.stringify(userAccount));
-          } catch {}
           
           if (window.location.pathname.startsWith('/auth/callback')) {
             window.history.replaceState({}, document.title, '/');
@@ -471,7 +473,7 @@ const location = useLocationSlice();
     clearCartAndAdd,
     removeFromCart,
     clearCart
-  } = useCartSlice(catalogTenants, currentTenant, showToast);
+  } = useCartSlice(catalogTenants, currentTenant, showToast, selectedCityId);
 
   const playChime = () => {
     try {
@@ -534,9 +536,13 @@ const location = useLocationSlice();
 
         if (isRestaurantAccount && currentUser.tenantId) {
           const tenantId = currentUser.tenantId;
-          const liveOrders = await fetchLiveOrdersForRestaurant(tenantId);
+          const [liveOrders, liveDrivers] = await Promise.all([
+            fetchLiveOrdersForRestaurant(tenantId),
+            fetchRestaurantDrivers(tenantId)
+          ]);
           if (!cancelled) {
             setOrders(liveOrders.filter(o => o.tenantId === tenantId));
+            setDrivers(liveDrivers);
           }
           activeUnsub = subscribeToRestaurantOrders(tenantId, async (payload) => {
             const updated = await fetchLiveOrdersForRestaurant(tenantId);
@@ -664,7 +670,6 @@ const location = useLocationSlice();
         const tenantMatch = updatedTenants.find(t => t.id === res.user!.tenantId);
         if (tenantMatch) setCurrentTenant(tenantMatch);
       }
-      try { localStorage.setItem('gs_demo_session_v1', JSON.stringify(res.user)); } catch {}
       showToast(`👋 ¡Bienvenid@, ${res.user.name}!`);
       return { success: true };
     }
@@ -689,7 +694,7 @@ const location = useLocationSlice();
     const cleanPhone = options?.phone?.trim() || undefined;
     const cleanAddress = options?.defaultAddress?.trim() || undefined;
     const cleanNotes = options?.defaultDeliveryNotes?.trim() || undefined;
-    const cleanCityId = options?.preferredCityId?.trim() || selectedCityId || cities[0]?.id || 'armenia';
+    const cleanCityId = options?.preferredCityId?.trim() || selectedCityId || cities[0]?.id || '00000000-0000-0000-0000-000000000001';
     const cleanZoneId = options?.preferredZoneId?.trim() || null;
     const initialSavedAddresses = options?.savedAddresses?.length
       ? sanitizeSavedAddresses(options.savedAddresses, cleanCityId)
@@ -777,7 +782,6 @@ const location = useLocationSlice();
         setCurrentUser(res.user);
         setUserRole(res.user.role);
         setEmailVerificationState('confirmed');
-        try { localStorage.setItem('gs_demo_session_v1', JSON.stringify(res.user)); } catch {}
         showToast(`🎉 ¡Cuenta creada exitosamente para ${res.user.username ? `@${res.user.username}` : res.user.name}!`);
       } else {
         setEmailVerificationState('pending');
@@ -876,9 +880,11 @@ const location = useLocationSlice();
         setSelectedCity(matchedCityId);
       }
     }
-    try {
-      localStorage.setItem('gs_demo_session_v1', JSON.stringify(nextUser));
-    } catch {}
+    if (authMode === 'demo') {
+      try {
+        localStorage.setItem('gs_demo_session_v1', JSON.stringify(nextUser));
+      } catch {}
+    }
 
     // Actualizar comentarios propios en memoria para reflejar el nuevo @ y foto al instante
     const updateCommentList = (list: Post[]) =>
@@ -1003,7 +1009,7 @@ const location = useLocationSlice();
     if (authMode === 'demo') {
       const key = `gs_demo_members_${restaurantId}`;
       const saved = localStorage.getItem(key);
-      let members: any[] = saved ? JSON.parse(saved) : [];
+      const members: RestaurantMember[] = saved ? JSON.parse(saved) : [];
       if (members.find(m => m.email.toLowerCase() === email.toLowerCase() && m.status !== 'revoked')) {
         return { success: false, error: 'User already invited or active.' };
       }
@@ -1253,28 +1259,35 @@ const location = useLocationSlice();
     if (isSubmittingOrder) return { success: false };
     if (cart.length === 0) return { success: false };
 
-    if (authMode === 'remote' && !currentUser?.email) {
+    const isAnonymousTableQrOrder =
+      typeof typeOrDetails === 'object' &&
+      typeOrDetails.fulfillment === 'table_service' &&
+      Boolean(typeOrDetails.tableId) &&
+      Boolean(typeOrDetails.tableToken || typeOrDetails.deviceId);
+
+    if (authMode === 'remote' && !currentUser?.email && !isAnonymousTableQrOrder) {
       setOrderError('Debes iniciar sesión para realizar un pedido.');
       return { success: false };
     }
-
-    setIsSubmittingOrder(true);
-    setOrderError(null);
 
     const sourceTenants = authMode === 'remote' ? remoteTenants : tenants;
     const cartTenantId = cart[0]?.product?.tenantId;
     const orderTenant = (cartTenantId ? sourceTenants.find(t => t.id === cartTenantId) : undefined) || currentTenant;
 
+    setIsSubmittingOrder(true);
+    setOrderError(null);
+
     const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
     let fulfillment: OrderFulfillment = 'pickup';
     let typeString = 'Recoger en local';
-    let customerName = currentUser?.name || 'Cliente Demo';
+    let customerName = currentUser?.name || (isAnonymousTableQrOrder ? 'Comensal QR' : 'Cliente Demo');
     let customerPhone = '';
     let deliveryAddress: CustomerDeliveryAddress | undefined = undefined;
     let tableNumber: string | undefined = undefined;
     let tableId: string | undefined = undefined;
     let tableToken: string | undefined = undefined;
+    let deviceId: string | undefined = undefined;
     let restaurantNotes: string | undefined = undefined;
     let deliveryFeeApplied = 0;
 
@@ -1287,6 +1300,7 @@ const location = useLocationSlice();
       tableNumber = details.tableNumber;
       tableId = details.tableId;
       tableToken = details.tableToken;
+      deviceId = details.deviceId;
       restaurantNotes = details.restaurantNotes;
 
       if (fulfillment === 'pickup') {
@@ -1313,6 +1327,20 @@ const location = useLocationSlice();
       }
     }
 
+    // Validación de ciudad cruzada para domicilio y recoger en local (P1-12)
+    if (
+      (fulfillment === 'restaurant_delivery' || fulfillment === 'pickup') &&
+      orderTenant.cityId &&
+      selectedCityId &&
+      orderTenant.cityId !== selectedCityId
+    ) {
+      setIsSubmittingOrder(false);
+      const cityMismatchError = `El restaurante ${orderTenant.name} opera en otra ciudad y no está disponible para pedidos en la ciudad seleccionada.`;
+      setOrderError(cityMismatchError);
+      showToast(`⚠️ ${cityMismatchError}`);
+      return { success: false };
+    }
+
     const calculatedTotal = subtotal + deliveryFeeApplied;
     
     // Preparar el pedido vinculado estrictamente al restaurante de los productos y al cliente actual
@@ -1336,6 +1364,7 @@ const location = useLocationSlice();
       tableNumber,
       tableId,
       tableToken,
+      deviceId,
       restaurantNotes
     };
 
@@ -1361,7 +1390,8 @@ const location = useLocationSlice();
         return { success: true, isRemote: true, orderId: res.orderId };
       }
 
-      const paymentRes = await createRemotePayment(res.orderId, 'sandbox');
+      const remoteMethod = method === 'wompi' ? 'wompi' : 'sandbox';
+      const paymentRes = await createRemotePayment(res.orderId, remoteMethod, deviceId);
       setIsSubmittingOrder(false);
 
       if (!paymentRes.success) {
@@ -1372,10 +1402,6 @@ const location = useLocationSlice();
       clearCart();
       playChime();
       showToast(`¡Pedido (${typeString}) enviado a ${orderTenant.name}! Completa el pago seguro en la URL provista.`);
-      
-      if (paymentRes.sandboxUrl) {
-        console.log('Redirecting to sandbox UI:', paymentRes.sandboxUrl);
-      }
 
       return { 
         success: true, 
@@ -1501,8 +1527,7 @@ const location = useLocationSlice();
           if (o.id === orderId) {
             return {
               ...o,
-              paymentStatus: 'approved',
-              payments: (o as any).payments?.map((p: any) => p.id === paymentId ? { ...p, status: 'approved' } : p)
+              paymentStatus: 'approved'
             };
           }
           return o;
@@ -1587,9 +1612,48 @@ const location = useLocationSlice();
       showToast('⚠️ No tienes autorización para asignar repartidores en este restaurante.');
       return;
     }
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, driverId } : o));
+    const targetDriver = drivers.find(d => d.id === driverId);
+    if (authMode === 'remote' && targetDriver) {
+      recentLocalOrderUpdatesRef.current.set(orderId, Date.now());
+      void assignRemoteOrderDriver(orderId, driverId);
+    }
+    setOrders(prev =>
+      prev.map(o =>
+        o.id === orderId
+          ? {
+              ...o,
+              driverId,
+              driverName: targetDriver?.name || o.driverName,
+              driverPhone: targetDriver?.phone || o.driverPhone
+            }
+          : o
+      )
+    );
     setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, status: 'busy', assignedOrderId: orderId } : d));
-    showToast(`Domiciliario asignado al pedido #${orderId}`);
+    showToast(`Domiciliario asignado al pedido #${orderId.slice(0, 8)}`);
+  };
+
+  const toggleKdsOrderItem = async (orderId: string, itemKey: string, checked?: boolean): Promise<void> => {
+    const targetOrder = orders.find(o => o.id === orderId);
+    if (!targetOrder) return;
+    if (!isRestaurantOwner(currentUser) && !isRestaurantStaff(currentUser)) return;
+    if (currentUser?.tenantId !== targetOrder.tenantId) return;
+
+    const currentChecked: Record<string, boolean> = targetOrder.kdsCheckedItems || {};
+    const nextVal = typeof checked === 'boolean' ? checked : !currentChecked[itemKey];
+    const nextChecked: Record<string, boolean> = {
+      ...currentChecked,
+      [itemKey]: nextVal
+    };
+
+    setOrders(prev =>
+      prev.map(o => (o.id === orderId ? { ...o, kdsCheckedItems: nextChecked } : o))
+    );
+
+    if (authMode === 'remote') {
+      recentLocalOrderUpdatesRef.current.set(orderId, Date.now());
+      await updateRemoteOrderKdsItems(orderId, nextChecked);
+    }
   };
 
   const triggerTestOrder = () => {
@@ -1903,8 +1967,43 @@ const location = useLocationSlice();
       return false;
     }
 
+    let storyItemId = `story_custom_${Date.now()}`;
+
+    if (authMode === 'remote') {
+      try {
+        const savedPost = await createLivePost(
+          targetTenant.id,
+          storyData.dishName?.trim() || targetTenant.name,
+          storyData.caption?.trim() || `Historia 24h de ${targetTenant.name}`,
+          Number(storyData.price) || 0,
+          mediaSource || imagePreview,
+          mediaType,
+          storyData.productId && storyData.productId !== '0' ? storyData.productId : undefined,
+          1080,
+          1920,
+          ['#story24h']
+        );
+        if (savedPost) {
+          storyItemId = `story_post_${savedPost.id}`;
+          const fullStoryPost: Post = {
+            ...savedPost,
+            tenantName: targetTenant.name,
+            tenantCategory: targetTenant.category,
+            tenantLogoEmoji: targetTenant.logoEmoji || '🍽️',
+            tenantAddress: targetTenant.address,
+            hashtags: ['#story24h'],
+            createdAt: Date.now()
+          };
+          setRemotePosts(prev => [fullStoryPost, ...prev]);
+          setPosts(prev => [fullStoryPost, ...prev]);
+        }
+      } catch (err) {
+        console.warn('No se pudo replicar la historia en posts remotos, conservada localmente:', err);
+      }
+    }
+
     const newStoryItem: StoryItem = {
-      id: `story_custom_${Date.now()}`,
+      id: storyItemId,
       tenantId: targetTenant.id,
       tenantName: targetTenant.name,
       tenantEmoji: targetTenant.logoEmoji || '🍽️',
@@ -1921,25 +2020,6 @@ const location = useLocationSlice();
 
     setCustomStoryItems(prev => [newStoryItem, ...prev]);
 
-    if (authMode === 'remote') {
-      try {
-        await createLivePost(
-          targetTenant.id,
-          newStoryItem.dishName,
-          newStoryItem.caption || `Historia 24h de ${targetTenant.name}`,
-          newStoryItem.price,
-          mediaSource || imagePreview,
-          mediaType,
-          newStoryItem.productId && newStoryItem.productId !== '0' ? newStoryItem.productId : undefined,
-          1080,
-          1920,
-          ['#story24h']
-        );
-      } catch (err) {
-        console.warn('No se pudo replicar la historia en posts remotos, conservada localmente:', err);
-      }
-    }
-
     showToast('🔥 ¡Historia activa por 24h en el carrusel superior!');
     return true;
   };
@@ -1948,6 +2028,21 @@ const location = useLocationSlice();
     if (!storyItemId) return;
     setCustomStoryItems(prev => prev.filter(item => item.id !== storyItemId));
     setHiddenStoryItemIds(prev => (prev.includes(storyItemId) ? prev : [...prev, storyItemId]));
+
+    if (authMode === 'remote' && storyItemId.startsWith('story_post_')) {
+      const postId = storyItemId.replace(/^story_post_/, '');
+      const sourceList = remotePosts.length > 0 ? remotePosts : posts;
+      const targetPost = sourceList.find(p => p.id === postId);
+      const targetTenantId = targetPost?.tenantId || currentUser?.tenantId;
+      if (postId && targetTenantId) {
+        const res = await deleteLivePost(postId, targetTenantId);
+        if (res.success) {
+          setRemotePosts(prev => prev.filter(p => p.id !== postId));
+          setPosts(prev => prev.filter(p => p.id !== postId));
+        }
+      }
+    }
+
     showToast('🗑️ Historia retirada del carrusel activo');
   };
 
@@ -1957,6 +2052,17 @@ const location = useLocationSlice();
       return;
     }
     const targetTenantId = currentUser.tenantId;
+    if (authMode === 'remote') {
+      void createRestaurantDriver(targetTenantId, driverData).then(savedDriver => {
+        if (savedDriver) {
+          setDrivers(prev => [...prev, savedDriver]);
+          showToast(`🛵 Repartidor ${savedDriver.name} registrado`);
+        } else {
+          showToast('⚠️ No se pudo guardar el repartidor en el servidor.');
+        }
+      });
+      return;
+    }
     const newDriver: Driver = {
       ...driverData,
       id: `d_${Date.now()}`,
@@ -1965,6 +2071,22 @@ const location = useLocationSlice();
     };
     setDrivers(prev => [...prev, newDriver]);
     showToast(`🛵 Repartidor ${newDriver.name} registrado`);
+  };
+
+  const deleteDriver = async (driverId: string): Promise<void> => {
+    if (!isRestaurantOwner(currentUser) || !currentUser?.tenantId) {
+      showToast('⚠️ No tienes autorización para eliminar repartidores.');
+      return;
+    }
+    if (authMode === 'remote') {
+      const ok = await deleteRestaurantDriver(driverId);
+      if (!ok) {
+        showToast('⚠️ No se pudo eliminar el repartidor en el servidor.');
+        return;
+      }
+    }
+    setDrivers(prev => prev.filter(d => d.id !== driverId));
+    showToast('🗑️ Repartidor eliminado');
   };
 
   const updateProduct = async (productId: string, updates: Partial<Product>) => {
@@ -2105,8 +2227,8 @@ const location = useLocationSlice();
     }
 
     const hasDelivery = applicationData.deliveryModes.includes('restaurant_delivery');
-    let finalDeliveryFee = hasDelivery ? applicationData.deliveryFee : undefined;
-    let finalDeliveryRadiusKm = hasDelivery ? applicationData.deliveryRadiusKm : undefined;
+    const finalDeliveryFee = hasDelivery ? applicationData.deliveryFee : undefined;
+    const finalDeliveryRadiusKm = hasDelivery ? applicationData.deliveryRadiusKm : undefined;
 
     if (hasDelivery) {
       if (finalDeliveryFee !== undefined && (!Number.isFinite(finalDeliveryFee) || finalDeliveryFee < 0)) {
@@ -2148,13 +2270,20 @@ const location = useLocationSlice();
           return false; // Stop the flow, do not add fake app
         }
 
-        const finalApp = result.application;
+        let finalApp = result.application;
 
-        // Imágenes (opcionales): se suben DESPUÉS de crear la solicitud, con URLs firmadas.
+        // Imágenes (opcionales): se suben DESPUÉS de crear la solicitud, con URLs firmadas o directas.
         // Si fallan, la solicitud ya es válida y solo se avisa al usuario.
         if (assets && (assets.logo || assets.banner)) {
           const assetResult = await uploadApplicationAssets(finalApp.id, assets);
           if (assetResult.error) assetWarning = assetResult.error;
+          if (assetResult.logoUrl || assetResult.bannerUrl) {
+            finalApp = {
+              ...finalApp,
+              logoUrl: assetResult.logoUrl || finalApp.logoUrl,
+              bannerUrl: assetResult.bannerUrl || finalApp.bannerUrl
+            };
+          }
         }
 
         // Success! Only save the real App
@@ -2492,19 +2621,35 @@ const location = useLocationSlice();
 
   const activeTenants = authMode === 'remote' ? remoteTenants : tenants;
   const activeProducts = authMode === 'remote' ? remoteProducts : products;
-  const activePosts = authMode === 'remote' ? remotePosts : posts;
+  const rawActivePosts = authMode === 'remote' ? remotePosts : posts;
+  // Filtrar historias efímeras (#story24h) para que nunca contaminen el feed principal (P1-03)
+  const activePosts = React.useMemo<Post[]>(
+    () => rawActivePosts.filter(p => !p.hashtags?.includes('#story24h')),
+    [rawActivePosts]
+  );
+
+  const [storyReferenceNow] = useState<number>(() => Date.now());
 
   const activeStories = React.useMemo<Story[]>(() => {
     const dynamicStories: Story[] = [];
     const seenTenantIds = new Set<string>();
     const hiddenSet = new Set(hiddenStoryItemIds);
+    const now = storyReferenceNow;
+    const storyTtlMs = 24 * 60 * 60 * 1000;
 
     for (const tenant of activeTenants) {
       if (tenant.status !== 'active') continue;
       const tenantCustomStories = customStoryItems.filter(
-        (item) => item.tenantId === tenant.id && !hiddenSet.has(item.id)
+        (item) =>
+          item.tenantId === tenant.id &&
+          !hiddenSet.has(item.id) &&
+          (!item.createdAt || now - item.createdAt <= storyTtlMs)
       );
-      const tenantPosts = activePosts.filter((p) => p.tenantId === tenant.id);
+      const tenantPosts = rawActivePosts.filter(
+        (p) =>
+          p.tenantId === tenant.id &&
+          (!p.createdAt || now - p.createdAt <= storyTtlMs)
+      );
       const tenantProducts = activeProducts.filter((pr) => pr.tenantId === tenant.id && pr.available);
 
       const items: StoryItem[] = [...tenantCustomStories];
@@ -2600,7 +2745,7 @@ const location = useLocationSlice();
     }
 
     return dynamicStories;
-  }, [activeTenants, activePosts, activeProducts, stories, customStoryItems, hiddenStoryItemIds]);
+  }, [activeTenants, rawActivePosts, activeProducts, stories, customStoryItems, hiddenStoryItemIds, storyReferenceNow]);
 
   const scopedOrders = React.useMemo(() => {
     if (!currentUser) return [];
@@ -2644,6 +2789,7 @@ const location = useLocationSlice();
     createStoryItem,
     deleteStoryItem,
     addDriver,
+    deleteDriver,
     deleteProduct,
     updateEquityWeight,
     addToCart,
@@ -2658,6 +2804,7 @@ const location = useLocationSlice();
     addProduct,
     updateProduct,
     assignDriverToOrder,
+    toggleKdsOrderItem,
     submitRestaurantApplication,
     reviewRestaurantApplication,
     activateApprovedRestaurant,
@@ -2697,6 +2844,7 @@ const location = useLocationSlice();
       createStoryItem,
       deleteStoryItem,
       addDriver,
+      deleteDriver,
       deleteProduct,
       updateEquityWeight,
       addToCart,
@@ -2711,6 +2859,7 @@ const location = useLocationSlice();
       addProduct,
       updateProduct,
       assignDriverToOrder,
+      toggleKdsOrderItem,
       submitRestaurantApplication,
       reviewRestaurantApplication,
       activateApprovedRestaurant,
@@ -2750,6 +2899,7 @@ const location = useLocationSlice();
     createStoryItem: ((...args) => handlersRef.current.createStoryItem(...args)) as typeof createStoryItem,
     deleteStoryItem: ((...args) => handlersRef.current.deleteStoryItem(...args)) as typeof deleteStoryItem,
     addDriver: ((...args) => handlersRef.current.addDriver(...args)) as typeof addDriver,
+    deleteDriver: ((...args) => handlersRef.current.deleteDriver(...args)) as typeof deleteDriver,
     deleteProduct: ((...args) => handlersRef.current.deleteProduct(...args)) as typeof deleteProduct,
     setEquityWeight: ((...args) => handlersRef.current.updateEquityWeight(...args)) as typeof updateEquityWeight,
     addToCart: ((...args) => handlersRef.current.addToCart(...args)) as typeof addToCart,
@@ -2764,6 +2914,7 @@ const location = useLocationSlice();
     addProduct: ((...args) => handlersRef.current.addProduct(...args)) as typeof addProduct,
     updateProduct: ((...args) => handlersRef.current.updateProduct(...args)) as typeof updateProduct,
     assignDriverToOrder: ((...args) => handlersRef.current.assignDriverToOrder(...args)) as typeof assignDriverToOrder,
+    toggleKdsOrderItem: ((...args) => handlersRef.current.toggleKdsOrderItem(...args)) as typeof toggleKdsOrderItem,
     submitRestaurantApplication: ((...args) => handlersRef.current.submitRestaurantApplication(...args)) as typeof submitRestaurantApplication,
     reviewRestaurantApplication: ((...args) => handlersRef.current.reviewRestaurantApplication(...args)) as typeof reviewRestaurantApplication,
     activateApprovedRestaurant: ((...args) => handlersRef.current.activateApprovedRestaurant(...args)) as typeof activateApprovedRestaurant,

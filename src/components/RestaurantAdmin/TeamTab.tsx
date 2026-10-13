@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/useApp';
 import type { Tenant, RestaurantMember } from '../../types';
 import {
@@ -39,22 +39,30 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const isOwner =
-    members.find(m => m.userId === currentUser?.id)?.role === 'owner' ||
+    members.find(m => m.userId === currentUser?.id && m.status === 'active')?.role === 'owner' ||
+    currentUser?.businessRole === 'restaurant_owner' ||
     currentUser?.role === 'admin' ||
-    currentUser?.role === 'platform_admin' ||
-    currentUser?.tenantId === tenant.id;
+    currentUser?.role === 'platform_admin';
 
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     setLoading(true);
     const data = await fetchRestaurantMembers(tenant.id);
     setMembers(data);
     setLoading(false);
-  };
+  }, [fetchRestaurantMembers, tenant.id]);
 
   useEffect(() => {
-    loadMembers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenant.id]);
+    let isMounted = true;
+    fetchRestaurantMembers(tenant.id).then(data => {
+      if (isMounted) {
+        setMembers(data);
+        setLoading(false);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchRestaurantMembers, tenant.id]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();

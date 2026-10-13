@@ -116,12 +116,27 @@ export interface SettlementReceiptData {
   bankDetails?: string;
 }
 
+function escapeReceiptHtml(value: string | undefined | null): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * Genera y descarga un Acta de Liquidación y Cruce de Saldos en formato HTML imprimible a PDF
  * para soporte contable del restaurante y de GastroSync.
  */
 export function downloadSettlementReceiptHtml(data: SettlementReceiptData): void {
   const fmt = (n: number) => `$${Math.round(n || 0).toLocaleString('es-CO')} COP`;
+  const safeRef = escapeReceiptHtml(data.referenceCode);
+  const safeRestName = escapeReceiptHtml(data.restaurantName);
+  const safeChannel = escapeReceiptHtml(data.paymentChannel.toUpperCase());
+  const safeBankDetails = data.bankDetails ? escapeReceiptHtml(data.bankDetails) : '';
+  const safeNotes = data.notes ? escapeReceiptHtml(data.notes) : '';
+
   const typeLabel =
     data.settlementType === 'platform_payout_to_restaurant'
       ? 'DISPERSIÓN BANCARIA AL RESTAURANTE (NETO TRAS CRUCE)'
@@ -133,7 +148,7 @@ export function downloadSettlementReceiptHtml(data: SettlementReceiptData): void
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Acta de Liquidación ${data.referenceCode} - ${data.restaurantName}</title>
+  <title>Acta de Liquidación ${safeRef} - ${safeRestName}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #0f172a; padding: 32px; }
     .sheet { max-width: 720px; margin: 0 auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 16px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
@@ -158,17 +173,17 @@ export function downloadSettlementReceiptHtml(data: SettlementReceiptData): void
       </div>
       <div style="text-align: right;">
         <span class="badge">CONCILIADO</span>
-        <div style="font-size: 13px; font-weight: 800; margin-top: 6px;">Ref: ${data.referenceCode}</div>
-        <div style="font-size: 12px; color: #64748b;">Fecha: ${new Date(data.createdAt).toLocaleString('es-CO')}</div>
+        <div style="font-size: 13px; font-weight: 800; margin-top: 6px;">Ref: ${safeRef}</div>
+        <div style="font-size: 12px; color: #64748b;">Fecha: ${escapeReceiptHtml(new Date(data.createdAt).toLocaleString('es-CO'))}</div>
       </div>
     </div>
 
     <div style="font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
-      <div><strong>Restaurante Aliado:</strong> ${data.restaurantName}</div>
+      <div><strong>Restaurante Aliado:</strong> ${safeRestName}</div>
       <div><strong>Tipo de Operación:</strong> ${typeLabel}</div>
-      <div><strong>Canal Bancario / Pasarela:</strong> ${data.paymentChannel.toUpperCase()}</div>
-      ${data.bankDetails ? `<div><strong>Cuenta Destino Registrada:</strong> ${data.bankDetails}</div>` : ''}
-      ${data.notes ? `<div><strong>Observaciones / Comprobante:</strong> ${data.notes}</div>` : ''}
+      <div><strong>Canal Bancario / Pasarela:</strong> ${safeChannel}</div>
+      ${safeBankDetails ? `<div><strong>Cuenta Destino Registrada:</strong> ${safeBankDetails}</div>` : ''}
+      ${safeNotes ? `<div><strong>Observaciones / Comprobante:</strong> ${safeNotes}</div>` : ''}
     </div>
 
     <table>

@@ -85,6 +85,7 @@ export interface AppContextType {
   }) => Promise<boolean>;
   deleteStoryItem: (storyItemId: string) => Promise<void>;
   addDriver: (driver: Omit<Driver, 'id' | 'tenantId' | 'status'>) => void;
+  deleteDriver?: (driverId: string) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
   setEquityWeight: (weight: number) => void;
   addToCart: (product: Product) => { success: boolean; requiresClear?: boolean; activeTenantName?: string; } | void;
@@ -99,6 +100,7 @@ export interface AppContextType {
   addProduct: (product: Omit<Product, 'id' | 'tenantId'>) => Promise<boolean>;
   updateProduct: (productId: string, updates: Partial<Product>) => Promise<void>;
   assignDriverToOrder: (orderId: string, driverId: string) => void;
+  toggleKdsOrderItem: (orderId: string, itemKey: string, checked?: boolean) => Promise<void>;
   submitRestaurantApplication: (applicationData: Omit<RestaurantApplication, 'id' | 'submittedAt' | 'status'>, assets?: ApplicationAssetFiles) => Promise<boolean>;
   reviewRestaurantApplication: (applicationId: string, nextStatus: 'reviewing' | 'approved' | 'rejected', reviewNote?: string) => Promise<boolean>;
   activateApprovedRestaurant: (applicationId: string) => Promise<{ success: boolean; tenantId?: string; error?: string; message?: string }>;

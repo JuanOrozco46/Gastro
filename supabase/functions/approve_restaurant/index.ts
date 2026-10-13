@@ -140,7 +140,19 @@ serve(async (req) => {
       // 2. Generar un slug único (reintenta ante colisión)
       const baseSlug = application.restaurant_name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'restaurante';
 
-      // 3. Crear el restaurante
+      const resolvedLogoUrl =
+        (typeof application.logo_url === 'string' && application.logo_url.trim()) ||
+        (typeof application.logo_path === 'string' && application.logo_path.trim()
+          ? supabaseAdmin.storage.from('gastro-media').getPublicUrl(application.logo_path.trim()).data.publicUrl
+          : null);
+
+      const resolvedBannerUrl =
+        (typeof application.banner_url === 'string' && application.banner_url.trim()) ||
+        (typeof application.banner_path === 'string' && application.banner_path.trim()
+          ? supabaseAdmin.storage.from('gastro-media').getPublicUrl(application.banner_path.trim()).data.publicUrl
+          : null);
+
+      // 3. Crear el restaurante (preservando logo_url, banner_url y schedule_hours -> business_hours)
       let restaurantId: string | null = null;
       let lastInsertError: string | undefined;
       for (let attempt = 0; attempt < 5 && !restaurantId; attempt++) {
@@ -154,15 +166,19 @@ serve(async (req) => {
           address: application.address,
           status: 'active',
           is_open: false,
+          accepting_orders: true,
           city_id: application.city_id,
           zone_id: application.zone_id,
           phone: application.owner_phone,
           whatsapp: application.whatsapp,
-          min_order: application.min_order ?? null,
+          min_order: application.min_order ?? 0,
           estimated_delivery_minutes: application.estimated_delivery_minutes ?? null,
           delivery_modes: application.delivery_modes || ['pickup', 'restaurant_delivery'],
           delivery_fee: application.delivery_fee || 0,
-          delivery_radius_km: application.delivery_radius_km || 5
+          delivery_radius_km: application.delivery_radius_km || 5,
+          logo_url: resolvedLogoUrl,
+          banner_url: resolvedBannerUrl,
+          business_hours: application.schedule_hours ?? null
         }).select('id').single();
 
         if (!restaurantError && restaurantData) {
@@ -190,14 +206,22 @@ serve(async (req) => {
         throw new Error('Error al vincular el usuario al restaurante: ' + memberError.message);
       }
 
-      // 4b. Sincronizar perfil del propietario con rol de restaurante y datos de la solicitud
+      // 4b. Sincronizar perfil del propietario sin degradar platform_admin (P1-14)
+      const { data: existingOwnerProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('platform_role')
+        .eq('id', newOwnerId)
+        .maybeSingle();
+
+      const ownerIsPlatformAdmin = existingOwnerProfile?.platform_role === 'platform_admin';
+
       await supabaseAdmin.from('profiles').upsert({
         id: newOwnerId,
         full_name: application.owner_name?.trim() || ownerEmail,
         phone: application.owner_phone?.trim() || null,
         default_address: application.address?.trim() || null,
-        platform_role: 'customer',
-        business_role: 'restaurant_owner',
+        platform_role: ownerIsPlatformAdmin ? 'platform_admin' : 'customer',
+        business_role: ownerIsPlatformAdmin ? 'platform_admin' : 'restaurant_owner',
         tenant_id: restaurantId,
         updated_at: new Date().toISOString()
       });
@@ -231,9 +255,15 @@ serve(async (req) => {
     }
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
+    const lower = msg.toLowerCase();
+    const status =
+      lower.includes('no autorizado') || lower.includes('falta el token') ? 401
+      : lower.includes('permisos insuficientes') ? 403
+      : lower.includes('no encontrada') ? 404
+      : 400;
     return new Response(
-      JSON.stringify({ error: msg }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      JSON.stringify({ success: false, error: msg }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status }
     );
   }
 })

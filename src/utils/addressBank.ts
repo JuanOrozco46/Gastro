@@ -1,5 +1,5 @@
 import type { SavedDeliveryAddress, UserAccount } from '../types';
-import { DEFAULT_CITIES } from '../context/defaultData';
+import { DEFAULT_CITIES } from '../context/defaultData.ts';
 
 const ADDRESS_BANK_STORAGE_PREFIX = 'gs_address_bank_v1_';
 

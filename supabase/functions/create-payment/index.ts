@@ -28,9 +28,10 @@ serve(async (req) => {
   }
 
   try {
-    const { orderId, provider = 'wompi' } = await req.json();
+    const body = await req.json();
+    const { orderId, provider = 'wompi', deviceId } = body ?? {};
 
-    if (!orderId) {
+    if (!orderId || typeof orderId !== 'string') {
       return new Response(
         JSON.stringify({ error: 'Falta el parámetro requerido: orderId' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
@@ -50,34 +51,10 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Validate Auth user
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'No autorizado. Se requiere token JWT.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-      );
-    }
-
-    const supabaseAuthClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') || '', {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const { data: userData, error: authError } = await supabaseAuthClient.auth.getUser();
-    
-    if (authError || !userData?.user) {
-      return new Response(
-        JSON.stringify({ error: 'No autorizado. Usuario no válido.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-      );
-    }
-
-    const userId = userData.user.id;
-
-    // Retrieve order and validate ownership & status
+    // Retrieve order first to determine whether it is an authenticated customer order or an anonymous QR table order
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
-      .select('id, restaurant_id, customer_id, total_cop, status, delivery_fee_cop, subtotal_cop')
+      .select('id, restaurant_id, customer_id, fulfillment, table_id, device_id, total_cop, status, delivery_fee_cop, subtotal_cop')
       .eq('id', orderId)
       .single();
 
@@ -88,11 +65,64 @@ serve(async (req) => {
       );
     }
 
-    if (order.customer_id !== userId) {
-      return new Response(
-        JSON.stringify({ error: 'El pedido no pertenece al usuario autenticado.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-      );
+    const isAnonymousTableOrder =
+      order.fulfillment === 'table_service' &&
+      order.customer_id === null &&
+      Boolean(order.table_id) &&
+      typeof order.device_id === 'string' &&
+      order.device_id.trim().length >= 8;
+
+    if (isAnonymousTableOrder) {
+      const providedDeviceId = typeof deviceId === 'string' ? deviceId.trim() : '';
+      if (!providedDeviceId || providedDeviceId !== order.device_id.trim()) {
+        return new Response(
+          JSON.stringify({ error: 'No autorizado. La sesión de mesa no coincide con el pedido.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        );
+      }
+
+      const { data: activeTable } = await supabaseAdmin
+        .from('restaurant_tables')
+        .select('id, is_active, archived_at')
+        .eq('id', order.table_id)
+        .eq('restaurant_id', order.restaurant_id)
+        .maybeSingle();
+
+      if (!activeTable || !activeTable.is_active || activeTable.archived_at !== null) {
+        return new Response(
+          JSON.stringify({ error: 'La mesa asociada al pedido no se encuentra activa.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+    } else {
+      // Validate Auth user for all customer-owned orders
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ error: 'No autorizado. Se requiere token JWT.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+        );
+      }
+
+      const supabaseAuthClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') || '', {
+        global: { headers: { Authorization: authHeader } }
+      });
+
+      const { data: userData, error: authError } = await supabaseAuthClient.auth.getUser();
+      
+      if (authError || !userData?.user) {
+        return new Response(
+          JSON.stringify({ error: 'No autorizado. Usuario no válido.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+        );
+      }
+
+      if (order.customer_id !== userData.user.id) {
+        return new Response(
+          JSON.stringify({ error: 'El pedido no pertenece al usuario autenticado.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        );
+      }
     }
 
     if (order.status !== 'pending') {

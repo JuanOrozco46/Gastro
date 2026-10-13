@@ -17,7 +17,8 @@ export type AddToCartResult =
 export function useCartSlice(
   tenants: Tenant[],
   currentTenant: Tenant,
-  showToast: (message: string) => void
+  showToast: (message: string) => void,
+  selectedCityId?: string
 ) {
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
@@ -46,6 +47,17 @@ export function useCartSlice(
     const prodTenant = tenants.find(t => t.id === product.tenantId) || currentTenant;
     if (!prodTenant.isOpen) {
       showToast(`⚠️ ${prodTenant.name} se encuentra CERRADO temporalmente.`);
+      return { success: false };
+    }
+
+    const isQrTableRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/mesa/');
+    if (
+      !isQrTableRoute &&
+      selectedCityId &&
+      prodTenant.cityId &&
+      prodTenant.cityId !== selectedCityId
+    ) {
+      showToast(`⚠️ ${prodTenant.name} opera en otra ciudad y no realiza entregas en tu ciudad seleccionada.`);
       return { success: false };
     }
 

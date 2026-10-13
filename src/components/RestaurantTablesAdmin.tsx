@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   QrCode,
@@ -43,16 +43,22 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const loadTables = async () => {
-    setIsLoading(true);
+  const loadTables = useCallback(async () => {
     const data = await fetchRestaurantTables(tenant.id);
     setTables(data);
     setIsLoading(false);
-  };
+  }, [tenant.id]);
 
   useEffect(() => {
-    loadTables();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let active = true;
+    void fetchRestaurantTables(tenant.id).then((data) => {
+      if (!active) return;
+      setTables(data);
+      setIsLoading(false);
+    });
+    return () => {
+      active = false;
+    };
   }, [tenant.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {

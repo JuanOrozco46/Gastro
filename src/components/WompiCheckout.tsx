@@ -17,9 +17,13 @@ interface WompiCheckoutProps {
   onCancel: () => void;
 }
 
+interface WompiWidgetInstance {
+  open: (cb: (result: unknown) => void) => void;
+}
+
 export const WompiCheckout: React.FC<WompiCheckoutProps> = ({ config, onWidgetClosed, onCancel }) => {
   const [loadError, setLoadError] = useState(false);
-  const widgetRef = useRef<any>(null);
+  const widgetRef = useRef<WompiWidgetInstance | null>(null);
   const openedRef = useRef(false);
 
   useEffect(() => {
@@ -43,8 +47,10 @@ export const WompiCheckout: React.FC<WompiCheckoutProps> = ({ config, onWidgetCl
         if (!isMounted || openedRef.current) return;
         openedRef.current = true;
 
-        const WidgetCheckout = (window as unknown as { WidgetCheckout: new (config: unknown) => { open: (cb: (result: unknown) => void) => void } }).WidgetCheckout;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const WidgetCheckout = (window as unknown as {
+          WidgetCheckout: new (config: unknown) => WompiWidgetInstance;
+        }).WidgetCheckout;
+
         const checkout = new WidgetCheckout({
           currency: config.currency,
           amountInCents: config.amountInCents,
@@ -53,9 +59,7 @@ export const WompiCheckout: React.FC<WompiCheckoutProps> = ({ config, onWidgetCl
           signature: { integrity: config.signature }
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        checkout.open((result: unknown) => {
-          console.log('Resultado del Widget Wompi:', result);
+        checkout.open(() => {
           if (isMounted) onWidgetClosed();
         });
         

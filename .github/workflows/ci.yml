@@ -1,0 +1,35 @@
+name: GastroSync CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (oxlint + eslint)
+        run: npm run lint
+
+      - name: Typecheck (strict TypeScript)
+        run: npx tsc -b
+
+      - name: Run Automated Tests
+        run: npm test
+
+      - name: Production Build
+        run: npm run build

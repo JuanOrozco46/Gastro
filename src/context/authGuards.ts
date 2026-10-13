@@ -1,5 +1,5 @@
 import type { UserRole, BusinessUserRole, UserAccount, ProvisionedOwnerAccount } from '../types';
-import { loadUserAddressBank, sanitizeSavedAddresses } from '../utils/addressBank';
+import { loadUserAddressBank, sanitizeSavedAddresses } from '../utils/addressBank.ts';
 
 // Internal typed authorization helpers
 export const isRestaurantOwner = (user: UserAccount | null): boolean => {
@@ -60,9 +60,12 @@ export const validateAndGetProvisionedAccounts = (): ProvisionedOwnerAccount[] =
   }
 };
 
-// Validates a cached session from localStorage for Supabase session recovery fallback.
-// In production, onAuthStateChange handles session restoration. This is a safety net.
-export const validateCachedSession = (): UserAccount | null => {
+// Validates a cached session from localStorage strictly for Demo mode.
+// In remote (Supabase) mode, only the verified Supabase JWT session and DB profile are authoritative.
+export const validateCachedSession = (authMode: 'remote' | 'demo' = 'demo'): UserAccount | null => {
+  if (authMode === 'remote') {
+    return null;
+  }
   try {
     const saved = localStorage.getItem('gs_demo_session_v1');
     if (!saved) return null;
@@ -103,14 +106,20 @@ export const validateCachedSession = (): UserAccount | null => {
 
     const userId = typeof obj.id === 'string' ? obj.id : undefined;
     const email = obj.email.trim().toLowerCase();
-    const preferredCityId = typeof obj.preferredCityId === 'string' && obj.preferredCityId.trim()
+    const rawCityId = typeof obj.preferredCityId === 'string' && obj.preferredCityId.trim()
       ? obj.preferredCityId.trim().toLowerCase()
       : undefined;
+    const preferredCityId = rawCityId === 'armenia'
+      ? '00000000-0000-0000-0000-000000000001'
+      : rawCityId;
     const preferredZoneId = typeof obj.preferredZoneId === 'string' && obj.preferredZoneId.trim()
       ? obj.preferredZoneId.trim().toLowerCase()
       : null;
     const localBank = loadUserAddressBank([userId, email]);
-    const savedAddresses = sanitizeSavedAddresses(obj.savedAddresses || localBank, preferredCityId || 'armenia');
+    const savedAddresses = sanitizeSavedAddresses(
+      obj.savedAddresses || localBank,
+      preferredCityId || '00000000-0000-0000-0000-000000000001'
+    );
 
     return {
       id: userId,

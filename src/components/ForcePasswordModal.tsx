@@ -19,8 +19,8 @@ export const ForcePasswordModal: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.');
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
     if (password !== confirmPassword) {
@@ -38,7 +38,10 @@ export const ForcePasswordModal: React.FC = () => {
       });
 
       if (updateError) throw updateError;
-      
+
+      if (window.location.pathname.startsWith('/reset-password')) {
+        window.history.replaceState({}, document.title, '/');
+      }
       // Reload page strictly to clean up states and ensure everything is updated
       window.location.reload();
     } catch (err: unknown) {
@@ -89,7 +92,7 @@ export const ForcePasswordModal: React.FC = () => {
               className="input-field"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="Min. 6 caracteres"
+              placeholder="Mín. 8 caracteres"
               required
             />
           </div>

@@ -1,4 +1,4 @@
-import type { Tenant, Product, Post, Order, OrderItem, OrderFulfillment, OrderStatus, RestaurantDeliveryMode } from '../types';
+import type { Tenant, Product, Post, Order, OrderItem, OrderFulfillment, OrderStatus, RestaurantDeliveryMode, PaymentMethod } from '../types';
 
 export interface DbProfile {
   id: string;
@@ -186,9 +186,14 @@ export interface DbOrder {
   subtotal_cop: number;
   delivery_fee_cop: number;
   total_cop: number;
+  driver_id?: string | null;
+  driver_name?: string | null;
+  driver_phone?: string | null;
+  kds_checked_items?: Record<string, boolean> | null;
   created_at: string;
   updated_at: string;
   order_items?: DbOrderItem[];
+  items?: DbOrderItem[];
   payments?: Pick<DbPayment, 'id' | 'status' | 'provider'>[];
 }
 
@@ -351,11 +356,13 @@ export function mapDbOrderToOrder(db: DbOrder): Order {
     ? JSON.parse(db.delivery_address)
     : db.delivery_address;
 
+  const rawItems = db.order_items || db.items || [];
+
   return {
     id: db.id,
     tenantId: db.restaurant_id,
     type: mapDbFulfillmentToType(db.fulfillment, db.table_number),
-    items: (db.order_items || []).map(mapDbOrderItemToOrderItem),
+    items: rawItems.map(mapDbOrderItemToOrderItem),
     subtotal: db.subtotal_cop,
     deliveryFeeApplied: db.delivery_fee_cop,
     total: db.total_cop,
@@ -363,6 +370,10 @@ export function mapDbOrderToOrder(db: DbOrder): Order {
     createdAt: new Date(db.created_at).getTime(),
     customerName: db.customer_name,
     customerPhone: db.customer_phone,
+    driverId: db.driver_id || undefined,
+    driverName: db.driver_name || undefined,
+    driverPhone: db.driver_phone || undefined,
+    kdsCheckedItems: db.kds_checked_items || undefined,
     fulfillment: db.fulfillment as OrderFulfillment,
     customerId: db.customer_id || undefined,
     deliveryAddress: parsedAddress || undefined,
@@ -371,6 +382,6 @@ export function mapDbOrderToOrder(db: DbOrder): Order {
     cancellationReason: db.cancellation_reason || undefined,
     paymentId: db.payments?.[0]?.id,
     paymentStatus: db.payments?.[0]?.status,
-    paymentMethod: ((db.payments?.[0]?.provider || db.payment_method) as any) || 'cash'
+    paymentMethod: ((db.payments?.[0]?.provider || db.payment_method) as PaymentMethod) || 'cash'
   };
 }

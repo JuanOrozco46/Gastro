@@ -47,71 +47,140 @@ export const EmailVerificationScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" style={{
-        backgroundImage: 'radial-gradient(circle at 50% 30%, var(--primary) 0%, transparent 40%)'
-      }} />
+    <div style={{
+      minHeight: 'calc(100vh - 64px)',
+      background: 'var(--bg-main)',
+      color: 'var(--text-main)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '1.5rem',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 0,
+          opacity: 0.18,
+          pointerEvents: 'none',
+          backgroundImage: 'radial-gradient(circle at 50% 30%, var(--primary) 0%, transparent 45%)'
+        }}
+      />
 
-      <div className="relative z-10 max-w-md w-full bg-[#111111] p-8 rounded-3xl border border-white/10 shadow-2xl">
-        <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center border border-primary/30 shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]">
-            <Mail className="text-primary w-8 h-8" />
+      <div className="card" style={{
+        position: 'relative',
+        zIndex: 10,
+        maxWidth: '440px',
+        width: '100%',
+        background: 'var(--bg-card)',
+        padding: '2rem',
+        borderRadius: '24px',
+        border: '1px solid var(--border-color)',
+        boxShadow: 'var(--shadow-lg)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            background: 'rgba(255, 107, 53, 0.15)',
+            borderRadius: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid rgba(255, 107, 53, 0.35)',
+            color: 'var(--primary)'
+          }}>
+            <Mail size={32} />
           </div>
         </div>
 
-        <h1 className="text-2xl font-bold text-center mb-2">Confirma tu correo para continuar</h1>
+        <h1 style={{ fontSize: '1.45rem', fontWeight: 900, textAlign: 'center', margin: '0 0 0.5rem', color: 'var(--text-main)' }}>
+          Confirma tu correo para continuar
+        </h1>
         
-        <p className="text-center text-gray-400 mb-6 text-sm leading-relaxed">
-          Te enviamos un enlace de confirmación a <strong className="text-white">{pendingVerificationEmail}</strong>. Abre tu correo, confirma la cuenta y vuelve aquí para continuar.
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem', lineHeight: 1.55 }}>
+          Te enviamos un enlace de confirmación a <strong style={{ color: 'var(--text-main)' }}>{pendingVerificationEmail || 'tu correo electrónico'}</strong>. Abre tu bandeja de entrada, confirma la cuenta y vuelve aquí para continuar.
         </p>
 
-        {emailVerificationState === 'error' && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3">
-            <AlertTriangle className="text-red-400 shrink-0 mt-0.5" size={18} />
-            <p className="text-sm text-red-200">Todavía no detectamos la confirmación. Revisa el enlace recibido e inténtalo nuevamente.</p>
+        {(emailVerificationState === 'error' || emailVerificationState === 'expired') && (
+          <div style={{
+            marginBottom: '1.25rem',
+            padding: '0.9rem 1rem',
+            borderRadius: '14px',
+            background: 'rgba(239, 68, 68, 0.12)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.75rem'
+          }}>
+            <AlertTriangle style={{ color: '#F87171', flexShrink: 0, marginTop: '2px' }} size={18} />
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#FECACA', lineHeight: 1.45 }}>
+              Todavía no detectamos la confirmación. Revisa el enlace recibido en tu correo (incluyendo Spam) e inténtalo nuevamente.
+            </p>
           </div>
         )}
 
-        <div className="space-y-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <button
+            type="button"
             onClick={openMailApp}
-            className="w-full py-3 px-4 bg-primary text-primary-foreground font-semibold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '14px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
           >
             Abrir aplicación de correo
             <ArrowRight size={18} />
           </button>
 
           <button
+            type="button"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="w-full py-3 px-4 bg-white/5 border border-white/10 font-medium rounded-xl flex items-center justify-center gap-2 hover:bg-white/10 transition-colors disabled:opacity-50"
+            className="btn btn-outline"
+            style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
           >
             {isRefreshing ? <RefreshCw className="spin" size={18} /> : <CheckCircle size={18} />}
             Ya confirmé mi correo
           </button>
 
           <button
+            type="button"
             onClick={handleResend}
             disabled={cooldown > 0 || isResending}
-            className="w-full py-3 px-4 bg-white/5 border border-white/10 font-medium rounded-xl flex items-center justify-center gap-2 hover:bg-white/10 transition-colors disabled:opacity-50"
+            className="btn btn-outline"
+            style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', opacity: cooldown > 0 || isResending ? 0.6 : 1 }}
           >
             {isResending ? <RefreshCw className="spin" size={18} /> : <Mail size={18} />}
             {cooldown > 0 ? `Podrás solicitar otro correo en ${cooldown}s` : 'Reenviar correo'}
           </button>
         </div>
 
-        <div className="mt-8 flex items-center justify-between pt-6 border-t border-white/10">
+        <div style={{
+          marginTop: '1.75rem',
+          paddingTop: '1.25rem',
+          borderTop: '1px solid var(--border-color)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          flexWrap: 'wrap'
+        }}>
           <button 
+            type="button"
             onClick={signOutUnverifiedUser}
-            className="text-sm text-gray-400 hover:text-white flex items-center gap-2 transition-colors"
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', padding: '0.35rem 0' }}
           >
             <Edit2 size={16} />
             Cambiar correo
           </button>
 
           <button 
+            type="button"
             onClick={signOutUnverifiedUser}
-            className="text-sm text-red-400 hover:text-red-300 flex items-center gap-2 transition-colors"
+            style={{ background: 'transparent', border: 'none', color: '#F87171', fontSize: '0.85rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', padding: '0.35rem 0' }}
           >
             <LogOut size={16} />
             Cerrar sesión

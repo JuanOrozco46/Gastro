@@ -99,6 +99,8 @@ export interface UserRegistrationOptions {
   savedAddresses?: SavedDeliveryAddress[];
   avatarFile?: File | null;
   avatarDataUrl?: string;
+  termsAcceptedAt?: string;
+  privacyAcceptedAt?: string;
 }
 
 export interface City {
@@ -434,6 +436,7 @@ export interface CheckoutDetails {
   tableNumber?: string;
   tableId?: string;
   tableToken?: string;
+  deviceId?: string;
   restaurantNotes?: string;
 }
 
@@ -449,6 +452,9 @@ export interface Order {
   createdAt: number;
   customerName?: string;
   driverId?: string;
+  driverName?: string;
+  driverPhone?: string;
+  kdsCheckedItems?: Record<string, boolean>;
   paymentMethod?: PaymentMethod;
   transactionId?: string;
   paymentId?: string;
@@ -461,6 +467,7 @@ export interface Order {
   tableNumber?: string;
   tableId?: string;
   tableToken?: string;
+  deviceId?: string;
   restaurantNotes?: string;
   cancellationReason?: string;
 }

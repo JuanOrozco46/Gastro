@@ -165,7 +165,10 @@ export async function fetchRestaurantSupportTickets(restaurantId: string): Promi
   }
 }
 
-export async function fetchSupportTicket(ticketId: string): Promise<{
+export async function fetchSupportTicket(
+  ticketId: string,
+  options?: { includeInternal?: boolean }
+): Promise<{
   ticket: SupportTicket | null,
   messages: SupportMessage[],
   order?: Order | null,
@@ -182,30 +185,65 @@ export async function fetchSupportTicket(ticketId: string): Promise<{
       return { ticket: null, messages: [], error: 'Ticket no encontrado o sin acceso.' };
     }
 
-    const { data: messagesData, error: msgsError } = await supabase!.from('support_messages')
+    let canSeeInternal = false;
+    if (options?.includeInternal !== false) {
+      const { data: userRes } = await supabase!.auth.getUser();
+      if (userRes?.user?.id) {
+        const { data: prof } = await supabase!
+          .from('profiles')
+          .select('platform_role')
+          .eq('id', userRes.user.id)
+          .maybeSingle();
+        canSeeInternal = prof?.platform_role === 'platform_admin';
+      }
+    }
+
+    let msgsQuery = supabase!.from('support_messages')
       .select('*')
-      .eq('ticket_id', ticketId)
-      .order('created_at', { ascending: true });
+      .eq('ticket_id', ticketId);
+
+    if (!canSeeInternal) {
+      msgsQuery = msgsQuery.eq('is_internal', false);
+    }
+
+    const { data: messagesData, error: msgsError } = await msgsQuery.order('created_at', { ascending: true });
 
     if (msgsError) {
       console.error('Error fetching messages', msgsError);
     }
 
+    const safeMessages = ((messagesData as SupportMessage[]) || []).filter(
+      (m) => canSeeInternal || !m.is_internal
+    );
+
     let orderData: Order | null = null;
     if (ticketData && ticketData.related_order_id) {
-      const { data: ord } = await supabase!.from('orders').select('*').eq('id', ticketData.related_order_id).single();
+      const { data: ord } = await supabase!
+        .from('orders')
+        .select('*, order_items(id, order_id, product_id, product_name, unit_price_cop, quantity)')
+        .eq('id', ticketData.related_order_id)
+        .maybeSingle();
       if (ord) {
+        const rawItems = Array.isArray(ord.order_items)
+          ? ord.order_items.map((oi: { id: string; product_name: string; quantity: number; unit_price_cop: number }) => ({
+              id: oi.id,
+              name: oi.product_name,
+              qty: oi.quantity,
+              price: oi.unit_price_cop
+            }))
+          : (ord.items || []);
+
         orderData = {
           id: ord.id,
           tenantId: ord.restaurant_id,
           createdAt: new Date(ord.created_at).getTime(),
-          items: ord.items || [],
-          total: ord.total,
+          items: rawItems,
+          total: Number(ord.total_cop ?? ord.total ?? 0),
           status: ord.status,
           customerName: ord.customer_name,
           customerPhone: ord.customer_phone,
           fulfillment: ord.fulfillment,
-          type: ord.type || (ord.fulfillment === 'pickup' ? 'Recogida' : 'Domicilio'),
+          type: ord.type || (ord.fulfillment === 'pickup' ? 'Recogida' : ord.fulfillment === 'table_service' ? 'Mesa' : 'Domicilio'),
           paymentMethod: ord.payment_method
         } as Order;
       }
@@ -213,7 +251,7 @@ export async function fetchSupportTicket(ticketId: string): Promise<{
 
     return { 
       ticket: ticketData as SupportTicket, 
-      messages: (messagesData as SupportMessage[]) || [], 
+      messages: safeMessages, 
       order: orderData,
       error: null 
     };
@@ -491,13 +529,13 @@ export async function fetchSupportMetrics(filters?: {
 }): Promise<{ data: SupportMetrics | null, error: string | null }> {
   try {
     const { data, error } = await supabase!.rpc('get_support_metrics', {
-      p_start_date: filters?.start_date,
-      p_end_date: filters?.end_date,
-      p_city_id: filters?.city_id,
-      p_restaurant_id: filters?.restaurant_id,
-      p_category: filters?.category,
-      p_assigned_to: filters?.assigned_to,
-      p_priority: filters?.priority
+      p_start_date: filters?.start_date || null,
+      p_end_date: filters?.end_date || null,
+      p_city_id: filters?.city_id || null,
+      p_restaurant_id: filters?.restaurant_id || null,
+      p_category: filters?.category || null,
+      p_assigned_to: filters?.assigned_to || null,
+      p_priority: filters?.priority || null
     });
 
     if (error) {
@@ -505,7 +543,19 @@ export async function fetchSupportMetrics(filters?: {
       return { data: null, error: 'No autorizado o error al cargar métricas.' };
     }
 
-    return { data: data as SupportMetrics, error: null };
+    const raw = (data || {}) as Partial<SupportMetrics>;
+    const normalized: SupportMetrics = {
+      total_created: Number(raw.total_created) || 0,
+      total_open: Number(raw.total_open) || 0,
+      total_resolved: Number(raw.total_resolved) || 0,
+      total_closed: Number(raw.total_closed) || 0,
+      avg_first_response_seconds: Number(raw.avg_first_response_seconds) || 0,
+      avg_resolution_seconds: Number(raw.avg_resolution_seconds) || 0,
+      avg_rating: Number(raw.avg_rating) || 0,
+      total_ratings: Number(raw.total_ratings) || 0
+    };
+
+    return { data: normalized, error: null };
   } catch (err: unknown) {
     console.error('Network err fetchSupportMetrics', err);
     return { data: null, error: 'Error de red.' };

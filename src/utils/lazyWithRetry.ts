@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import type { ComponentType, LazyExoticComponent } from 'react';
+import type { LazyExoticComponent } from 'react';
 
 const CHUNK_RELOAD_STORAGE_KEY = 'gs_last_chunk_reload_ts';
 const CHUNK_RELOAD_COOLDOWN_MS = 15_000;
@@ -76,8 +76,11 @@ export function registerChunkErrorHandlers(): void {
  * Envoltorio sobre `React.lazy` con reintento automático ante micro-cortes de red
  * y auto-recarga limpia cuando un despliegue nuevo invalida el hash de un chunk.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function lazyWithRetry<T extends ComponentType<any>>(
+type BaseLazyComponent = Parameters<typeof lazy>[0] extends () => Promise<{ default: infer C }>
+  ? C
+  : never;
+
+export function lazyWithRetry<T extends BaseLazyComponent>(
   importer: () => Promise<{ default: T }>
 ): LazyExoticComponent<T> {
   registerChunkErrorHandlers();

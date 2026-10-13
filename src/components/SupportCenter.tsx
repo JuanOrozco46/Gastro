@@ -60,7 +60,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
   }, []);
 
   useEffect(() => {
-    supabase!.auth.getUser().then(({ data }) => {
+    supabase?.auth.getUser().then(({ data }) => {
       if (data.user) setCurrentUserId(data.user.id);
     });
     loadTickets();
@@ -74,7 +74,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
       setError(error);
     } else {
       setActiveTicket(ticket);
-      setMessages(messages);
+      setMessages(messages.filter(m => !m.is_internal));
       setActiveView('conversation');
       setSelectedTicketId(ticketId);
     }
@@ -124,9 +124,10 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
     if (!newMessage.trim() || !activeTicket) return;
     
     setIsSubmitting(true);
+    setError(null);
     const { data, error } = await createSupportMessage(activeTicket.id, newMessage);
     if (error) {
-      alert(error);
+      setError(error);
     } else if (data) {
       setMessages([...messages, data]);
       setNewMessage('');
@@ -143,12 +144,13 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
   const handleChangeStatus = async (newStatus: 'closed' | 'open') => {
     if (!activeTicket) return;
     setIsSubmitting(true);
+    setError(null);
     const { success, error } = await updateSupportTicketStatus(activeTicket.id, newStatus);
     if (success) {
       setActiveTicket({ ...activeTicket, status: newStatus });
       setTickets(tickets.map(t => t.id === activeTicket.id ? { ...t, status: newStatus } : t));
     } else {
-      alert(error || 'Error al actualizar el ticket');
+      setError(error || 'Error al actualizar el ticket');
     }
     setIsSubmitting(false);
   };

@@ -1,6 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { Tenant, Product, Post, RestaurantApplication, OrderFulfillment, City, Zone, RestaurantDeliveryMode, PostComment, RestaurantReview } from '../types';
+import type { Tenant, Product, Post, RestaurantApplication, OrderFulfillment, City, Zone, RestaurantDeliveryMode, PostComment, RestaurantReview, Driver, RestaurantMember, RestaurantMemberRole, RestaurantMemberStatus } from '../types';
 import type {
   DbRestaurant, DbProduct, DbPost
 } from './supabaseTypes';
@@ -174,6 +174,21 @@ async function fetchProfilesMetaMap(userIds: string[]): Promise<Map<string, Comm
   const map = new Map<string, CommentAuthorMeta>();
   if (!isSupabaseConfigured || !supabase || userIds.length === 0) return map;
 
+  const { data: rpcProfiles, error: rpcErr } = await supabase.rpc('get_public_profiles_by_ids', {
+    p_user_ids: userIds
+  });
+
+  if (!rpcErr && Array.isArray(rpcProfiles)) {
+    (rpcProfiles as Array<{ id: string; full_name: string | null; username?: string | null; avatar_url?: string | null }>).forEach((p) => {
+      map.set(p.id, {
+        fullName: p.full_name || 'Usuario',
+        username: p.username || undefined,
+        avatarUrl: p.avatar_url || undefined
+      });
+    });
+    return map;
+  }
+
   const { data: extProfiles, error: extErr } = await supabase
     .from('profiles')
     .select('id, full_name, username, avatar_url')
@@ -190,16 +205,6 @@ async function fetchProfilesMetaMap(userIds: string[]): Promise<Map<string, Comm
     return map;
   }
 
-  const { data: basicProfiles } = await supabase
-    .from('profiles')
-    .select('id, full_name')
-    .in('id', userIds);
-
-  if (basicProfiles) {
-    basicProfiles.forEach((p: { id: string; full_name: string }) => {
-      map.set(p.id, { fullName: p.full_name || 'Usuario' });
-    });
-  }
   return map;
 }
 
@@ -683,6 +688,21 @@ export async function uploadApplicationAssets(
     }
 
     if (logoUrl || bannerUrl) {
+      const { error: rpcAttachErr } = await supabase.rpc('attach_application_media_urls', {
+        p_application_id: applicationId,
+        p_logo_url: logoUrl || null,
+        p_banner_url: bannerUrl || null
+      });
+
+      if (!rpcAttachErr) {
+        return {
+          logo: Boolean(logoUrl),
+          banner: Boolean(bannerUrl),
+          logoUrl,
+          bannerUrl
+        };
+      }
+
       const dbPatch: Record<string, string> = {};
       if (logoUrl) dbPatch.logo_url = logoUrl;
       if (bannerUrl) dbPatch.banner_url = bannerUrl;
@@ -732,11 +752,13 @@ export async function uploadApplicationAssets(
     });
     if (fin.error) return { ...empty, error: await readFunctionError(fin.error) };
 
-    const result = fin.data as { logo?: boolean; banner?: boolean; rejected?: string[] } | null;
+    const result = fin.data as { logo?: boolean; banner?: boolean; logoUrl?: string; bannerUrl?: string; rejected?: string[] } | null;
     const rejected = result?.rejected ?? [];
     return {
       logo: !!result?.logo,
       banner: !!result?.banner,
+      logoUrl: result?.logoUrl,
+      bannerUrl: result?.bannerUrl,
       error: rejected.length > 0 ? `Imágenes rechazadas: ${rejected.join('; ')}` : undefined
     };
   } catch (err: unknown) {
@@ -789,6 +811,8 @@ export async function submitLiveApplication(
       delivery_radius_km: appData.deliveryRadiusKm,
       estimated_delivery_minutes: appData.estimatedDeliveryMinutes,
       schedule_hours: appData.scheduleHours,
+      logo_url: appData.logoUrl || null,
+      banner_url: appData.bannerUrl || null,
       notes: appData.notes,
       commission_rate_accepted: appData.commissionRateAccepted,
       terms_version: appData.termsVersion,
@@ -833,6 +857,8 @@ export async function submitLiveApplication(
         deliveryRadiusKm: appData.deliveryRadiusKm,
         estimatedDeliveryMinutes: appData.estimatedDeliveryMinutes,
         scheduleHours: appData.scheduleHours,
+        logoUrl: appData.logoUrl,
+        bannerUrl: appData.bannerUrl,
         notes: appData.notes,
         commissionRateAccepted: appData.commissionRateAccepted,
         termsVersion: appData.termsVersion,
@@ -859,8 +885,8 @@ export async function fetchLiveApplications(): Promise<RestaurantApplication[]> 
       return [];
     }
 
-    // Las imágenes viven en un bucket PRIVADO: se resuelven a URLs firmadas de corta vida.
-    // Solo el platform_admin pasa la política de lectura; para otros usuarios no habrá URL.
+    // Las imágenes pueden venir en logo_url/banner_url (bucket público gastro-media)
+    // o en logo_path/banner_path (bucket privado application-assets con URL firmada).
     const client = supabase;
     const signPath = async (path: unknown): Promise<string | undefined> => {
       if (typeof path !== 'string' || !path) return undefined;
@@ -886,8 +912,8 @@ export async function fetchLiveApplications(): Promise<RestaurantApplication[]> 
       deliveryRadiusKm: app.delivery_radius_km as number | undefined,
       estimatedDeliveryMinutes: (app.estimated_delivery_minutes as number | null) ?? undefined,
       scheduleHours: (app.schedule_hours as string | null) ?? undefined,
-      logoUrl: await signPath(app.logo_path),
-      bannerUrl: await signPath(app.banner_path),
+      logoUrl: ((app.logo_url as string | null) || undefined) ?? await signPath(app.logo_path),
+      bannerUrl: ((app.banner_url as string | null) || undefined) ?? await signPath(app.banner_path),
       commissionRateAccepted: app.commission_rate_accepted !== null && app.commission_rate_accepted !== undefined ? Number(app.commission_rate_accepted) : undefined,
       termsAcceptedAt: app.terms_accepted_at ? new Date(app.terms_accepted_at as string).getTime() : undefined,
       termsVersion: (app.terms_version as string | null) ?? undefined,
@@ -1054,7 +1080,7 @@ export async function createLiveProduct(tenantId: string, newProd: Omit<Product,
 export async function updateLiveProduct(productId: string, updates: Partial<Product>): Promise<Product | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
-    const dbUpdates: any = {};
+    const dbUpdates: Record<string, unknown> = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.desc !== undefined) dbUpdates.description = updates.desc || null;
     if (updates.category !== undefined) dbUpdates.category = updates.category;
@@ -1088,11 +1114,26 @@ export async function updateLiveProduct(productId: string, updates: Partial<Prod
 export async function deleteLiveProduct(productId: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
+    const { data: existingProd } = await supabase
+      .from('products')
+      .select('image_url')
+      .eq('id', productId)
+      .maybeSingle();
+
+    const imageUrlToClean = (existingProd as { image_url?: string | null } | null)?.image_url;
+
     const { error } = await supabase.from('products').delete().eq('id', productId);
     if (error) {
       console.warn('⚠️ Error deleting product, maybe foreign key violation. Archiving instead.');
-      const { error: archiveError } = await supabase.from('products').update({ is_archived: true, available: false }).eq('id', productId);
+      const { error: archiveError } = await supabase
+        .from('products')
+        .update({ is_archived: true, available: false })
+        .eq('id', productId);
       return !archiveError;
+    }
+
+    if (imageUrlToClean) {
+      await deleteMediaFile(imageUrlToClean);
     }
     return true;
   } catch (err) {
@@ -1144,12 +1185,13 @@ export async function deleteLivePost(postId: string, restaurantId: string): Prom
     });
     if (error) throw error;
     
-    if (data?.action === 'deleted' && data?.media_url) {
+    const resData = data as { action?: string; media_url?: string } | null;
+    if (resData?.action === 'deleted' && resData?.media_url) {
       const bucketName = 'gastro-media';
       const marker = `/object/public/${bucketName}/`;
-      const markerIndex = data.media_url.indexOf(marker);
+      const markerIndex = resData.media_url.indexOf(marker);
       if (markerIndex !== -1) {
-        const filePath = data.media_url.substring(markerIndex + marker.length);
+        const filePath = resData.media_url.substring(markerIndex + marker.length);
         if (filePath) {
           await supabase.storage.from(bucketName).remove([filePath]);
         }
@@ -1157,9 +1199,9 @@ export async function deleteLivePost(postId: string, restaurantId: string): Prom
     }
     
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.warn('⚠️ Error deleting live post:', err);
-    return { success: false, error: err.message || 'Error al eliminar la publicación' };
+    return { success: false, error: err instanceof Error ? err.message : 'Error al eliminar la publicación' };
   }
 }
 
@@ -1307,7 +1349,20 @@ export async function updateRemoteTenant(tenantId: string, updates: Partial<Tena
 // 10. TEAM MEMBERS MANAGEMENT
 // ============================================================================
 
-import type { RestaurantMember } from '../types';
+interface DbRestaurantMemberRow {
+  id: string;
+  restaurant_id: string;
+  user_id: string | null;
+  email: string;
+  role: RestaurantMemberRole;
+  status: RestaurantMemberStatus;
+  invited_by?: string | null;
+  invited_at?: string | null;
+  accepted_at?: string | null;
+  revoked_at?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}
 
 export async function fetchRestaurantMembers(restaurantId: string): Promise<RestaurantMember[]> {
   if (!isSupabaseConfigured || !supabase) return [];
@@ -1319,19 +1374,19 @@ export async function fetchRestaurantMembers(restaurantId: string): Promise<Rest
     
     if (error) throw error;
     
-    return (data || []).map((db: any) => ({
+    return ((data || []) as DbRestaurantMemberRow[]).map((db) => ({
       id: db.id,
       restaurantId: db.restaurant_id,
       userId: db.user_id,
       email: db.email,
       role: db.role,
       status: db.status,
-      invitedBy: db.invited_by,
-      invitedAt: db.invited_at,
-      acceptedAt: db.accepted_at,
-      revokedAt: db.revoked_at,
+      invitedBy: db.invited_by ?? undefined,
+      invitedAt: db.invited_at ?? undefined,
+      acceptedAt: db.accepted_at ?? undefined,
+      revokedAt: db.revoked_at ?? undefined,
       createdAt: db.created_at,
-      updatedAt: db.updated_at
+      updatedAt: db.updated_at ?? undefined
     }));
   } catch (err) {
     console.error('⚠️ Error fetching restaurant members:', err);
@@ -1349,9 +1404,9 @@ export async function inviteRestaurantStaff(restaurantId: string, email: string)
     });
     if (error) throw error;
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('⚠️ Error inviting staff:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -1361,8 +1416,8 @@ export async function resendStaffInvitation(memberId: string): Promise<{ success
     const { error } = await supabase.rpc('resend_restaurant_invitation', { p_member_id: memberId });
     if (error) throw error;
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -1372,8 +1427,8 @@ export async function suspendRestaurantMember(memberId: string): Promise<{ succe
     const { error } = await supabase.rpc('update_member_status', { p_member_id: memberId, p_new_status: 'suspended' });
     if (error) throw error;
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -1383,8 +1438,8 @@ export async function reactivateRestaurantMember(memberId: string): Promise<{ su
     const { error } = await supabase.rpc('update_member_status', { p_member_id: memberId, p_new_status: 'active' });
     if (error) throw error;
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -1394,8 +1449,8 @@ export async function revokeRestaurantMember(memberId: string): Promise<{ succes
     const { error } = await supabase.rpc('update_member_status', { p_member_id: memberId, p_new_status: 'revoked' });
     if (error) throw error;
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -1405,8 +1460,122 @@ export async function acceptRestaurantInvitation(memberId: string): Promise<{ su
     const { error } = await supabase.rpc('accept_restaurant_invitation', { p_member_id: memberId });
     if (error) throw error;
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// ============================================================================
+// 11. DRIVERS & KDS PERSISTENCE (P1-10)
+// ============================================================================
+
+interface DbRestaurantDriverRow {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  phone: string;
+  vehicle: string | null;
+  status: 'available' | 'busy' | 'offline';
+  is_active: boolean;
+}
+
+export async function fetchRestaurantDrivers(restaurantId: string): Promise<Driver[]> {
+  if (!isSupabaseConfigured || !supabase || !restaurantId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('restaurant_drivers')
+      .select('id, restaurant_id, name, phone, vehicle, status, is_active')
+      .eq('restaurant_id', restaurantId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+
+    if (error || !data) return [];
+    return (data as DbRestaurantDriverRow[]).map((d) => ({
+      id: d.id,
+      tenantId: d.restaurant_id,
+      name: d.name,
+      phone: d.phone,
+      vehicle: d.vehicle || 'Moto',
+      status: d.status || 'available'
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function createRestaurantDriver(
+  restaurantId: string,
+  payload: { name: string; phone: string; vehicle?: string }
+): Promise<Driver | null> {
+  if (!isSupabaseConfigured || !supabase || !restaurantId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('restaurant_drivers')
+      .insert({
+        restaurant_id: restaurantId,
+        name: payload.name.trim(),
+        phone: payload.phone.trim(),
+        vehicle: (payload.vehicle || 'Moto').trim(),
+        status: 'available',
+        is_active: true
+      })
+      .select('id, restaurant_id, name, phone, vehicle, status, is_active')
+      .single();
+
+    if (error || !data) return null;
+    const row = data as DbRestaurantDriverRow;
+    return {
+      id: row.id,
+      tenantId: row.restaurant_id,
+      name: row.name,
+      phone: row.phone,
+      vehicle: row.vehicle || 'Moto',
+      status: row.status || 'available'
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteRestaurantDriver(driverId: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !driverId) return false;
+  try {
+    const { error } = await supabase
+      .from('restaurant_drivers')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', driverId);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function assignRemoteOrderDriver(orderId: string, driverId: string | null): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !orderId) return false;
+  try {
+    const { error } = await supabase.rpc('assign_order_driver', {
+      p_order_id: orderId,
+      p_driver_id: driverId
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function updateRemoteOrderKdsItems(
+  orderId: string,
+  checkedItems: Record<string, boolean>
+): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !orderId) return false;
+  try {
+    const { error } = await supabase.rpc('update_order_kds_items', {
+      p_order_id: orderId,
+      p_checked_items: checkedItems
+    });
+    return !error;
+  } catch {
+    return false;
   }
 }
 
@@ -1455,8 +1624,8 @@ export async function createRestaurantTable(payload: { restaurantId: string; tab
 
     if (error) throw error;
     return { success: true, data };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -1476,8 +1645,8 @@ export async function updateRestaurantTable(id: string, payload: { tableNumber?:
 
     if (error) throw error;
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -1491,8 +1660,8 @@ export async function archiveRestaurantTable(id: string) {
 
     if (error) throw error;
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -1501,9 +1670,9 @@ export async function regenerateTableToken(tableId: string): Promise<{ success: 
   try {
     const { data, error } = await supabase.rpc('regenerate_table_token', { p_table_id: tableId });
     if (error) throw error;
-    return { success: true, token: data };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+    return { success: true, token: data as string };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -1512,10 +1681,10 @@ export async function resolveTableByToken(token: string) {
   try {
     const { data, error } = await supabase.rpc('resolve_table_by_token', { p_token: token });
     if (error) throw error;
-    if (data && data.error) return { success: false, error: data.error };
+    if (data && data.error) return { success: false, error: data.error as string };
     return { success: true, data };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 

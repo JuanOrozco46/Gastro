@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../context/useApp';
 import { getFulfillmentBadgeText } from '../utils/tenantHelpers';
 import type { Order, OrderStatus, Tenant } from '../types';
@@ -68,6 +68,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
     updateOrderStatus,
     confirmCashPayment,
     toggleProductAvailability,
+    toggleKdsOrderItem,
     triggerTestOrder
   } = useApp();
   const tenantCityName = cities.find(c => c.id === tenant.cityId)?.name || 'Colombia';
@@ -81,7 +82,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
 
-  // Estado local persistido de platos marcados como listos dentro de cada comanda (estilo Uber Eats KDS)
+  // Estado local + sincronizado en BD de platos marcados como listos dentro de cada comanda
   const [checkedItemsMap, setCheckedItemsMap] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem(`gs_kds_checked_${tenant.id}`);
@@ -115,10 +116,21 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
     [products, tenant.id]
   );
 
-  const toggleItemChecked = (orderId: string, itemIdx: number) => {
-    const key = `${orderId}_${itemIdx}`;
+  const isOrderItemChecked = useCallback((order: Order, itemIdx: number): boolean => {
+    const dbMap = order.kdsCheckedItems;
+    const itemKey = `item_${itemIdx}`;
+    if (dbMap && typeof dbMap[itemKey] === 'boolean') {
+      return dbMap[itemKey];
+    }
+    return Boolean(checkedItemsMap[`${order.id}_${itemIdx}`]);
+  }, [checkedItemsMap]);
+
+  const toggleItemChecked = (order: Order, itemIdx: number) => {
+    const currentChecked = isOrderItemChecked(order, itemIdx);
+    const nextChecked = !currentChecked;
+    const key = `${order.id}_${itemIdx}`;
     setCheckedItemsMap(prev => {
-      const next = { ...prev, [key]: !prev[key] };
+      const next = { ...prev, [key]: nextChecked };
       try {
         localStorage.setItem(`gs_kds_checked_${tenant.id}`, JSON.stringify(next));
       } catch {
@@ -126,6 +138,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
       }
       return next;
     });
+    void toggleKdsOrderItem(order.id, `item_${itemIdx}`, nextChecked);
   };
 
   const filteredOrders = useMemo(() => {
@@ -190,7 +203,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
     for (const o of activeForKitchen) {
       const channelLabel = getFulfillmentBadgeText(o.fulfillment, o.type);
       o.items.forEach((item, idx) => {
-        const isDone = Boolean(checkedItemsMap[`${o.id}_${idx}`]);
+        const isDone = isOrderItemChecked(o, idx);
         const entry = map.get(item.name) || {
           name: item.name,
           totalQty: 0,
@@ -212,7 +225,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
     }
 
     return Array.from(map.values()).sort((a, b) => b.pendingQty - a.pendingQty);
-  }, [incomingOrders, kitchenOrders, checkedItemsMap]);
+  }, [incomingOrders, kitchenOrders, isOrderItemChecked]);
 
   const handleTransition = async (order: Order, nextStatus: OrderStatus) => {
     setUpdatingOrderId(order.id);
@@ -320,7 +333,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
     const isBusy = updatingOrderId === order.id;
     const totalItemsCount = order.items.length;
     const checkedCount = order.items.reduce(
-      (acc, _, idx) => acc + (checkedItemsMap[`${order.id}_${idx}`] ? 1 : 0),
+      (acc, _, idx) => acc + (isOrderItemChecked(order, idx) ? 1 : 0),
       0
     );
     const progressPct = totalItemsCount > 0 ? Math.round((checkedCount / totalItemsCount) * 100) : 0;
@@ -533,11 +546,11 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
         {/* Lista Interactiva de Platos de la Comanda */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {order.items.map((item, idx) => {
-            const isChecked = Boolean(checkedItemsMap[`${order.id}_${idx}`]);
+            const isChecked = isOrderItemChecked(order, idx);
             return (
               <div
                 key={`${order.id}_item_${idx}`}
-                onClick={() => toggleItemChecked(order.id, idx)}
+                onClick={() => toggleItemChecked(order, idx)}
                 title="Haz clic para marcar/desmarcar este plato como listo"
                 style={{
                   display: 'flex',

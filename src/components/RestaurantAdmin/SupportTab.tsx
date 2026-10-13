@@ -82,7 +82,7 @@ export const SupportTab: React.FC<Props> = ({ restaurantId, initialTicketId }) =
       setError(error);
     } else {
       setActiveTicket(ticket);
-      setMessages(messages);
+      setMessages(messages.filter(m => !m.is_internal));
       setActiveView('conversation');
     }
     setLoadingConv(false);

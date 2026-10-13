@@ -34,23 +34,23 @@ export const SupportMetricsPanel: React.FC = () => {
   }, [startDate, endDate]);
 
   if (loading && !metrics) {
-    return <div className="p-8 text-center text-gray-500">Cargando métricas...</div>;
+    return <div style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}>Cargando métricas...</div>;
   }
 
   if (error) {
-    return <div className="p-8 text-center text-red-500">{error}</div>;
+    return <div style={{ padding: '32px', textAlign: 'center', color: '#EF4444' }}>{error}</div>;
   }
 
   if (!metrics) return null;
 
   return (
     <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <BarChart3 size={24} style={{ color: 'var(--primary)' }} /> 
           Métricas de Soporte
         </h2>
-        <div style={{ display: 'flex', gap: '16px' }}>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
           <input
             type="date"
             className="form-input"
@@ -105,7 +105,7 @@ export const SupportMetricsPanel: React.FC = () => {
             </div>
             <h3 style={{ color: '#94A3B8', fontWeight: 600, fontSize: '0.875rem', margin: 0 }}>CSAT Promedio</h3>
           </div>
-          <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', margin: 0 }}>{metrics.avg_rating.toFixed(1)} <span style={{ fontSize: '1.125rem', color: '#64748B' }}>/ 5.0</span></p>
+          <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', margin: 0 }}>{Number(metrics.avg_rating ?? 0).toFixed(1)} <span style={{ fontSize: '1.125rem', color: '#64748B' }}>/ 5.0</span></p>
           <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '8px' }}>
             Basado en {metrics.total_ratings} calificaciones
           </div>

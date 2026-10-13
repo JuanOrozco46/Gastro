@@ -42,6 +42,15 @@ export function getSavedCookieConsent(): CookieConsentPreferences | null {
   }
 }
 
+export function isFunctionalStorageAllowed(): boolean {
+  const consent = getSavedCookieConsent();
+  // Si el usuario rechazó explícitamente las cookies funcionales ("Solo esenciales"), no persistir
+  if (consent && consent.functional === false) {
+    return false;
+  }
+  return true;
+}
+
 export function saveCookieConsent(prefs: {
   functional: boolean;
   analytics: boolean;
@@ -56,6 +65,11 @@ export function saveCookieConsent(prefs: {
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(payload));
+      if (!prefs.functional) {
+        window.localStorage.removeItem('gs_selected_city_v1');
+        window.localStorage.removeItem('gs_selected_zone_v1');
+        window.localStorage.removeItem('gs_location_preference_v1');
+      }
     } catch {
       // Ignorar si el navegador bloquea localStorage
     }

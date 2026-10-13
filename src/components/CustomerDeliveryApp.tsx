@@ -356,6 +356,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const [priceFilter, setPriceFilter] = useState<'all' | '$' | '$$' | '$$$'>('all');
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [onlyVideo, setOnlyVideo] = useState(false);
+  const [onlySaved, setOnlySaved] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'price_low' | 'price_high'>('recent');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -521,7 +522,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   // Category filter chips
   const CATEGORIES = ['all', 'Italiana', 'Hamburguesas', 'Asiática', 'Típica', 'Mexicana'];
 
-  const hasActiveFilters = searchQuery.trim() !== '' || filterCategory !== 'all' || priceFilter !== 'all' || onlyOpen || onlyVideo || sortBy !== 'recent';
+  const hasActiveFilters = searchQuery.trim() !== '' || filterCategory !== 'all' || priceFilter !== 'all' || onlyOpen || onlyVideo || onlySaved || sortBy !== 'recent';
 
   const clearAllFilters = useCallback(() => {
     setSearchQuery('');
@@ -529,6 +530,7 @@ export const CustomerDeliveryApp: React.FC = () => {
     setPriceFilter('all');
     setOnlyOpen(false);
     setOnlyVideo(false);
+    setOnlySaved(false);
     setSortBy('recent');
   }, []);
 
@@ -583,6 +585,11 @@ export const CustomerDeliveryApp: React.FC = () => {
       result = result.filter(p => p.mediaType === 'video');
     }
 
+    // 5b. Only saved posts
+    if (onlySaved) {
+      result = result.filter(p => savedPosts.has(p.id));
+    }
+
     // 6. Sorting
     if (sortBy !== 'recent') {
       result = [...result].sort((a, b) => {
@@ -596,7 +603,7 @@ export const CustomerDeliveryApp: React.FC = () => {
     }
 
     return result;
-  }, [zoneFilteredPosts, searchQuery, filterCategory, priceFilter, onlyOpen, onlyVideo, sortBy, tenantMap, activeCity, zones]);
+  }, [zoneFilteredPosts, searchQuery, filterCategory, priceFilter, onlyOpen, onlyVideo, onlySaved, savedPosts, sortBy, tenantMap, activeCity, zones]);
 
   return (
     <div className="tab-content active">
@@ -762,6 +769,14 @@ export const CustomerDeliveryApp: React.FC = () => {
                     Solo video
                   </button>
 
+                  <button
+                    className={`gf-toggle-btn ${onlySaved ? 'active' : ''}`}
+                    onClick={() => setOnlySaved(v => !v)}
+                  >
+                    <Bookmark size={13} />
+                    Solo guardados
+                  </button>
+
                   <div className="gf-filter-divider" />
 
                   {/* Sort */}
@@ -800,12 +815,24 @@ export const CustomerDeliveryApp: React.FC = () => {
             {CATEGORIES.map(cat => (
               <button
                 key={cat}
-                className={`gf-filter-chip ${filterCategory === cat ? 'active' : ''}`}
-                onClick={() => setFilterCategory(cat)}
+                className={`gf-filter-chip ${filterCategory === cat && !onlySaved ? 'active' : ''}`}
+                onClick={() => {
+                  setOnlySaved(false);
+                  setFilterCategory(cat);
+                }}
               >
                 {cat === 'all' ? 'Todo' : cat}
               </button>
             ))}
+            <button
+              type="button"
+              className={`gf-filter-chip ${onlySaved ? 'active' : ''}`}
+              onClick={() => setOnlySaved(v => !v)}
+              title="Ver mis publicaciones guardadas"
+            >
+              <Bookmark size={12} style={{ marginRight: 4, display: 'inline-block', verticalAlign: 'middle' }} />
+              Guardados{savedPosts.size > 0 ? ` (${savedPosts.size})` : ''}
+            </button>
           </div>
 
           {/* ── Feed + Cart layout ── */}

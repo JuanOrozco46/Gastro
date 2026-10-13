@@ -493,12 +493,12 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
         setAutoLockCash(parsed.autoLockCashOnLimit);
       }
 
-      if (!historyRes.error && historyRes.data) {
+      if (!historyRes.error && Array.isArray(historyRes.data)) {
         setSettlementHistory(
-          historyRes.data.map((row: any) => ({
-            id: row.id,
-            restaurantId: row.restaurant_id,
-            settlementType: row.settlement_type,
+          (historyRes.data as Array<Record<string, unknown>>).map(row => ({
+            id: String(row.id || ''),
+            restaurantId: String(row.restaurant_id || ''),
+            settlementType: (row.settlement_type as RestaurantSettlementRecord['settlementType']) || 'restaurant_payment_to_platform',
             grossSalesCop: Number(row.gross_sales_cop || 0),
             cashSalesCop: Number(row.cash_sales_cop || 0),
             digitalSalesCop: Number(row.digital_sales_cop || 0),
@@ -507,12 +507,12 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
             wompiGatewayFeeCop: Number(row.wompi_gateway_fee_cop || 0),
             autoOffsetCop: Number(row.auto_offset_cop || 0),
             netAmountCop: Number(row.net_amount_cop || 0),
-            paymentChannel: row.payment_channel || 'transferencia_bancaria',
-            referenceCode: row.reference_code || '',
-            notes: row.notes || undefined,
-            status: row.status || 'completed',
-            createdAt: row.created_at,
-            confirmedAt: row.confirmed_at || undefined
+            paymentChannel: String(row.payment_channel || 'transferencia_bancaria'),
+            referenceCode: String(row.reference_code || ''),
+            notes: row.notes ? String(row.notes) : undefined,
+            status: (row.status as RestaurantSettlementRecord['status']) || 'completed',
+            createdAt: String(row.created_at || new Date().toISOString()),
+            confirmedAt: row.confirmed_at ? String(row.confirmed_at) : undefined
           }))
         );
       }
@@ -714,7 +714,11 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
         setSettlementHistory(prev => [mockRecord, ...prev]);
       }
 
-      showToast(`✅ ¡Comisión de $${unifiedSettlement.livePendingDebt.toLocaleString('es-CO')} COP conciliada! Tu cupo de efectivo está al 100%.`);
+      showToast(
+        authMode === 'remote'
+          ? `✅ Reporte de abono por $${unifiedSettlement.livePendingDebt.toLocaleString('es-CO')} COP enviado a revisión de GastroSync. Tu cupo se actualizará al conciliarse.`
+          : `✅ ¡Comisión de $${unifiedSettlement.livePendingDebt.toLocaleString('es-CO')} COP conciliada! Tu cupo de efectivo está al 100%.`
+      );
       setShowPayDebtModal(false);
       setPaymentReference('');
       setPaymentNotes('');
@@ -1668,7 +1672,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
                   <select
                     className="pam-input no-icon"
                     value={paymentChannel}
-                    onChange={e => setPaymentChannel(e.target.value as any)}
+                    onChange={e => setPaymentChannel(e.target.value as typeof paymentChannel)}
                     style={{ width: '100%', padding: '8px 10px' }}
                   >
                     <option value="wompi_pse">⚡ Pasarela Wompi / PSE (Conciliación Instantánea)</option>
@@ -1734,7 +1738,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
           {settlementHistory.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <FileCheck2 size={16} style={{ color: '#059669' }} /> Historial de Cortes y Liquidaciones Conciliadas ({settlementHistory.length})
+                <FileCheck2 size={16} style={{ color: '#059669' }} /> Historial de Cortes y Liquidaciones ({settlementHistory.length})
               </h4>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.79rem' }}>
@@ -1775,7 +1779,21 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
                           ${item.netAmountCop.toLocaleString('es-CO')}
                         </td>
                         <td style={{ padding: '8px' }}>
-                          <span className="rpa-badge success">✓ CONCILIADO</span>
+                          <span
+                            className={`rpa-badge ${
+                              item.status === 'pending_review'
+                                ? 'warning'
+                                : item.status === 'rejected'
+                                ? 'danger'
+                                : 'success'
+                            }`}
+                          >
+                            {item.status === 'pending_review'
+                              ? '⏳ EN REVISIÓN'
+                              : item.status === 'rejected'
+                              ? '✗ RECHAZADO'
+                              : '✓ CONCILIADO'}
+                          </span>
                         </td>
                         <td style={{ padding: '8px', textAlign: 'right' }}>
                           <button

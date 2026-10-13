@@ -4,6 +4,7 @@ import { PaymentSimulatorService } from '../services/paymentService';
 import type { PaymentMethod, OrderFulfillment, CheckoutDetails, SavedDeliveryAddress } from '../types';
 import { calculateOrderFinancialBreakdown, MIN_DIGITAL_PAYMENT_COP } from '../utils/wompiFees';
 import { loadUserAddressBank, sanitizeSavedAddresses } from '../utils/addressBank';
+import { getDeviceId } from '../utils/deviceId';
 import { openLegalCenter } from '../utils/legalNavigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -20,8 +21,6 @@ import {
   Hash,
   Banknote,
   Landmark,
-  Smartphone,
-  CreditCard,
   ShieldCheck,
   Lock,
   Check,
@@ -67,7 +66,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
     if (!currentUser) return [];
     const localBank = loadUserAddressBank([currentUser.id, currentUser.email]);
     const raw = currentUser.savedAddresses?.length ? currentUser.savedAddresses : localBank;
-    const sanitized = sanitizeSavedAddresses(raw, currentUser.preferredCityId || currentTenant.cityId || selectedCityId || 'armenia');
+    const defaultCityUuid = currentUser.preferredCityId || currentTenant.cityId || selectedCityId || '00000000-0000-0000-0000-000000000001';
+    const sanitized = sanitizeSavedAddresses(raw, defaultCityUuid);
     if (sanitized.length > 0) return sanitized;
     if (currentUser.defaultAddress?.trim()) {
       return [
@@ -76,7 +76,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
           label: 'Casa',
           address: currentUser.defaultAddress.trim(),
           notes: currentUser.defaultDeliveryNotes?.trim() || undefined,
-          cityId: currentUser.preferredCityId || currentTenant.cityId || selectedCityId || 'armenia',
+          cityId: defaultCityUuid,
           zoneId: currentUser.preferredZoneId || null,
           isPrimary: true,
           isDefault: true
@@ -137,12 +137,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
   })();
   const [tableNumber, setTableNumber] = useState(initialTableNum);
   const [restaurantNotes, setRestaurantNotes] = useState('');
-
-  // Card Form State
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardHolder, setCardHolder] = useState('');
-  const [cardExp, setCardExp] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
 
   const [tempOrderId] = useState(() => Math.floor(104 + Math.random() * 895).toString());
 
@@ -279,7 +273,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       if (fulfillment === 'restaurant_delivery' && deliveryAddress.trim()) {
         const cleanAddr = deliveryAddress.trim();
         const cleanNotes = deliveryNotes.trim() || undefined;
-        const targetCityId = currentTenant.cityId || selectedCityId || currentUser.preferredCityId || 'armenia';
+        const targetCityId = currentTenant.cityId || selectedCityId || currentUser.preferredCityId || '00000000-0000-0000-0000-000000000001';
 
         profilePatch.defaultAddress = cleanAddr;
         profilePatch.defaultDeliveryNotes = cleanNotes || '';
@@ -337,6 +331,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       tableNumber: fulfillment === 'table_service' ? tableNumber.trim() : undefined,
       tableId: fulfillment === 'table_service' ? prefilledTableId : undefined,
       tableToken: fulfillment === 'table_service' ? prefilledTableToken : undefined,
+      deviceId: fulfillment === 'table_service' ? getDeviceId() : undefined,
       restaurantNotes: restaurantNotes.trim() || undefined
     };
 
@@ -364,14 +359,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
         tenantId: currentTenant.id,
         totalAmount: total,
         commissionRate: currentTenant.commissionRate,
-        paymentMethod: method,
-        cardDetails: method === 'card' ? {
-          number: cardNumber,
-          holder: cardHolder,
-          expMonth: cardExp.split('/')[0] || '12',
-          expYear: cardExp.split('/')[1] || '28',
-          cvc: cardCvc
-        } : undefined
+        paymentMethod: method
       });
       setLoading(false);
       const res = await submitOrderWithPayment(checkoutDetails, method, transaction);
@@ -409,21 +397,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       : []),
     {
       id: 'wompi',
-      name: 'PSE / Nequi',
-      subtitle: 'Pasarela Wompi',
+      name: authMode === 'demo' ? 'Pago Digital (Simulador)' : 'Pasarela Wompi',
+      subtitle: 'PSE, Nequi, Tarjeta o Bancolombia',
       icon: <Landmark size={18} />
-    },
-    {
-      id: 'mercadopago',
-      name: 'MercadoPago',
-      subtitle: 'Billetera digital',
-      icon: <Smartphone size={18} />
-    },
-    {
-      id: 'card',
-      name: 'Tarjeta',
-      subtitle: 'Crédito o débito',
-      icon: <CreditCard size={18} />
     }
   ];
 
@@ -1067,78 +1043,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
                     </div>
                   )}
 
-                  {/* Method Details for Card (Demo Simulator) */}
-                  {method === 'card' && (
+                  {method !== 'cash' && (
                     <div className="gs-checkout-fields-card">
-                      <div className="gs-checkout-field">
-                        <label className="gs-checkout-label" htmlFor="checkout-card-number">
-                          <span>Número de tarjeta</span>
-                        </label>
-                        <div className="gs-checkout-input-wrap">
-                          <span className="gs-checkout-input-icon"><CreditCard size={15} /></span>
-                          <input
-                            id="checkout-card-number"
-                            type="text"
-                            className="gs-checkout-input is-mono"
-                            placeholder="4532 •••• •••• ••••"
-                            value={cardNumber}
-                            onChange={e => setCardNumber(e.target.value)}
-                            required
-                          />
-                        </div>
-                      </div>
-                      <div className="gs-checkout-field">
-                        <label className="gs-checkout-label" htmlFor="checkout-card-holder">
-                          <span>Nombre del titular</span>
-                        </label>
-                        <div className="gs-checkout-input-wrap">
-                          <span className="gs-checkout-input-icon"><User size={15} /></span>
-                          <input
-                            id="checkout-card-holder"
-                            type="text"
-                            className="gs-checkout-input"
-                            placeholder="Como aparece en la tarjeta"
-                            value={cardHolder}
-                            onChange={e => setCardHolder(e.target.value)}
-                            required
-                          />
-                        </div>
-                      </div>
-                      <div className="gs-checkout-grid-2">
-                        <div className="gs-checkout-field">
-                          <label className="gs-checkout-label" htmlFor="checkout-card-exp">
-                            <span>Vencimiento (MM/AA)</span>
-                          </label>
-                          <div className="gs-checkout-input-wrap">
-                            <span className="gs-checkout-input-icon"><Hash size={15} /></span>
-                            <input
-                              id="checkout-card-exp"
-                              type="text"
-                              className="gs-checkout-input is-mono"
-                              placeholder="MM/AA"
-                              value={cardExp}
-                              onChange={e => setCardExp(e.target.value)}
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div className="gs-checkout-field">
-                          <label className="gs-checkout-label" htmlFor="checkout-card-cvc">
-                            <span>Código CVC / CVV</span>
-                          </label>
-                          <div className="gs-checkout-input-wrap">
-                            <span className="gs-checkout-input-icon"><Lock size={15} /></span>
-                            <input
-                              id="checkout-card-cvc"
-                              type="password"
-                              maxLength={4}
-                              className="gs-checkout-input is-mono"
-                              placeholder="•••"
-                              value={cardCvc}
-                              onChange={e => setCardCvc(e.target.value)}
-                              required
-                            />
-                          </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        <ShieldCheck size={18} style={{ color: '#10B981', flexShrink: 0, marginTop: '2px' }} />
+                        <div>
+                          <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '2px' }}>
+                            {authMode === 'demo'
+                              ? 'Simulación de Pago Digital (Sin cargos reales)'
+                              : 'Checkout Tokenizado Seguro (PCI-DSS)'}
+                          </strong>
+                          <span>
+                            {authMode === 'demo'
+                              ? 'Estás en modo de prueba local. No se capturan datos de tarjetas reales ni se efectúan cobros.'
+                              : 'GastroSync nunca captura números de tarjeta ni códigos CVV en esta pantalla. Serás redirigido al widget cifrado de Wompi para pagar con PSE, Nequi o Tarjeta.'}
+                          </span>
                         </div>
                       </div>
                     </div>

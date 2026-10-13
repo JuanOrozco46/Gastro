@@ -281,6 +281,24 @@ serve(async (req) => {
           continue
         }
         update[`${kind}_path`] = path
+
+        const extToMime: Record<string, string> = {
+          jpg: 'image/jpeg',
+          png: 'image/png',
+          webp: 'image/webp',
+        }
+        const { error: pubUpErr } = await admin.storage
+          .from('gastro-media')
+          .upload(path, bytes, {
+            upsert: true,
+            contentType: extToMime[ext] ?? 'image/jpeg',
+          })
+        if (!pubUpErr) {
+          const { data: pubUrlData } = admin.storage.from('gastro-media').getPublicUrl(path)
+          if (pubUrlData?.publicUrl) {
+            update[`${kind}_url`] = pubUrlData.publicUrl
+          }
+        }
       }
 
       if (Object.keys(update).length > 0) {
@@ -294,6 +312,8 @@ serve(async (req) => {
         success: true,
         logo: !!update.logo_path || !!app.logo_path,
         banner: !!update.banner_path || !!app.banner_path,
+        logoUrl: update.logo_url ?? undefined,
+        bannerUrl: update.banner_url ?? undefined,
         rejected,
       }, req)
     }

@@ -37,9 +37,9 @@ const MainContent: React.FC = () => {
   if (path.startsWith('/auth/callback')) {
     return (
       <main>
-        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 text-center">
+        <div style={{ minHeight: '100vh', background: 'var(--bg-main)', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', textAlign: 'center' }}>
           <ViewLoader />
-          <p className="mt-4 text-gray-400">Verificando sesión, por favor espera...</p>
+          <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Verificando sesión, por favor espera...</p>
         </div>
       </main>
     );
@@ -57,6 +57,16 @@ const MainContent: React.FC = () => {
     );
   }
 
+  if (emailVerificationState === 'pending' || emailVerificationState === 'error' || emailVerificationState === 'expired') {
+    return (
+      <ErrorBoundary moduleName="Verificación de Correo">
+        <Suspense fallback={<ViewLoader />}>
+          <EmailVerificationScreen />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
+
   if (userRole === 'login') {
     return (
       <ErrorBoundary moduleName="Inicio de Sesión">
@@ -67,19 +77,8 @@ const MainContent: React.FC = () => {
     );
   }
 
-  if (emailVerificationState === 'pending' || emailVerificationState === 'error') {
-    return (
-      <ErrorBoundary moduleName="Verificación de Correo">
-        <Suspense fallback={<ViewLoader />}>
-          <EmailVerificationScreen />
-        </Suspense>
-      </ErrorBoundary>
-    );
-  }
-
   return (
     <main>
-      <ForcePasswordModal />
       <ErrorBoundary key={userRole} moduleName="Aplicación Principal">
         <Suspense fallback={<ViewLoader />}>
           {userRole === 'client_delivery' && <CustomerDeliveryApp />}
@@ -98,6 +97,7 @@ export function App() {
     <AppProvider>
       <div className="app-layout">
         <Header />
+        <ForcePasswordModal />
         <MainContent />
         <Toast />
         <LegalCenterModal />

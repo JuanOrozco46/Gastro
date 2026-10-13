@@ -20,14 +20,14 @@ export const TablePublicView: React.FC = () => {
   const [tableOrders, setTableOrders] = useState<Order[]>([]);
 
   useEffect(() => {
-    const token = window.location.pathname.split('/mesa/')[1];
-    if (!token) {
-      setError('Enlace inválido o incompleto.');
-      setIsLoading(false);
-      return;
-    }
-
     const init = async () => {
+      const token = window.location.pathname.split('/mesa/')[1];
+      if (!token) {
+        setError('Enlace inválido o incompleto.');
+        setIsLoading(false);
+        return;
+      }
+
       const res = await resolveTableByToken(token);
       if (!res.success) {
         if (res.error === 'invalid_token') setError('El código QR es inválido o no existe.');
@@ -55,8 +55,7 @@ export const TablePublicView: React.FC = () => {
       setIsLoading(false);
     };
     init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setCurrentTenantBySlug]);
 
   useEffect(() => {
     if (table?.id) {
@@ -444,7 +443,12 @@ export const TablePublicView: React.FC = () => {
 
       <PaymentModal
         isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
+        onClose={() => {
+          setIsPaymentOpen(false);
+          if (table?.id) {
+            void fetchLiveOrdersForTable(table.id).then(setTableOrders);
+          }
+        }}
         orderType="table_service"
         prefilledTableId={table.id}
         prefilledTableToken={window.location.pathname.split('/mesa/')[1]}

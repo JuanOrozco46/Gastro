@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+/* Tipografías servidas con pila nativa segura sin solicitudes automáticas a terceros sin consentimiento */
 
 :root {
   /* GastroSync — Warm Gastronomy Identity */
@@ -12408,6 +12408,31 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .gf-story-ring.is-live {
     animation: none;
+  }
+}
+
+/* ── P2-05: Mobile Responsiveness & Touch Target Hardening (<= 768px) ── */
+@media (max-width: 768px) {
+  .grid-2,
+  .rpa-kpis {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-support-container {
+    flex-direction: column !important;
+  }
+
+  .ast-sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--neutral-border);
+  }
+
+  .btn,
+  .gf-tab-pill,
+  .gf-filter-chip {
+    min-height: 44px;
   }
 }
 

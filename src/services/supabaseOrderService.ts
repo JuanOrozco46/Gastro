@@ -35,8 +35,8 @@ export async function createLiveOrder(
   }
 
   try {
-    let deviceId = '';
-    if (typeof window !== 'undefined') {
+    let deviceId = order.deviceId || '';
+    if (!deviceId && typeof window !== 'undefined') {
       let stored = localStorage.getItem('gs_device_id');
       if (!stored) {
         stored = crypto.randomUUID();
@@ -51,8 +51,8 @@ export async function createLiveOrder(
       p_customer_name: order.customerName || 'Cliente',
       p_customer_phone: order.customerPhone || '0000000000',
       p_delivery_address: order.deliveryAddress || null,
-      p_table_number: (order as any).tableNumber || null,
-      p_table_id: (order as any).tableId || null,
+      p_table_number: order.tableNumber || null,
+      p_table_id: order.tableId || null,
       p_table_token: order.tableToken || null,
       p_device_id: deviceId,
       p_restaurant_notes: order.restaurantNotes || null,
@@ -87,23 +87,45 @@ export async function createLiveOrder(
   }
 }
 
+const ORDER_EXTENDED_COLS = `
+  id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, payment_method, subtotal_cop, delivery_fee_cop, total_cop, driver_id, driver_name, driver_phone, kds_checked_items, created_at, updated_at,
+  order_items (
+    id, order_id, product_id, product_name, unit_price_cop, quantity
+  ),
+  payments (
+    id, status, provider
+  )
+`;
+
+const ORDER_BASE_COLS = `
+  id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, payment_method, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
+  order_items (
+    id, order_id, product_id, product_name, unit_price_cop, quantity
+  ),
+  payments (
+    id, status, provider
+  )
+`;
+
 export async function fetchLiveOrdersForRestaurant(tenantId: string): Promise<Order[]> {
   if (!isSupabaseConfigured || !supabase || !tenantId) return [];
 
   try {
-    const { data: dbOrders, error } = await supabase
+    let { data: dbOrders, error } = await supabase
       .from('orders')
-      .select(`
-        id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, payment_method, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
-        order_items (
-          id, order_id, product_id, product_name, unit_price_cop, quantity
-        ),
-        payments (
-          id, status, provider
-        )
-      `)
+      .select(ORDER_EXTENDED_COLS)
       .eq('restaurant_id', tenantId)
       .order('created_at', { ascending: false });
+
+    if (error && (error.message.includes('driver_') || error.message.includes('kds_checked_items'))) {
+      const fallback = await supabase
+        .from('orders')
+        .select(ORDER_BASE_COLS)
+        .eq('restaurant_id', tenantId)
+        .order('created_at', { ascending: false });
+      dbOrders = fallback.data as typeof dbOrders;
+      error = fallback.error;
+    }
 
     if (error || !dbOrders) {
       console.warn('⚠️ Error al cargar pedidos de restaurante:', error);
@@ -123,19 +145,21 @@ export async function fetchLiveOrdersForCustomer(customerId: string): Promise<Or
   if (!isSupabaseConfigured || !supabase || !customerId) return [];
 
   try {
-    const { data: dbOrders, error } = await supabase
+    let { data: dbOrders, error } = await supabase
       .from('orders')
-      .select(`
-        id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, payment_method, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
-        order_items (
-          id, order_id, product_id, product_name, unit_price_cop, quantity
-        ),
-        payments (
-          id, status, provider
-        )
-      `)
+      .select(ORDER_EXTENDED_COLS)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false });
+
+    if (error && (error.message.includes('driver_') || error.message.includes('kds_checked_items'))) {
+      const fallback = await supabase
+        .from('orders')
+        .select(ORDER_BASE_COLS)
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false });
+      dbOrders = fallback.data as typeof dbOrders;
+      error = fallback.error;
+    }
 
     if (error || !dbOrders) {
       reportDataError('pedidos', 'No se pudieron cargar tus pedidos.');
@@ -309,13 +333,19 @@ export interface RemotePaymentResponse {
  */
 export async function createRemotePayment(
   orderId: string,
-  provider: string = 'wompi'
+  provider: string = 'wompi',
+  deviceId?: string
 ): Promise<RemotePaymentResponse> {
   if (!isSupabaseConfigured || !supabase) return { success: false, error: 'Supabase no configurado' };
 
   try {
+    let resolvedDeviceId = deviceId || '';
+    if (!resolvedDeviceId && typeof window !== 'undefined') {
+      resolvedDeviceId = localStorage.getItem('gs_device_id') || '';
+    }
+
     const { data, error } = await supabase.functions.invoke('create-payment', {
-      body: { orderId, provider }
+      body: { orderId, provider, deviceId: resolvedDeviceId || undefined }
     });
 
     if (error) {

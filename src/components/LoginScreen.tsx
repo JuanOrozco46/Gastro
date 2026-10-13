@@ -457,6 +457,7 @@ export const LoginScreen: React.FC = () => {
               createdAt: Date.now()
             }]
           : [];
+        const consentTimestamp = acceptedLegalConsent ? new Date().toISOString() : undefined;
         const res = await registerAccount(name.trim(), email, password, 'client_delivery', {
           username: normalizeUsername(username),
           phone: phone.trim(),
@@ -465,7 +466,9 @@ export const LoginScreen: React.FC = () => {
           preferredCityId,
           savedAddresses: initialSaved,
           avatarFile,
-          avatarDataUrl: avatarPreview || undefined
+          avatarDataUrl: avatarPreview || undefined,
+          termsAcceptedAt: consentTimestamp,
+          privacyAcceptedAt: consentTimestamp
         });
         if (typeof res === 'object' && !res.success) {
           setLoginError(res.error || 'Error al crear la cuenta.');

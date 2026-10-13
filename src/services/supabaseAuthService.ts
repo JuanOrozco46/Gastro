@@ -533,20 +533,37 @@ export async function signUpWithSupabase(
           }]
         : [];
     let finalAvatarUrl = options?.avatarDataUrl || undefined;
+    const nowIso = new Date().toISOString();
+    const termsAcceptedAtIso = options?.termsAcceptedAt || nowIso;
+    const privacyAcceptedAtIso = options?.privacyAcceptedAt || nowIso;
 
-    // Verificar disponibilidad del @username si se especificó
+    // Verificar disponibilidad del @username si se especificó usando RPC segura (P0-02)
     if (cleanUsername) {
-      const { data: existingHandle } = await supabase
-        .from('profiles')
-        .select('id')
-        .ilike('username', cleanUsername)
-        .maybeSingle();
+      const { data: isAvailable, error: rpcErr } = await supabase.rpc('check_username_available', {
+        p_username: cleanUsername,
+        p_exclude_user_id: null
+      });
 
-      if (existingHandle) {
+      if (!rpcErr && isAvailable === false) {
         return {
           success: false,
           error: `El usuario @${cleanUsername} ya está registrado. Prueba con otro @.`
         };
+      }
+
+      if (rpcErr) {
+        const { data: existingHandle } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('username', cleanUsername)
+          .maybeSingle();
+
+        if (existingHandle) {
+          return {
+            success: false,
+            error: `El usuario @${cleanUsername} ya está registrado. Prueba con otro @.`
+          };
+        }
       }
     }
 
@@ -563,7 +580,9 @@ export async function signUpWithSupabase(
           default_delivery_notes: cleanNotes || null,
           preferred_city_id: cleanCityId,
           preferred_zone_id: cleanZoneId,
-          saved_addresses: initialSavedAddresses
+          saved_addresses: initialSavedAddresses,
+          terms_accepted_at: termsAcceptedAtIso,
+          privacy_accepted_at: privacyAcceptedAtIso
         }
       }
     });
@@ -591,6 +610,8 @@ export async function signUpWithSupabase(
       default_delivery_notes: cleanNotes || null,
       preferred_city_id: cleanCityId,
       saved_addresses: initialSavedAddresses,
+      terms_accepted_at: termsAcceptedAtIso,
+      privacy_accepted_at: privacyAcceptedAtIso,
       platform_role: 'customer'
     });
 
@@ -699,18 +720,32 @@ export async function updateSupabaseUserProfile(
   if (isSupabaseConfigured && supabase && userId) {
     try {
       if (cleanUsername) {
-        const { data: existingHandle } = await supabase
-          .from('profiles')
-          .select('id')
-          .ilike('username', cleanUsername)
-          .neq('id', userId)
-          .maybeSingle();
+        const { data: isAvailable, error: rpcErr } = await supabase.rpc('check_username_available', {
+          p_username: cleanUsername,
+          p_exclude_user_id: userId
+        });
 
-        if (existingHandle) {
+        if (!rpcErr && isAvailable === false) {
           return {
             success: false,
             error: `El usuario @${cleanUsername} ya está en uso por otra cuenta.`
           };
+        }
+
+        if (rpcErr) {
+          const { data: existingHandle } = await supabase
+            .from('profiles')
+            .select('id')
+            .ilike('username', cleanUsername)
+            .neq('id', userId)
+            .maybeSingle();
+
+          if (existingHandle) {
+            return {
+              success: false,
+              error: `El usuario @${cleanUsername} ya está en uso por otra cuenta.`
+            };
+          }
         }
       }
 

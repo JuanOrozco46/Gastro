@@ -19,7 +19,7 @@ import { useCallback } from 'react';
 const AdminSupportTicketsContent: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
@@ -43,7 +43,7 @@ const AdminSupportTicketsContent: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    supabase!.auth.getUser().then(({ data }) => {
+    supabase?.auth.getUser().then(({ data }) => {
       if (data.user) setCurrentUserId(data.user.id);
     });
     loadTickets();
@@ -51,10 +51,11 @@ const AdminSupportTicketsContent: React.FC = () => {
 
   const loadConversation = async (ticket: SupportTicket) => {
     setLoadingConv(true);
+    setError(null);
     setActiveTicket(ticket);
     const { messages, order, error } = await fetchSupportTicket(ticket.id);
     if (error) {
-      alert(error);
+      setError(error);
     } else {
       setMessages(messages);
       setActiveOrder(order || null);
@@ -67,6 +68,7 @@ const AdminSupportTicketsContent: React.FC = () => {
     if (!newMessage.trim() || !activeTicket) return;
     
     setLoadingConv(true);
+    setError(null);
     let result;
     if (isInternal) {
       result = await createInternalSupportNote(activeTicket.id, newMessage);
@@ -75,7 +77,7 @@ const AdminSupportTicketsContent: React.FC = () => {
     }
 
     if (result.error) {
-      alert(result.error);
+      setError(result.error);
     } else if (result.data) {
       setMessages([...messages, result.data]);
       setNewMessage('');
@@ -90,34 +92,37 @@ const AdminSupportTicketsContent: React.FC = () => {
 
   const handleChangeStatus = async (newStatus: TicketStatus) => {
     if (!activeTicket) return;
+    setError(null);
     const { success, error } = await updateSupportTicketStatus(activeTicket.id, newStatus);
     if (success) {
       setActiveTicket({ ...activeTicket, status: newStatus });
       setTickets(tickets.map(t => t.id === activeTicket.id ? { ...t, status: newStatus } : t));
     } else {
-      alert(error || 'Error al actualizar');
+      setError(error || 'Error al actualizar');
     }
   };
 
   const handleChangePriority = async (newPriority: TicketPriority) => {
     if (!activeTicket) return;
+    setError(null);
     const { success, error } = await updateSupportPriority(activeTicket.id, newPriority);
     if (success) {
       setActiveTicket({ ...activeTicket, priority: newPriority });
       setTickets(tickets.map(t => t.id === activeTicket.id ? { ...t, priority: newPriority } : t));
     } else {
-      alert(error || 'Error al actualizar');
+      setError(error || 'Error al actualizar');
     }
   };
 
   const handleAssign = async (agentId: string | null) => {
     if (!activeTicket) return;
+    setError(null);
     const { success, error } = await assignSupportTicket(activeTicket.id, agentId);
     if (success) {
       setActiveTicket({ ...activeTicket, assigned_to: agentId });
       setTickets(tickets.map(t => t.id === activeTicket.id ? { ...t, assigned_to: agentId } : t));
     } else {
-      alert(error || 'Error al asignar');
+      setError(error || 'Error al asignar');
     }
   };
 
@@ -311,7 +316,12 @@ const AdminSupportTicketsContent: React.FC = () => {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-              
+              {error && (
+                <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#FCA5A5', padding: '12px', borderRadius: '10px', marginBottom: '16px', fontSize: '0.85rem' }}>
+                  {error}
+                </div>
+              )}
+
               {/* Contexto del Pedido si existe */}
               {activeOrder && (
                 <div style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
@@ -336,6 +346,16 @@ const AdminSupportTicketsContent: React.FC = () => {
                       <strong style={{ color: 'white' }}>{activeOrder.type}</strong>
                     </div>
                   </div>
+                  {activeOrder.items && activeOrder.items.length > 0 && (
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(56, 189, 248, 0.15)', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                      <strong style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Ítems del pedido:</strong>
+                      {activeOrder.items.map((it, idx) => (
+                        <div key={`${it.id}_${idx}`}>
+                          {it.qty}x {it.name} ({formatCop(it.price * it.qty)})
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -121,6 +121,8 @@ const SuperAdminViewContent: React.FC = () => {
   const [settlementNotesInput, setSettlementNotesInput] = useState<string>('');
   const [downloadReceiptOnSave, setDownloadReceiptOnSave] = useState<boolean>(true);
 
+  const [reviewingSettlementId, setReviewingSettlementId] = useState<string | null>(null);
+
   const fetchPlatformSettlements = useCallback(async () => {
     if (authMode === 'demo' || !supabase) return;
     setLoadingSettlements(true);
@@ -134,12 +136,12 @@ const SuperAdminViewContent: React.FC = () => {
           .limit(30)
       ]);
 
-      if (!overviewRes.error && overviewRes.data) {
+      if (!overviewRes.error && Array.isArray(overviewRes.data)) {
         setRemoteSettlementRows(
-          overviewRes.data.map((r: any) => ({
-            restaurantId: r.restaurant_id,
-            restaurantName: r.restaurant_name,
-            restaurantSlug: r.restaurant_slug,
+          (overviewRes.data as Array<Record<string, unknown>>).map(r => ({
+            restaurantId: String(r.restaurant_id || ''),
+            restaurantName: String(r.restaurant_name || ''),
+            restaurantSlug: String(r.restaurant_slug || ''),
             commissionRate: Number(r.commission_rate || 0.03),
             acceptsCash: Boolean(r.accepts_cash ?? true),
             cashCommissionLimitCop: Number(r.cash_commission_limit_cop || 50000),
@@ -159,23 +161,23 @@ const SuperAdminViewContent: React.FC = () => {
             totalPaymentsReceivedCop: Number(r.total_payments_received_cop || 0),
             livePendingPayoutToRestaurantCop: Number(r.live_pending_payout_to_restaurant_cop || 0),
             livePendingDebtToPlatformCop: Number(r.live_pending_debt_to_platform_cop || 0),
-            payoutBankName: r.payout_bank_name || undefined,
-            payoutAccountType: r.payout_account_type || undefined,
-            payoutAccountNumber: r.payout_account_number || undefined,
-            payoutAccountHolder: r.payout_account_holder || undefined,
-            payoutDocumentType: r.payout_document_type || undefined,
-            payoutDocumentNumber: r.payout_document_number || undefined,
-            wompiMerchantId: r.wompi_merchant_id || undefined
+            payoutBankName: r.payout_bank_name ? String(r.payout_bank_name) : undefined,
+            payoutAccountType: r.payout_account_type ? String(r.payout_account_type) : undefined,
+            payoutAccountNumber: r.payout_account_number ? String(r.payout_account_number) : undefined,
+            payoutAccountHolder: r.payout_account_holder ? String(r.payout_account_holder) : undefined,
+            payoutDocumentType: r.payout_document_type ? String(r.payout_document_type) : undefined,
+            payoutDocumentNumber: r.payout_document_number ? String(r.payout_document_number) : undefined,
+            wompiMerchantId: r.wompi_merchant_id ? String(r.wompi_merchant_id) : undefined
           }))
         );
       }
 
-      if (!recordsRes.error && recordsRes.data) {
+      if (!recordsRes.error && Array.isArray(recordsRes.data)) {
         setSettlementRecords(
-          recordsRes.data.map((row: any) => ({
-            id: row.id,
-            restaurantId: row.restaurant_id,
-            settlementType: row.settlement_type,
+          (recordsRes.data as Array<Record<string, unknown>>).map(row => ({
+            id: String(row.id || ''),
+            restaurantId: String(row.restaurant_id || ''),
+            settlementType: (row.settlement_type as RestaurantSettlementRecord['settlementType']) || 'restaurant_payment_to_platform',
             grossSalesCop: Number(row.gross_sales_cop || 0),
             cashSalesCop: Number(row.cash_sales_cop || 0),
             digitalSalesCop: Number(row.digital_sales_cop || 0),
@@ -184,12 +186,12 @@ const SuperAdminViewContent: React.FC = () => {
             wompiGatewayFeeCop: Number(row.wompi_gateway_fee_cop || 0),
             autoOffsetCop: Number(row.auto_offset_cop || 0),
             netAmountCop: Number(row.net_amount_cop || 0),
-            paymentChannel: row.payment_channel || 'transferencia_bancaria',
-            referenceCode: row.reference_code || '',
-            notes: row.notes || undefined,
-            status: row.status || 'completed',
-            createdAt: row.created_at,
-            confirmedAt: row.confirmed_at || undefined
+            paymentChannel: String(row.payment_channel || 'transferencia_bancaria'),
+            referenceCode: String(row.reference_code || ''),
+            notes: row.notes ? String(row.notes) : undefined,
+            status: (row.status as RestaurantSettlementRecord['status']) || 'completed',
+            createdAt: String(row.created_at || new Date().toISOString()),
+            confirmedAt: row.confirmed_at ? String(row.confirmed_at) : undefined
           }))
         );
       }
@@ -197,6 +199,33 @@ const SuperAdminViewContent: React.FC = () => {
       setLoadingSettlements(false);
     }
   }, [authMode]);
+
+  const handleReviewSettlementRecord = async (
+    settlementId: string,
+    decision: 'completed' | 'rejected'
+  ) => {
+    if (!supabase || reviewingSettlementId) return;
+    setReviewingSettlementId(settlementId);
+    try {
+      const { error } = await supabase.rpc('admin_review_restaurant_settlement', {
+        p_settlement_id: settlementId,
+        p_decision: decision,
+        p_notes: decision === 'completed' ? 'Pago verificado y conciliado por SuperAdmin' : 'Comprobante rechazado por SuperAdmin'
+      });
+      if (error) {
+        showToast(`⚠️ Error al revisar liquidación: ${error.message}`);
+        return;
+      }
+      showToast(
+        decision === 'completed'
+          ? '✅ Pago de comisión conciliado y aprobado.'
+          : '❌ Reporte de pago rechazado.'
+      );
+      await fetchPlatformSettlements();
+    } finally {
+      setReviewingSettlementId(null);
+    }
+  };
 
   useEffect(() => {
     if (activeTab !== 'settlement') return;
@@ -1264,10 +1293,10 @@ const SuperAdminViewContent: React.FC = () => {
                     <th style={{ padding: '10px' }}>Referencia / Fecha</th>
                     <th style={{ padding: '10px' }}>Restaurante</th>
                     <th style={{ padding: '10px' }}>Tipo de Operación</th>
-                    <th style={{ padding: '10px' }}>Canal</th>
+                    <th style={{ padding: '10px' }}>Canal / Estado</th>
                     <th style={{ padding: '10px', textAlign: 'right' }}>Cruce Aplicado</th>
                     <th style={{ padding: '10px', textAlign: 'right' }}>Monto Neto</th>
-                    <th style={{ padding: '10px', textAlign: 'right' }}>Soporte</th>
+                    <th style={{ padding: '10px', textAlign: 'right' }}>Soporte / Conciliación</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1298,7 +1327,35 @@ const SuperAdminViewContent: React.FC = () => {
                             )}
                           </td>
                           <td style={{ padding: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>
-                            {rec.paymentChannel.toUpperCase()}
+                            <div>{rec.paymentChannel.toUpperCase()}</div>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                marginTop: '3px',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                padding: '2px 7px',
+                                borderRadius: '999px',
+                                background:
+                                  rec.status === 'pending_review'
+                                    ? 'rgba(245, 158, 11, 0.2)'
+                                    : rec.status === 'rejected'
+                                    ? 'rgba(239, 68, 68, 0.2)'
+                                    : 'rgba(16, 185, 129, 0.2)',
+                                color:
+                                  rec.status === 'pending_review'
+                                    ? '#F59E0B'
+                                    : rec.status === 'rejected'
+                                    ? '#EF4444'
+                                    : '#10B981'
+                              }}
+                            >
+                              {rec.status === 'pending_review'
+                                ? '⏳ Por Conciliar'
+                                : rec.status === 'rejected'
+                                ? '❌ Rechazado'
+                                : '✅ Conciliado'}
+                            </span>
                           </td>
                           <td style={{ padding: '10px', textAlign: 'right', color: '#A78BFA', fontWeight: 700 }}>
                             {formatCopOrZero(rec.autoOffsetCop)}
@@ -1307,32 +1364,56 @@ const SuperAdminViewContent: React.FC = () => {
                             {formatCopOrZero(rec.netAmountCop)}
                           </td>
                           <td style={{ padding: '10px', textAlign: 'right' }}>
-                            <button
-                              type="button"
-                              className="btn btn-outline"
-                              onClick={() =>
-                                downloadSettlementReceiptHtml({
-                                  referenceCode: rec.referenceCode,
-                                  createdAt: rec.createdAt,
-                                  restaurantName: restName,
-                                  settlementType: rec.settlementType,
-                                  paymentChannel: rec.paymentChannel,
-                                  grossSalesCop: rec.grossSalesCop,
-                                  cashSalesCop: rec.cashSalesCop,
-                                  digitalSalesCop: rec.digitalSalesCop,
-                                  cashCommissionCop: rec.cashCommissionCop,
-                                  digitalCommissionCop: rec.digitalCommissionCop,
-                                  wompiGatewayFeeCop: rec.wompiGatewayFeeCop || 0,
-                                  autoOffsetCop: rec.autoOffsetCop,
-                                  netAmountCop: rec.netAmountCop,
-                                  notes: rec.notes
-                                })
-                              }
-                              style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 800, borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              <Download size={12} />
-                              <span>Acta</span>
-                            </button>
+                            <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                              {rec.status === 'pending_review' && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    disabled={reviewingSettlementId === rec.id}
+                                    onClick={() => void handleReviewSettlementRecord(rec.id, 'completed')}
+                                    style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 800, borderRadius: '8px' }}
+                                  >
+                                    ✓ Aprobar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    disabled={reviewingSettlementId === rec.id}
+                                    onClick={() => void handleReviewSettlementRecord(rec.id, 'rejected')}
+                                    style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 800, borderRadius: '8px', color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                                  >
+                                    ✕ Rechazar
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={() =>
+                                  downloadSettlementReceiptHtml({
+                                    referenceCode: rec.referenceCode,
+                                    createdAt: rec.createdAt,
+                                    restaurantName: restName,
+                                    settlementType: rec.settlementType,
+                                    paymentChannel: rec.paymentChannel,
+                                    grossSalesCop: rec.grossSalesCop,
+                                    cashSalesCop: rec.cashSalesCop,
+                                    digitalSalesCop: rec.digitalSalesCop,
+                                    cashCommissionCop: rec.cashCommissionCop,
+                                    digitalCommissionCop: rec.digitalCommissionCop,
+                                    wompiGatewayFeeCop: rec.wompiGatewayFeeCop || 0,
+                                    autoOffsetCop: rec.autoOffsetCop,
+                                    netAmountCop: rec.netAmountCop,
+                                    notes: rec.notes
+                                  })
+                                }
+                                style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 800, borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <Download size={12} />
+                                <span>Acta</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

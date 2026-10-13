@@ -3,6 +3,7 @@ import type { City, Zone, UserLocationState } from '../types';
 import { fetchLiveCities, fetchLiveZones } from '../services/supabaseDataService';
 import { resolveLocationFromCoords } from '../services/locationResolver';
 import { DEFAULT_CITIES, DEFAULT_ZONES } from './defaultData';
+import { isFunctionalStorageAllowed } from '../utils/legalNavigation';
 
 /**
  * Slice de ubicación: ciudades, zonas, selección persistida y detección GPS.
@@ -14,9 +15,11 @@ export function useLocationSlice() {
 
   const [selectedCityId, setSelectedCityIdState] = useState<string>(() => {
     try {
-      const savedCity = localStorage.getItem('gs_selected_city_v1');
-      if (savedCity && savedCity.trim()) {
-        return savedCity;
+      if (isFunctionalStorageAllowed()) {
+        const savedCity = localStorage.getItem('gs_selected_city_v1');
+        if (savedCity && savedCity.trim()) {
+          return savedCity;
+        }
       }
     } catch {
       // ignore
@@ -26,9 +29,11 @@ export function useLocationSlice() {
 
   const [selectedZoneId, setSelectedZoneIdState] = useState<string | null>(() => {
     try {
-      const savedZone = localStorage.getItem('gs_selected_zone_v1');
-      if (savedZone && savedZone !== 'null' && savedZone.trim()) {
-        return savedZone;
+      if (isFunctionalStorageAllowed()) {
+        const savedZone = localStorage.getItem('gs_selected_zone_v1');
+        if (savedZone && savedZone !== 'null' && savedZone.trim()) {
+          return savedZone;
+        }
       }
     } catch {
       // ignore
@@ -39,7 +44,9 @@ export function useLocationSlice() {
   const setSelectedCity = (cityId: string) => {
     setSelectedCityIdState(cityId);
     try {
-      localStorage.setItem('gs_selected_city_v1', cityId);
+      if (isFunctionalStorageAllowed()) {
+        localStorage.setItem('gs_selected_city_v1', cityId);
+      }
     } catch { /* ignore */ }
 
     setSelectedZoneIdState(prevZoneId => {
@@ -56,7 +63,7 @@ export function useLocationSlice() {
   const setSelectedZone = (zoneId: string | null) => {
     setSelectedZoneIdState(zoneId);
     try {
-      if (zoneId) {
+      if (zoneId && isFunctionalStorageAllowed()) {
         localStorage.setItem('gs_selected_zone_v1', zoneId);
       } else {
         localStorage.removeItem('gs_selected_zone_v1');
@@ -72,7 +79,11 @@ export function useLocationSlice() {
         const exists = liveCities.some(c => c.id === prev && c.isActive);
         if (exists) return prev;
         const fallback = liveCities[0].id;
-        try { localStorage.setItem('gs_selected_city_v1', fallback); } catch {}
+        try {
+          if (isFunctionalStorageAllowed()) {
+            localStorage.setItem('gs_selected_city_v1', fallback);
+          }
+        } catch {}
         return fallback;
       });
     }
@@ -140,12 +151,11 @@ export function useLocationSlice() {
   };
 
   const requestUserLocation = async (): Promise<void> => {
-    setLocationPreference('gps');
-    try {
-      localStorage.setItem('gs_location_preference_v1', 'gps');
-    } catch { /* ignore */ }
-
     if (typeof window === 'undefined' || !navigator || !navigator.geolocation) {
+      setLocationPreference('manual');
+      try {
+        localStorage.setItem('gs_location_preference_v1', 'manual');
+      } catch { /* ignore */ }
       setUserLocationState({
         permission: 'unavailable',
         isResolving: false,
@@ -167,6 +177,10 @@ export function useLocationSlice() {
         const resolution = resolveLocationFromCoords(latitude, longitude, cities, zones);
 
         if (resolution.status === 'resolved' && resolution.cityId) {
+          setLocationPreference('gps');
+          try {
+            localStorage.setItem('gs_location_preference_v1', 'gps');
+          } catch { /* ignore */ }
           setSelectedCity(resolution.cityId);
           if (resolution.zoneId) {
             setSelectedZone(resolution.zoneId);
@@ -181,6 +195,10 @@ export function useLocationSlice() {
             error: undefined
           });
         } else {
+          setLocationPreference('manual');
+          try {
+            localStorage.setItem('gs_location_preference_v1', 'manual');
+          } catch { /* ignore */ }
           setUserLocationState({
             permission: 'granted',
             latitude,
@@ -191,6 +209,10 @@ export function useLocationSlice() {
         }
       },
       (error) => {
+        setLocationPreference('manual');
+        try {
+          localStorage.setItem('gs_location_preference_v1', 'manual');
+        } catch { /* ignore */ }
         if (error.code === error.PERMISSION_DENIED) {
           setUserLocationState({
             permission: 'denied',

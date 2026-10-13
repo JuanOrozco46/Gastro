@@ -410,7 +410,7 @@ export const LegalCenterModal: React.FC = () => {
                       <CheckCircle2 size={16} /> ¿Qué aplica para GastroSync hoy (Startup / Pyme)?
                     </h4>
                     <p>
-                      Mientras los activos totales de la sociedad o persona natural operadora sean inferiores a 100.000 UVT, <strong>NO es obligatorio realizar el trámite de cargue en el portal RNBD de la SIC</strong>. No obstante, <strong>SÍ es 100% obligatorio cumplir todos los deberes de la Ley 1581 de 2012</strong> (Política de Privacidad, Consentimiento Informado, Seguridad RLS y Canal de Supresión), los cuales ya están implementados en esta plataforma.
+                      Mientras los activos totales de la sociedad o persona natural operadora sean inferiores a 100.000 UVT, el Decreto 090 de 2018 contempla exención del cargue en el portal RNBD de la SIC; sin embargo, <strong>esta calificación requiere revisión jurídica externa formal según la razón social, NIT y estados financieros certificados del operador antes de operación comercial</strong>. En todos los escenarios es obligatorio cumplir los deberes sustanciales de la Ley 1581 de 2012 (Política de Privacidad, Consentimiento Informado trazable, Seguridad RLS y Canal de Supresión).
                     </p>
                   </div>
                 </div>
