@@ -131,6 +131,14 @@ export const RestaurantAdmin: React.FC = () => {
   const [storyFormError, setStoryFormError] = useState<string | null>(null);
   const [isSubmittingStory, setIsSubmittingStory] = useState(false);
   const [isDeletingStory, setIsDeletingStory] = useState<string | null>(null);
+  const [storyNowMs, setStoryNowMs] = useState<number>(() => Date.now());
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      setStoryNowMs(Date.now());
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (!operatingTenant) {
     return (
@@ -1262,8 +1270,18 @@ export const RestaurantAdmin: React.FC = () => {
                                 {storyItem.caption}
                               </span>
                             )}
-                            <div style={{ display: 'flex', gap: '10px', fontSize: '0.73rem', color: 'var(--primary)', fontWeight: 700, marginTop: '2px' }}>
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '0.73rem', color: 'var(--primary)', fontWeight: 700, marginTop: '2px' }}>
                               <span>{storyItem.timeAgo}</span>
+                              {typeof storyItem.createdAt === 'number' && Number.isFinite(storyItem.createdAt) && (() => {
+                                const remainingMs = Math.max(0, storyItem.createdAt + 24 * 60 * 60 * 1000 - storyNowMs);
+                                const hoursLeft = Math.floor(remainingMs / (60 * 60 * 1000));
+                                const minsLeft = Math.max(1, Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000)));
+                                return (
+                                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                                    · Expira en {hoursLeft > 0 ? `${hoursLeft}h ${minsLeft}m` : `${minsLeft}m`}
+                                  </span>
+                                );
+                              })()}
                               {storyItem.price > 0 && (
                                 <span>· ${storyItem.price.toLocaleString('es-CO')} COP</span>
                               )}

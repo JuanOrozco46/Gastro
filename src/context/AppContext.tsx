@@ -140,7 +140,12 @@ const location = useLocationSlice();
       if (!Array.isArray(parsed)) return [];
       const now = Date.now();
       const ttlMs = 24 * 60 * 60 * 1000;
-      return parsed.filter((item: StoryItem) => !item.createdAt || now - item.createdAt < ttlMs);
+      return parsed.filter(
+        (item: StoryItem) =>
+          typeof item.createdAt === 'number' &&
+          Number.isFinite(item.createdAt) &&
+          now - item.createdAt < ttlMs
+      );
     } catch {
       return [];
     }
@@ -157,6 +162,8 @@ const location = useLocationSlice();
     }
   });
 
+  const [storyReferenceNow, setStoryReferenceNow] = useState<number>(() => Date.now());
+
   useEffect(() => {
     try {
       localStorage.setItem('gs_restaurant_stories_v1', JSON.stringify(customStoryItems.slice(0, 60)));
@@ -168,6 +175,66 @@ const location = useLocationSlice();
       localStorage.setItem('gs_hidden_story_items_v1', JSON.stringify(hiddenStoryItemIds.slice(0, 200)));
     } catch {}
   }, [hiddenStoryItemIds]);
+
+  // Expiración automática en tiempo real de historias 24h (cada 30s y al recuperar foco)
+  useEffect(() => {
+    const storyTtlMs = 24 * 60 * 60 * 1000;
+
+    const pruneExpiredStories = () => {
+      const now = Date.now();
+      setStoryReferenceNow(now);
+
+      setCustomStoryItems((prev) => {
+        const active = prev.filter(
+          (item) =>
+            typeof item.createdAt === 'number' &&
+            Number.isFinite(item.createdAt) &&
+            now - item.createdAt < storyTtlMs
+        );
+        return active.length === prev.length ? prev : active;
+      });
+
+      setRemotePosts((prev) => {
+        const active = prev.filter((p) => {
+          if (!p.hashtags?.includes('#story24h')) return true;
+          return (
+            typeof p.createdAt === 'number' &&
+            Number.isFinite(p.createdAt) &&
+            now - p.createdAt < storyTtlMs
+          );
+        });
+        return active.length === prev.length ? prev : active;
+      });
+
+      setPosts((prev) => {
+        const active = prev.filter((p) => {
+          if (!p.hashtags?.includes('#story24h')) return true;
+          return (
+            typeof p.createdAt === 'number' &&
+            Number.isFinite(p.createdAt) &&
+            now - p.createdAt < storyTtlMs
+          );
+        });
+        return active.length === prev.length ? prev : active;
+      });
+    };
+
+    const intervalId = window.setInterval(pruneExpiredStories, 30_000);
+    const onVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        pruneExpiredStories();
+      }
+    };
+
+    window.addEventListener('focus', onVisibilityOrFocus);
+    document.addEventListener('visibilitychange', onVisibilityOrFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', onVisibilityOrFocus);
+    };
+  }, []);
 
   const [restaurantApplications, setRestaurantApplications] = useState<RestaurantApplication[]>(() => {
     try {
@@ -1872,6 +1939,7 @@ const location = useLocationSlice();
         setProducts(prev => [autoProduct, ...prev]);
       }
 
+      const nowMs = Date.now();
       const fullPost: Post = {
         ...savedPost,
         tenantName: targetTenant.name,
@@ -1883,17 +1951,20 @@ const location = useLocationSlice();
         image: postData.mediaType === 'photo' ? mediaUrlToSave : (postData.image || targetTenant.bannerUrl || mediaUrlToSave),
         mediaUrl: mediaUrlToSave,
         timeAgo: 'Hace un momento',
+        createdAt: savedPost.createdAt || nowMs,
         comments: []
       };
+      setStoryReferenceNow(nowMs);
       setRemotePosts(prev => [fullPost, ...prev]);
       setPosts(prev => [fullPost, ...prev]);
       showToast('✨ ¡Tu publicación ya está en vivo en el Feed!');
       return true;
     }
 
+    const nowMs = Date.now();
     const newPost: Post = {
       ...postData,
-      id: `post_${Date.now()}`,
+      id: `post_${nowMs}`,
       tenantId: targetTenant.id,
       tenantName: targetTenant.name,
       tenantCategory: targetTenant.category,
@@ -1905,8 +1976,10 @@ const location = useLocationSlice();
       comments: [],
       viewCount: 1,
       ordersFromPost: 0,
-      timeAgo: 'Hace un momento'
+      timeAgo: 'Hace un momento',
+      createdAt: nowMs
     };
+    setStoryReferenceNow(nowMs);
     setPosts(prev => [newPost, ...prev]);
     showToast('✨ ¡Tu publicación ya está en vivo en el Feed!');
     return true;
@@ -1967,7 +2040,8 @@ const location = useLocationSlice();
       return false;
     }
 
-    let storyItemId = `story_custom_${Date.now()}`;
+    let createdTimestamp = Date.now();
+    let storyItemId = `story_custom_${createdTimestamp}`;
 
     if (authMode === 'remote') {
       try {
@@ -1985,6 +2059,7 @@ const location = useLocationSlice();
         );
         if (savedPost) {
           storyItemId = `story_post_${savedPost.id}`;
+          createdTimestamp = savedPost.createdAt || Date.now();
           const fullStoryPost: Post = {
             ...savedPost,
             tenantName: targetTenant.name,
@@ -1992,7 +2067,7 @@ const location = useLocationSlice();
             tenantLogoEmoji: targetTenant.logoEmoji || '🍽️',
             tenantAddress: targetTenant.address,
             hashtags: ['#story24h'],
-            createdAt: Date.now()
+            createdAt: createdTimestamp
           };
           setRemotePosts(prev => [fullStoryPost, ...prev]);
           setPosts(prev => [fullStoryPost, ...prev]);
@@ -2015,9 +2090,10 @@ const location = useLocationSlice();
       price: Number(storyData.price) || 0,
       productId: storyData.productId || '0',
       timeAgo: 'Hace un momento',
-      createdAt: Date.now()
+      createdAt: createdTimestamp
     };
 
+    setStoryReferenceNow(Date.now());
     setCustomStoryItems(prev => [newStoryItem, ...prev]);
 
     showToast('🔥 ¡Historia activa por 24h en el carrusel superior!');
@@ -2628,8 +2704,6 @@ const location = useLocationSlice();
     [rawActivePosts]
   );
 
-  const [storyReferenceNow] = useState<number>(() => Date.now());
-
   const activeStories = React.useMemo<Story[]>(() => {
     const dynamicStories: Story[] = [];
     const seenTenantIds = new Set<string>();
@@ -2637,20 +2711,24 @@ const location = useLocationSlice();
     const now = storyReferenceNow;
     const storyTtlMs = 24 * 60 * 60 * 1000;
 
+    const isWithin24h = (createdAt?: number): boolean =>
+      typeof createdAt === 'number' &&
+      Number.isFinite(createdAt) &&
+      now - createdAt < storyTtlMs;
+
     for (const tenant of activeTenants) {
       if (tenant.status !== 'active') continue;
       const tenantCustomStories = customStoryItems.filter(
         (item) =>
           item.tenantId === tenant.id &&
           !hiddenSet.has(item.id) &&
-          (!item.createdAt || now - item.createdAt <= storyTtlMs)
+          isWithin24h(item.createdAt)
       );
       const tenantPosts = rawActivePosts.filter(
         (p) =>
           p.tenantId === tenant.id &&
-          (!p.createdAt || now - p.createdAt <= storyTtlMs)
+          isWithin24h(p.createdAt)
       );
-      const tenantProducts = activeProducts.filter((pr) => pr.tenantId === tenant.id && pr.available);
 
       const items: StoryItem[] = [...tenantCustomStories];
       const existingMediaSet = new Set(
@@ -2681,43 +2759,6 @@ const location = useLocationSlice();
         });
       }
 
-      if (items.length === 0) {
-        for (const pr of tenantProducts.slice(0, 3)) {
-          const prodStoryId = `story_prod_${pr.id}`;
-          if (hiddenSet.has(prodStoryId)) continue;
-          items.push({
-            id: prodStoryId,
-            tenantId: tenant.id,
-            tenantName: tenant.name,
-            tenantEmoji: tenant.logoEmoji || pr.emoji || '🍽️',
-            image: pr.image || tenant.bannerUrl || tenant.logoUrl || '',
-            mediaType: 'photo',
-            dishName: pr.name,
-            price: pr.price,
-            productId: pr.id,
-            timeAgo: 'Disponible hoy'
-          });
-        }
-      }
-
-      if (items.length === 0 && (tenant.bannerUrl || tenant.logoUrl)) {
-        const welcomeStoryId = `story_welcome_${tenant.id}`;
-        if (!hiddenSet.has(welcomeStoryId)) {
-          items.push({
-            id: welcomeStoryId,
-            tenantId: tenant.id,
-            tenantName: tenant.name,
-            tenantEmoji: tenant.logoEmoji || '🍽️',
-            image: tenant.bannerUrl || tenant.logoUrl || '',
-            mediaType: 'photo',
-            dishName: tenant.name,
-            price: 0,
-            productId: '0',
-            timeAgo: tenant.isOpen ? 'Abierto ahora' : 'Vitrina'
-          });
-        }
-      }
-
       if (items.length > 0) {
         seenTenantIds.add(tenant.id);
         dynamicStories.push({
@@ -2732,20 +2773,24 @@ const location = useLocationSlice();
       }
     }
 
-    for (const fallbackStory of stories) {
-      if (!seenTenantIds.has(fallbackStory.tenantId)) {
-        const filteredFallbackItems = fallbackStory.items.filter((it) => !hiddenSet.has(it.id));
-        if (filteredFallbackItems.length > 0) {
-          dynamicStories.push({
-            ...fallbackStory,
-            items: filteredFallbackItems
-          });
+    if (authMode === 'demo') {
+      for (const fallbackStory of stories) {
+        if (!seenTenantIds.has(fallbackStory.tenantId)) {
+          const filteredFallbackItems = fallbackStory.items.filter(
+            (it) => !hiddenSet.has(it.id) && isWithin24h(it.createdAt)
+          );
+          if (filteredFallbackItems.length > 0) {
+            dynamicStories.push({
+              ...fallbackStory,
+              items: filteredFallbackItems
+            });
+          }
         }
       }
     }
 
     return dynamicStories;
-  }, [activeTenants, rawActivePosts, activeProducts, stories, customStoryItems, hiddenStoryItemIds, storyReferenceNow]);
+  }, [activeTenants, rawActivePosts, authMode, stories, customStoryItems, hiddenStoryItemIds, storyReferenceNow]);
 
   const scopedOrders = React.useMemo(() => {
     if (!currentUser) return [];

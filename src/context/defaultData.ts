@@ -198,6 +198,7 @@ export const DEFAULT_POSTS: Post[] = [
     isLiked: false,
     commentsCount: 0,
     timeAgo: 'Hace 2 horas',
+    createdAt: Date.now() - 2 * 60 * 60 * 1000,
     comments: [],
     hasValidProduct: true
   }

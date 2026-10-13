@@ -41,19 +41,40 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({ onOrderProduct }) => {
     }
   });
 
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const holdTimerRef = useRef<number | null>(null);
   const wasHeldRef = useRef(false);
 
   const cityFilteredStories = useMemo(() => {
-    return (stories || []).filter(story => {
-      const tenant = tenants.find(t => t.id === story.tenantId || t.slug === story.tenantId);
-      if (!tenant || tenant.status !== 'active') return false;
-      if (selectedCityId && tenant.cityId !== selectedCityId) return false;
-      if (selectedZoneId && tenant.zoneId !== selectedZoneId) return false;
-      return true;
-    });
-  }, [stories, tenants, selectedCityId, selectedZoneId]);
+    const storyTtlMs = 24 * 60 * 60 * 1000;
+    return (stories || [])
+      .map((story) => {
+        const validItems = (story.items || []).filter(
+          (item: StoryItem) =>
+            typeof item.createdAt === 'number' &&
+            Number.isFinite(item.createdAt) &&
+            nowMs - item.createdAt < storyTtlMs
+        );
+        return { ...story, items: validItems };
+      })
+      .filter(story => {
+        if (!story.items || story.items.length === 0) return false;
+        const tenant = tenants.find(t => t.id === story.tenantId || t.slug === story.tenantId);
+        if (!tenant || tenant.status !== 'active') return false;
+        if (selectedCityId && tenant.cityId !== selectedCityId) return false;
+        if (selectedZoneId && tenant.zoneId !== selectedZoneId) return false;
+        return true;
+      });
+  }, [stories, tenants, selectedCityId, selectedZoneId, nowMs]);
 
   const markStoryViewed = useCallback((storyId: string) => {
     setViewedStoryIds(prev => {

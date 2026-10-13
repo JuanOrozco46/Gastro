@@ -292,6 +292,24 @@ describe('GastroSync QA Hardening — Payment & Security Suite', () => {
     assert.match(storiesBar, /gf-story-slide-stage/);
     assert.match(storiesBar, /tenantTransition/);
     assert.match(storiesBar, /window\.requestAnimationFrame/);
+    assert.match(storiesBar, /nowMs - item\.createdAt < storyTtlMs/);
+
+    const appContext = fs.readFileSync(path.join(ROOT, 'src', 'context', 'AppContext.tsx'), 'utf8');
+    assert.match(appContext, /pruneExpiredStories/);
+    assert.match(appContext, /isWithin24h/);
+    assert.equal(
+      appContext.includes('story_prod_'),
+      false,
+      'activeStories no debe inyectar productos eternos (story_prod_) cuando expiran las historias de 24h'
+    );
+    assert.equal(
+      appContext.includes('story_welcome_'),
+      false,
+      'activeStories no debe inyectar portadas eternas (story_welcome_) cuando expiran las historias de 24h'
+    );
+
+    const dataService = fs.readFileSync(path.join(ROOT, 'src', 'services', 'supabaseDataService.ts'), 'utf8');
+    assert.match(dataService, /extractedTags\.includes\('#story24h'\)/);
   });
 });
 

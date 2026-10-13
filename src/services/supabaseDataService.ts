@@ -517,6 +517,17 @@ export async function fetchLivePosts(limit: number = 40, offset: number = 0): Pr
       // se extraen para el render de tags y se limpian del caption.
       const rawDesc = dbPost.description || '';
       const extractedTags = Array.from(new Set(rawDesc.match(/#[\p{L}0-9_]+/gu) || []));
+      const createdAtMs = new Date(dbPost.created_at).getTime();
+      const storyTtlMs = 24 * 60 * 60 * 1000;
+
+      // Las historias efímeras (#story24h) vencidas (>24h) no deben cargarse ni aparecer como activas
+      if (
+        extractedTags.includes('#story24h') &&
+        (!Number.isFinite(createdAtMs) || Date.now() - createdAtMs >= storyTtlMs)
+      ) {
+        return null;
+      }
+
       const cleanDesc = extractedTags.length > 0
         ? rawDesc.replace(/#[\p{L}0-9_]+/gu, '').replace(/\s{2,}/g, ' ').trim()
         : rawDesc;
@@ -542,7 +553,7 @@ export async function fetchLivePosts(limit: number = 40, offset: number = 0): Pr
         productId: dbPost.product_id || dbPost.id,
         hasValidProduct: !!dbPost.product_id, // Flag to indicate if product exists in catalog
         status: dbPost.is_published ? 'published' : 'draft',
-        createdAt: new Date(dbPost.created_at).getTime(),
+        createdAt: createdAtMs,
         hashtags: extractedTags.length > 0 ? extractedTags : undefined
       };
 

@@ -309,6 +309,14 @@ export function mapDbProductToProduct(db: DbProduct): Product {
 }
 
 export function mapDbPostToPost(db: DbPost): Post {
+  const rawDesc = db.description || '';
+  const extractedTags = Array.from(new Set(rawDesc.match(/#[\p{L}0-9_]+/gu) || []));
+  const cleanDesc =
+    extractedTags.length > 0
+      ? rawDesc.replace(/#[\p{L}0-9_]+/gu, '').replace(/\s{2,}/g, ' ').trim()
+      : rawDesc;
+  const parsedCreatedAt = db.created_at ? new Date(db.created_at).getTime() : Date.now();
+
   return {
     id: db.id,
     tenantId: db.restaurant_id,
@@ -317,9 +325,10 @@ export function mapDbPostToPost(db: DbPost): Post {
     tenantLogoEmoji: '🍽️',
     dishName: db.title,
     dishEmoji: '🍽️',
-    desc: db.description || '',
+    desc: cleanDesc,
     price: db.price_cop,
     image: db.media_url || '',
+    mediaUrl: db.media_url || undefined,
     mediaType: db.media_type,
     likes: 0,
     isLiked: false,
@@ -328,7 +337,9 @@ export function mapDbPostToPost(db: DbPost): Post {
     productId: db.product_id || '',
     hasValidProduct: !!db.product_id,
     width: db.media_width || undefined,
-    height: db.media_height || undefined
+    height: db.media_height || undefined,
+    createdAt: Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : Date.now(),
+    hashtags: extractedTags.length > 0 ? extractedTags : undefined
   };
 }
 
