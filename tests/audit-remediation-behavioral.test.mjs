@@ -236,5 +236,25 @@ describe('GastroSync Audit Remediation — Behavioral & Authorization Unit Tests
     assert.equal(paymentModal.includes('cardNumber'), false);
     assert.equal(paymentModal.includes('cardCvc'), false);
     assert.equal(paymentModal.includes("'mercadopago'"), false);
+
+    // P0-04 / P1-11 (Migración 059): Elimina DELETE directo sobre storage.objects y usa Storage API (.remove)
+    const sql059 = fs.readFileSync(
+      path.join(ROOT, 'supabase', 'migrations', '059_fix_storage_api_deletion_in_purge_rpcs.sql'),
+      'utf8'
+    );
+    const sql059WithoutComments = sql059
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n');
+    assert.equal(/DELETE\s+FROM\s+storage\.objects/i.test(sql059WithoutComments), false);
+    assert.match(sql059WithoutComments, /'storage_paths'/);
+    assert.match(sql059WithoutComments, /CREATE OR REPLACE FUNCTION public\.can_purge_restaurant_storage/i);
+
+    const dataServiceSrc = fs.readFileSync(
+      path.join(ROOT, 'src', 'services', 'supabaseDataService.ts'),
+      'utf8'
+    );
+    assert.match(dataServiceSrc, /purgeStorageObjectsFromRpcResponse/);
   });
 });
+

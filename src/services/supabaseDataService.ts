@@ -2101,6 +2101,65 @@ export async function ensureColombiaCityAndZone(
 }
 
 /**
+ * Limpia los archivos en el bucket `gastro-media` usando la Storage API oficial de Supabase
+ * (`supabase.storage.from('gastro-media').remove(paths)`), evitando el error de trigger
+ * `Direct deletion from storage tables is not allowed. Use the Storage API instead.`
+ */
+async function purgeStorageObjectsFromRpcResponse(
+  rpcPayload: { storage_paths?: unknown; media_urls?: unknown } | null | undefined
+): Promise<void> {
+  if (!isSupabaseConfigured || !supabase || !rpcPayload) return;
+
+  try {
+    const pathsSet = new Set<string>();
+
+    if (Array.isArray(rpcPayload.storage_paths)) {
+      for (const rawPath of rpcPayload.storage_paths) {
+        if (typeof rawPath === 'string' && rawPath.trim().length > 0) {
+          pathsSet.add(rawPath.trim().replace(/^\/+/, ''));
+        }
+      }
+    }
+
+    const basePublicUrl = supabase.storage
+      .from('gastro-media')
+      .getPublicUrl('').data.publicUrl.replace(/\/+$/, '');
+
+    if (Array.isArray(rpcPayload.media_urls)) {
+      for (const rawUrl of rpcPayload.media_urls) {
+        if (typeof rawUrl !== 'string' || rawUrl.trim().length === 0) continue;
+        const cleanUrl = rawUrl.trim();
+        if (basePublicUrl && cleanUrl.startsWith(basePublicUrl + '/')) {
+          const rel = cleanUrl.slice(basePublicUrl.length + 1).split('?')[0];
+          if (rel) pathsSet.add(decodeURIComponent(rel));
+        } else {
+          const marker = '/storage/v1/object/public/gastro-media/';
+          const idx = cleanUrl.indexOf(marker);
+          if (idx !== -1) {
+            const rel = cleanUrl.slice(idx + marker.length).split('?')[0];
+            if (rel) pathsSet.add(decodeURIComponent(rel));
+          }
+        }
+      }
+    }
+
+    const allPaths = Array.from(pathsSet).filter(Boolean);
+    if (allPaths.length === 0) return;
+
+    const chunkSize = 100;
+    for (let i = 0; i < allPaths.length; i += chunkSize) {
+      const batch = allPaths.slice(i, i + chunkSize);
+      const { error } = await supabase.storage.from('gastro-media').remove(batch);
+      if (error) {
+        console.warn('⚠️ Aviso al limpiar archivos de Storage tras baja:', error.message);
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ Excepción no bloqueante limpiando objetos de Storage:', err);
+  }
+}
+
+/**
  * Ejecuta la supresión de la cuenta personal del usuario autenticado y anonimiza sus pedidos históricos
  * conforme al Derecho de Supresión (Ley Estatutaria 1581 de 2012 - Habeas Data).
  */
@@ -2131,7 +2190,14 @@ export async function deleteMyUserAccountRemote(
       };
     }
 
-    const res = (data || {}) as { anonymized_orders?: number };
+    const res = (data || {}) as {
+      anonymized_orders?: number;
+      storage_paths?: unknown;
+      media_urls?: unknown;
+    };
+
+    await purgeStorageObjectsFromRpcResponse(res);
+
     return {
       success: true,
       anonymizedOrders: Number(res.anonymized_orders || 0)
@@ -2172,7 +2238,7 @@ export async function deactivateAndPurgeRestaurantRemote(
   }
 
   try {
-    const { error } = await supabase.rpc('deactivate_and_purge_my_restaurant', {
+    const { data, error } = await supabase.rpc('deactivate_and_purge_my_restaurant', {
       p_restaurant_id: restaurantId,
       p_confirm_text: normalized
     });
@@ -2184,6 +2250,13 @@ export async function deactivateAndPurgeRestaurantRemote(
       };
     }
 
+    const res = (data || {}) as {
+      storage_paths?: unknown;
+      media_urls?: unknown;
+    };
+
+    await purgeStorageObjectsFromRpcResponse(res);
+
     return { success: true };
   } catch (err: unknown) {
     return {
@@ -2192,4 +2265,5 @@ export async function deactivateAndPurgeRestaurantRemote(
     };
   }
 }
+
 
