@@ -93,7 +93,9 @@ export async function fetchLiveTenants(): Promise<Tenant[]> {
         id, slug, name, category, description, address, phone, whatsapp, city_id, zone_id, status, is_open, 
         delivery_modes, min_order, delivery_fee, delivery_radius_km, commission_rate,
         logo_url, banner_url, logo_emoji, specialties, accepting_orders, estimated_delivery_minutes, owner_user_id,
-        rating_avg, rating_count,
+        rating_avg, rating_count, accepts_cash, table_service_enabled,
+        payout_bank_name, payout_account_type, payout_account_number, payout_account_holder, payout_document_type, payout_document_number,
+        wompi_merchant_id, cash_commission_limit_cop, auto_lock_cash_on_limit,
         restaurant_hours ( id, day_of_week, is_closed, open_time, close_time, interval_index )
       `);
 
@@ -723,11 +725,6 @@ export async function uploadApplicationAssets(
         .update(dbPatch)
         .eq('id', applicationId);
 
-      await supabase
-        .from('restaurants')
-        .update(dbPatch)
-        .eq('application_id', applicationId);
-
       return {
         logo: Boolean(logoUrl),
         banner: Boolean(bannerUrl),
@@ -1238,6 +1235,15 @@ interface DBRestaurantUpdate {
   min_order?: number;
   delivery_radius_km?: number;
   delivery_modes?: string[];
+  payout_bank_name?: string | null;
+  payout_account_type?: string | null;
+  payout_account_number?: string | null;
+  payout_account_holder?: string | null;
+  payout_document_type?: string | null;
+  payout_document_number?: string | null;
+  wompi_merchant_id?: string | null;
+  cash_commission_limit_cop?: number | null;
+  auto_lock_cash_on_limit?: boolean | null;
 }
 
 export async function updateRemoteTenant(tenantId: string, updates: Partial<Tenant>): Promise<Tenant | null> {
@@ -1269,6 +1275,15 @@ export async function updateRemoteTenant(tenantId: string, updates: Partial<Tena
     if (typeof updates.minOrder === 'number') dbUpdates.min_order = updates.minOrder;
     if (typeof updates.deliveryRadiusKm === 'number') dbUpdates.delivery_radius_km = updates.deliveryRadiusKm;
     if (Array.isArray(updates.deliveryModes)) dbUpdates.delivery_modes = updates.deliveryModes;
+    if (typeof updates.payoutBankName === 'string') dbUpdates.payout_bank_name = updates.payoutBankName.trim() || null;
+    if (typeof updates.payoutAccountType === 'string') dbUpdates.payout_account_type = updates.payoutAccountType.trim() || null;
+    if (typeof updates.payoutAccountNumber === 'string') dbUpdates.payout_account_number = updates.payoutAccountNumber.trim() || null;
+    if (typeof updates.payoutAccountHolder === 'string') dbUpdates.payout_account_holder = updates.payoutAccountHolder.trim() || null;
+    if (typeof updates.payoutDocumentType === 'string') dbUpdates.payout_document_type = updates.payoutDocumentType.trim() || null;
+    if (typeof updates.payoutDocumentNumber === 'string') dbUpdates.payout_document_number = updates.payoutDocumentNumber.trim() || null;
+    if (typeof updates.wompiMerchantId === 'string') dbUpdates.wompi_merchant_id = updates.wompiMerchantId.trim() || null;
+    if (typeof updates.cashCommissionLimitCop === 'number') dbUpdates.cash_commission_limit_cop = updates.cashCommissionLimitCop;
+    if (typeof updates.autoLockCashOnLimit === 'boolean') dbUpdates.auto_lock_cash_on_limit = updates.autoLockCashOnLimit;
 
     let tenantUpdated = false;
     
@@ -1493,12 +1508,22 @@ interface DbRestaurantDriverRow {
 export async function fetchRestaurantDrivers(restaurantId: string): Promise<Driver[]> {
   if (!isSupabaseConfigured || !supabase || !restaurantId) return [];
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('restaurant_drivers')
       .select('id, restaurant_id, name, phone, vehicle, status, is_active')
       .eq('restaurant_id', restaurantId)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
+
+    if (error && error.message.includes('is_active')) {
+      const fallback = await supabase
+        .from('restaurant_drivers')
+        .select('id, restaurant_id, name, phone, vehicle, status')
+        .eq('restaurant_id', restaurantId)
+        .order('created_at', { ascending: true });
+      data = (fallback.data || []).map(d => ({ ...d, is_active: true })) as typeof data;
+      error = fallback.error;
+    }
 
     if (error || !data) return [];
     return (data as DbRestaurantDriverRow[]).map((d) => ({

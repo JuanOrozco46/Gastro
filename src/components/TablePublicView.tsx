@@ -21,7 +21,8 @@ export const TablePublicView: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
-      const token = window.location.pathname.split('/mesa/')[1];
+      const rawToken = window.location.pathname.split('/mesa/')[1];
+      const token = rawToken?.split('/')[0]?.split('?')[0]?.trim();
       if (!token) {
         setError('Enlace inválido o incompleto.');
         setIsLoading(false);
@@ -179,8 +180,9 @@ export const TablePublicView: React.FC = () => {
                         fontWeight: 800
                       }}>
                         {o.status === 'pending' ? 'Pendiente' : 
+                         o.status === 'accepted' ? 'Aceptado' :
                          o.status === 'preparing' ? 'En Cocina' : 
-                         o.status === 'ready' ? 'Listo / En camino' :
+                         o.status === 'ready' ? 'Listo / En mesa' :
                          o.status === 'delivered' ? 'Finalizado' : 'Cancelado'}
                       </span>
                     </div>
@@ -233,31 +235,43 @@ export const TablePublicView: React.FC = () => {
                     whileHover={{ scale: 1.01 }}
                     className="card table-qr-product-card" 
                     style={{ 
-                      display: 'flex', 
-                      gap: '14px', 
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      padding: '1rem 1.15rem',
-                      background: 'var(--glass-light)',
-                      backdropFilter: 'blur(16px)',
-                      borderColor: 'rgba(255, 255, 255, 0.09)',
-                      borderRadius: '20px'
-                    }}
-                  >
-                    <div style={{ 
-                      width: '58px', 
-                      height: '58px', 
-                      borderRadius: '16px', 
-                      background: 'var(--primary-glass)', 
-                      border: '1px solid var(--primary-glass-border)',
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      fontSize: '1.7rem',
-                      flexShrink: 0
-                    }}>
-                      {product.emoji}
-                    </div>
+                    display: 'flex', 
+                    gap: '14px', 
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    padding: '1rem 1.15rem',
+                    background: 'var(--glass-light)',
+                    backdropFilter: 'blur(16px)',
+                    borderColor: 'rgba(255, 255, 255, 0.09)',
+                    borderRadius: '20px'
+                  }}
+                >
+                  <div style={{ 
+                    width: '58px', 
+                    height: '58px', 
+                    borderRadius: '16px', 
+                    background: 'var(--primary-glass)', 
+                    border: '1px solid var(--primary-glass-border)',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    fontSize: '1.7rem',
+                    flexShrink: 0,
+                    overflow: 'hidden'
+                  }}>
+                    {product.image ? (
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      product.emoji || '🍽️'
+                    )}
+                  </div>
 
                     <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                       <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'white', lineHeight: 1.3 }}>{product.name}</h4>
@@ -451,7 +465,7 @@ export const TablePublicView: React.FC = () => {
         }}
         orderType="table_service"
         prefilledTableId={table.id}
-        prefilledTableToken={window.location.pathname.split('/mesa/')[1]}
+        prefilledTableToken={window.location.pathname.split('/mesa/')[1]?.split('/')[0]?.split('?')[0]?.trim()}
         entryPoint="qr"
       />
     </motion.div>

@@ -68,6 +68,8 @@ const PAYMENT_LABELS: Record<string, string> = {
   apple_pay: '🍎 Apple Pay',
   google_pay: '🌐 Google Pay',
   card: '💳 Tarjeta de Crédito/Débito',
+  wompi: '💳 Pago en Línea (Wompi)',
+  cash: '💵 Efectivo contra entrega',
   mercadopago: '📱 Wompi / PSE / Nequi'
 };
 
@@ -419,8 +421,36 @@ const OrderCard: React.FC<OrderCardProps> = ({
         </div>
       )}
 
-      {/* Progress Track */}
-      {order.status !== 'delivered' && (
+      {/* Progress Track or Cancellation Notice */}
+      {order.status === 'cancelled' ? (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.25)',
+          borderRadius: '16px',
+          padding: '1rem',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          color: '#FCA5A5',
+          fontSize: '0.85rem'
+        }}>
+          <Package size={22} color="#EF4444" style={{ flexShrink: 0 }} />
+          <div>
+            <strong style={{ display: 'block', color: 'white', marginBottom: '2px' }}>Pedido Cancelado</strong>
+            <span style={{ display: 'block' }}>
+              {order.cancellationReason?.trim()
+                ? <>Motivo: <strong style={{ color: 'white' }}>{order.cancellationReason.trim()}</strong></>
+                : 'Este pedido fue cancelado por el restaurante.'}
+            </span>
+            {order.paymentMethod !== 'cash' && (order.paymentStatus === 'refunded' || order.paymentStatus === 'approved') && (
+              <span style={{ display: 'block', marginTop: '4px' }}>
+                Tu pago en línea quedó marcado para devolución. El restaurante gestionará el reembolso; si no lo ves reflejado, contáctalo o abre un ticket en Soporte.
+              </span>
+            )}
+          </div>
+        </div>
+      ) : order.status !== 'delivered' && (
         <div style={{
           background: 'rgba(0,0,0,0.3)',
           borderRadius: '18px',

@@ -80,6 +80,7 @@ export const RestaurantAdmin: React.FC = () => {
     products,
     drivers,
     addDriver,
+    deleteDriver,
     posts,
     createPost,
     deletePost,
@@ -1563,11 +1564,27 @@ export const RestaurantAdmin: React.FC = () => {
                           {driver.vehicle} · 📞 {driver.phone}
                         </p>
                       </div>
-                      <span className={`rpa-badge ${driver.status === 'available' ? 'success' : 'warning'}`}>
-                        {driver.status === 'available'
-                          ? '🟢 Disponible'
-                          : `🛵 En entrega (#${driver.assignedOrderId})`}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className={`rpa-badge ${driver.status === 'available' ? 'success' : 'warning'}`}>
+                          {driver.status === 'available'
+                            ? '🟢 Disponible'
+                            : `🛵 En entrega (#${driver.assignedOrderId})`}
+                        </span>
+                        <button
+                          type="button"
+                          className="rpa-icon-btn danger"
+                          onClick={() => {
+                            if (window.confirm(`¿Deseas desvincular al repartidor ${driver.name}?`)) {
+                              if (typeof deleteDriver === 'function') {
+                                void deleteDriver(driver.id);
+                              }
+                            }
+                          }}
+                          title="Eliminar repartidor"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

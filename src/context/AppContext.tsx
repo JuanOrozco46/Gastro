@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Product, Order, Tenant, Driver, OrderStatus, PaymentMethod, Transaction, UserRole, Post, Story, StoryItem, UserAccount, UserRegistrationOptions, CheckoutDetails, OrderFulfillment, CustomerDeliveryAddress, RestaurantApplication, ProvisionedOwnerAccount, City, SavedDeliveryAddress, RestaurantMember } from '../types';
 import { AppContext } from './AppContextObject';
 
@@ -14,7 +14,7 @@ import { DEFAULT_CITIES, DEFAULT_ZONES, EMPTY_TENANT, DEFAULT_TENANTS, DEFAULT_P
 import { useLocationSlice } from './useLocationSlice';
 import { useToastSlice } from './useToastSlice';
 import { useCartSlice } from './useCartSlice';
-import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment, confirmCashPayment as confirmCashPaymentRemote } from '../services/supabaseOrderService';
+import { createLiveOrder, fetchLiveOrdersForRestaurant, fetchLiveOrdersForCustomer, updateLiveOrderStatus, acceptAndStartLiveOrder, subscribeToRestaurantOrders, subscribeToCustomerOrders, createRemotePayment, confirmCashPayment as confirmCashPaymentRemote } from '../services/supabaseOrderService';
 import { isRestaurantOwner, isRestaurantStaff, isPlatformAdmin, hasOwnershipOfTenant, validateAndGetProvisionedAccounts, validateCachedSession } from './authGuards';
 
 function resolveMatchingCityId(rawCityRef: string | undefined, availableCities: City[]): string | null {
@@ -294,6 +294,11 @@ const location = useLocationSlice();
     }
   });
 
+  const ordersRef = useRef<Order[]>(orders);
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
+
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     if (isSupabaseConfigured) {
       try {
@@ -544,7 +549,9 @@ const location = useLocationSlice();
 
   const playChime = () => {
     try {
-      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!)();
+      const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtxClass) return;
+      const ctx = new AudioCtxClass();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -557,6 +564,12 @@ const location = useLocationSlice();
 
       osc.connect(gain);
       gain.connect(ctx.destination);
+
+      osc.onended = () => {
+        try {
+          ctx.close();
+        } catch {}
+      };
 
       osc.start();
       osc.stop(ctx.currentTime + 0.5);
@@ -607,11 +620,12 @@ const location = useLocationSlice();
             fetchLiveOrdersForRestaurant(tenantId),
             fetchRestaurantDrivers(tenantId)
           ]);
-          if (!cancelled) {
-            setOrders(liveOrders.filter(o => o.tenantId === tenantId));
-            setDrivers(liveDrivers);
-          }
-          activeUnsub = subscribeToRestaurantOrders(tenantId, async (payload) => {
+          if (cancelled) return;
+          setOrders(liveOrders.filter(o => o.tenantId === tenantId));
+          setDrivers(liveDrivers);
+
+          const unsub = subscribeToRestaurantOrders(tenantId, async (payload) => {
+            if (cancelled) return;
             const updated = await fetchLiveOrdersForRestaurant(tenantId);
             if (!cancelled) {
               setOrders(updated.filter(o => o.tenantId === tenantId));
@@ -630,19 +644,32 @@ const location = useLocationSlice();
               }
             }
           });
+
+          if (cancelled) {
+            unsub();
+          } else {
+            activeUnsub = unsub;
+          }
         } else if (currentUser.id) {
           const customerId = currentUser.id;
           const liveOrders = await fetchLiveOrdersForCustomer(customerId);
-          if (!cancelled) {
-            setOrders(liveOrders.filter(o => o.customerId === customerId));
-          }
-          activeUnsub = subscribeToCustomerOrders(customerId, async () => {
+          if (cancelled) return;
+          setOrders(liveOrders.filter(o => o.customerId === customerId));
+
+          const unsub = subscribeToCustomerOrders(customerId, async () => {
+            if (cancelled) return;
             const updated = await fetchLiveOrdersForCustomer(customerId);
             if (!cancelled) {
               setOrders(updated.filter(o => o.customerId === customerId));
               showToast('🚴 El estado de tu pedido ha sido actualizado por la cocina.');
             }
           });
+
+          if (cancelled) {
+            unsub();
+          } else {
+            activeUnsub = unsub;
+          }
         } else {
           setOrders([]);
         }
@@ -712,7 +739,9 @@ const location = useLocationSlice();
           updatedTenants = liveTenants;
         }
         setRemotePosts(livePosts);
+        setPosts(livePosts);
         setRemoteProducts(liveProducts);
+        setProducts(liveProducts);
       }
       if (!res.emailConfirmed) {
         setEmailVerificationState('pending');
@@ -1512,7 +1541,7 @@ const location = useLocationSlice();
   };
 
   const updateOrderStatus = async (orderId: string, status: OrderStatus): Promise<boolean> => {
-    const targetOrder = orders.find(o => o.id === orderId);
+    const targetOrder = ordersRef.current.find((o: Order) => o.id === orderId) || orders.find((o: Order) => o.id === orderId);
     if (!targetOrder) return false;
 
     const owner = isRestaurantOwner(currentUser);
@@ -1565,23 +1594,70 @@ const location = useLocationSlice();
       }
     }
 
-    setOrders(prev =>
-      prev.map(o =>
-        o.id === orderId
-          ? {
-              ...o,
-              status,
-              paymentStatus:
-                status === 'delivered' && (o.paymentMethod || 'cash') === 'cash'
-                  ? 'approved'
-                  : status === 'cancelled'
-                    ? (o.paymentStatus === 'approved' ? 'refunded' : o.paymentStatus === 'pending' ? 'voided' : o.paymentStatus)
-                    : o.paymentStatus
-            }
-          : o
-      )
+    const nextOrders = (ordersRef.current.length > 0 ? ordersRef.current : orders).map((o: Order) =>
+      o.id === orderId
+        ? {
+            ...o,
+            status,
+            paymentStatus:
+              status === 'delivered' && (o.paymentMethod || 'cash') === 'cash'
+                ? 'approved'
+                : status === 'cancelled'
+                  ? (o.paymentStatus === 'approved' ? 'refunded' : o.paymentStatus === 'pending' ? 'voided' : o.paymentStatus)
+                  : o.paymentStatus
+          }
+        : o
     );
+    ordersRef.current = nextOrders;
+    setOrders(nextOrders);
     showToast(`Pedido #${orderId.slice(0, 8)} actualizado a ${status.toUpperCase()}`);
+    return true;
+  };
+
+  const acceptAndStartCooking = async (orderId: string): Promise<boolean> => {
+    const targetOrder = ordersRef.current.find((o: Order) => o.id === orderId) || orders.find((o: Order) => o.id === orderId);
+    if (!targetOrder) return false;
+
+    const owner = isRestaurantOwner(currentUser);
+    const staff = isRestaurantStaff(currentUser);
+
+    if (!owner && !staff) {
+      showToast('⚠️ No tienes autorización para modificar el estado de los pedidos.');
+      return false;
+    }
+
+    if (currentUser?.tenantId !== targetOrder.tenantId) {
+      showToast('⚠️ No tienes autorización para modificar pedidos de otro restaurante.');
+      return false;
+    }
+
+    if (targetOrder.status !== 'pending') {
+      showToast('⚠️ El pedido ya no se encuentra en estado pendiente.');
+      return false;
+    }
+
+    recentLocalOrderUpdatesRef.current.set(orderId, Date.now());
+
+    if (authMode === 'remote') {
+      const res = await acceptAndStartLiveOrder(orderId, targetOrder.tableId);
+      if (!res.success) {
+        recentLocalOrderUpdatesRef.current.delete(orderId);
+        showToast(res.error || 'No fue posible iniciar la preparación del pedido.');
+        return false;
+      }
+    }
+
+    const nextOrders = (ordersRef.current.length > 0 ? ordersRef.current : orders).map((o: Order) =>
+      o.id === orderId
+        ? {
+            ...o,
+            status: 'preparing' as OrderStatus
+          }
+        : o
+    );
+    ordersRef.current = nextOrders;
+    setOrders(nextOrders);
+    showToast(`Pedido #${orderId.slice(0, 8)}: preparación iniciada en cocina.`);
     return true;
   };
 
@@ -1618,7 +1694,8 @@ const location = useLocationSlice();
   };
 
   const toggleProductAvailability = async (productId: string) => {
-    const target = products.find(p => p.id === productId);
+    const activeProducts = authMode === 'remote' ? remoteProducts : products;
+    const target = activeProducts.find(p => p.id === productId) || products.find(p => p.id === productId);
     if (!target) return;
 
     if (!isRestaurantOwner(currentUser) || !hasOwnershipOfTenant(currentUser, target.tenantId)) {
@@ -1639,11 +1716,11 @@ const location = useLocationSlice();
 
     setProducts(prev => prev.map(p => {
       if (p.id === productId) {
-        showToast(`${p.name}: ${updated ? 'Disponible' : 'AGOTADO'}`);
         return { ...p, available: updated };
       }
       return p;
     }));
+    showToast(`${target.name}: ${updated ? 'Disponible' : 'AGOTADO'}`);
   };
 
   const addProduct = async (newProd: Omit<Product, 'id' | 'tenantId'>): Promise<boolean> => {
@@ -1675,7 +1752,12 @@ const location = useLocationSlice();
     const targetOrder = orders.find(o => o.id === orderId);
     if (!targetOrder) return;
 
-    if (!isRestaurantOwner(currentUser) || !hasOwnershipOfTenant(currentUser, targetOrder.tenantId)) {
+    const isOwnerOrStaff =
+      (isRestaurantOwner(currentUser) || isRestaurantStaff(currentUser)) &&
+      currentUser?.tenantId === targetOrder.tenantId;
+    const canAssign = isOwnerOrStaff || isPlatformAdmin(currentUser);
+
+    if (!canAssign) {
       showToast('⚠️ No tienes autorización para asignar repartidores en este restaurante.');
       return;
     }
@@ -1696,8 +1778,18 @@ const location = useLocationSlice();
           : o
       )
     );
-    setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, status: 'busy', assignedOrderId: orderId } : d));
-    showToast(`Domiciliario asignado al pedido #${orderId.slice(0, 8)}`);
+    setDrivers(prev =>
+      prev.map(d => {
+        if (d.id === driverId) {
+          return { ...d, status: 'busy', assignedOrderId: orderId };
+        }
+        if (targetOrder.driverId && d.id === targetOrder.driverId && d.id !== driverId) {
+          return { ...d, status: 'available', assignedOrderId: undefined };
+        }
+        return d;
+      })
+    );
+    showToast(`🛵 Domiciliario ${targetDriver?.name ? `(${targetDriver.name}) ` : ''}asignado al pedido #${orderId.slice(0, 8)}`);
   };
 
   const toggleKdsOrderItem = async (orderId: string, itemKey: string, checked?: boolean): Promise<void> => {
@@ -1986,7 +2078,8 @@ const location = useLocationSlice();
   };
 
   const deletePost = async (postId: string) => {
-    const target = posts.find(p => p.id === postId);
+    const activePosts = authMode === 'remote' ? remotePosts : posts;
+    const target = activePosts.find(p => p.id === postId) || posts.find(p => p.id === postId);
     if (!target) return;
 
     if (!isRestaurantOwner(currentUser) || !hasOwnershipOfTenant(currentUser, target.tenantId)) {
@@ -2166,7 +2259,8 @@ const location = useLocationSlice();
   };
 
   const updateProduct = async (productId: string, updates: Partial<Product>) => {
-    const target = products.find(p => p.id === productId);
+    const activeProducts = authMode === 'remote' ? remoteProducts : products;
+    const target = activeProducts.find(p => p.id === productId) || products.find(p => p.id === productId);
     if (!target) return;
 
     if (!isRestaurantOwner(currentUser) || !hasOwnershipOfTenant(currentUser, target.tenantId)) {
@@ -2191,7 +2285,8 @@ const location = useLocationSlice();
   };
 
   const deleteProduct = async (productId: string) => {
-    const target = products.find(p => p.id === productId);
+    const activeProducts = authMode === 'remote' ? remoteProducts : products;
+    const target = activeProducts.find(p => p.id === productId) || products.find(p => p.id === productId);
     if (!target) return;
 
     if (!isRestaurantOwner(currentUser) || !hasOwnershipOfTenant(currentUser, target.tenantId)) {
@@ -2844,6 +2939,7 @@ const location = useLocationSlice();
     submitOrderWithPayment,
     retryRemotePayment,
     updateOrderStatus,
+    acceptAndStartCooking,
     confirmCashPayment,
     toggleProductAvailability,
     addProduct,
@@ -2899,6 +2995,7 @@ const location = useLocationSlice();
       submitOrderWithPayment,
       retryRemotePayment,
       updateOrderStatus,
+      acceptAndStartCooking,
       confirmCashPayment,
       toggleProductAvailability,
       addProduct,
@@ -2954,6 +3051,7 @@ const location = useLocationSlice();
     submitOrderWithPayment: ((...args) => handlersRef.current.submitOrderWithPayment(...args)) as typeof submitOrderWithPayment,
     retryRemotePayment: ((...args) => handlersRef.current.retryRemotePayment(...args)) as typeof retryRemotePayment,
     updateOrderStatus: ((...args) => handlersRef.current.updateOrderStatus(...args)) as typeof updateOrderStatus,
+    acceptAndStartCooking: ((...args) => handlersRef.current.acceptAndStartCooking(...args)) as typeof acceptAndStartCooking,
     confirmCashPayment: ((...args) => handlersRef.current.confirmCashPayment(...args)) as typeof confirmCashPayment,
     toggleProductAvailability: ((...args) => handlersRef.current.toggleProductAvailability(...args)) as typeof toggleProductAvailability,
     addProduct: ((...args) => handlersRef.current.addProduct(...args)) as typeof addProduct,

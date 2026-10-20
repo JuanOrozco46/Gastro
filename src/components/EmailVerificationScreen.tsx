@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Mail, RefreshCw, LogOut, Edit2, ArrowRight, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useApp } from '../context/useApp';
 
@@ -14,6 +14,15 @@ export const EmailVerificationScreen: React.FC = () => {
   const [isResending, setIsResending] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const intervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
 
   const handleResend = async () => {
     if (cooldown > 0 || isResending) return;
@@ -21,10 +30,16 @@ export const EmailVerificationScreen: React.FC = () => {
     await resendVerificationEmail();
     setIsResending(false);
     setCooldown(60);
-    const interval = setInterval(() => {
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current);
+    }
+    intervalRef.current = window.setInterval(() => {
       setCooldown((prev) => {
         if (prev <= 1) {
-          clearInterval(interval);
+          if (intervalRef.current !== null) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
           return 0;
         }
         return prev - 1;

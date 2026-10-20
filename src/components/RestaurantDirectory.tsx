@@ -45,6 +45,12 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
     });
   }, [tenants, activeCity]);
 
+  const cityAverageRating = useMemo(() => {
+    if (cityTenants.length === 0) return '5.0';
+    const sum = cityTenants.reduce((acc, t) => acc + (Number(t.rating) || 5), 0);
+    return (sum / cityTenants.length).toFixed(1);
+  }, [cityTenants]);
+
   // Extract unique categories from tenants in the selected city
   const categories = useMemo(() => {
     const set = new Set(cityTenants.map(t => t.category));
@@ -163,7 +169,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
             </div>
             <div className="hero-stat-divider" />
             <div className="hero-stat-item">
-              <span className="stat-value">⭐ 4.8</span>
+              <span className="stat-value">⭐ {cityAverageRating}</span>
               <span className="stat-label">Calificación</span>
             </div>
             <div className="hero-stat-divider" />

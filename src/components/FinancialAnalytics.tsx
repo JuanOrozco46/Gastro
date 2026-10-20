@@ -531,19 +531,24 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
   }, [fetchMetrics, orders.length]);
 
   const finalMetrics = useMemo(() => {
-    const grossSales = Math.max(computedLocalMetrics.grossSales, rpcMetrics?.grossSales || 0);
-    const platformCommission = Math.max(computedLocalMetrics.platformCommission, rpcMetrics?.platformCommission || 0);
-    const wompiGatewayFees = Math.max(computedLocalMetrics.wompiGatewayFees, rpcMetrics?.wompiGatewayFees || 0);
-    const netRestaurant = Math.max(
-      computedLocalMetrics.netRestaurant,
-      rpcMetrics?.netRestaurant || Math.max(0, grossSales - platformCommission - wompiGatewayFees)
+    // Escoger la fuente más completa y coherente para evitar desalineación entre bruto, comisión y neto
+    const preferRpc = Boolean(
+      rpcMetrics &&
+      (rpcMetrics.paidOrdersCount > computedLocalMetrics.paidOrdersCount ||
+       (rpcMetrics.paidOrdersCount === computedLocalMetrics.paidOrdersCount && rpcMetrics.grossSales >= computedLocalMetrics.grossSales))
     );
-    const paidOrdersCount = Math.max(computedLocalMetrics.paidOrdersCount, rpcMetrics?.paidOrdersCount || 0);
+
+    const base = preferRpc && rpcMetrics ? rpcMetrics : computedLocalMetrics;
+    const grossSales = base.grossSales;
+    const platformCommission = base.platformCommission;
+    const wompiGatewayFees = base.wompiGatewayFees;
+    const netRestaurant = Math.max(0, grossSales - platformCommission - wompiGatewayFees);
+    const paidOrdersCount = base.paidOrdersCount;
     const pendingOrdersCount = computedLocalMetrics.pendingOrdersCount;
-    const cancelledOrdersCount = Math.max(computedLocalMetrics.cancelledOrdersCount, rpcMetrics?.cancelledOrdersCount || 0);
-    const refunds = Math.max(computedLocalMetrics.refunds, rpcMetrics?.refunds || 0);
-    const savingsVs30 = Math.max(computedLocalMetrics.savingsVs30, rpcMetrics?.savingsVs30 || 0);
-    const deliveryFees = Math.max(computedLocalMetrics.deliveryFees, rpcMetrics?.deliveryFees || 0);
+    const cancelledOrdersCount = preferRpc && rpcMetrics ? rpcMetrics.cancelledOrdersCount : computedLocalMetrics.cancelledOrdersCount;
+    const refunds = preferRpc && rpcMetrics ? rpcMetrics.refunds : computedLocalMetrics.refunds;
+    const savingsVs30 = base.savingsVs30 || Math.max(0, Math.round(grossSales * 0.3) - (platformCommission + wompiGatewayFees));
+    const deliveryFees = base.deliveryFees || computedLocalMetrics.deliveryFees;
     const avgTicket = paidOrdersCount > 0 ? Math.round(grossSales / paidOrdersCount) : 0;
 
     return {
@@ -565,23 +570,29 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ tenantId
 
   // Motor unificado de Cruce de Saldos (Efectivo vs Digital con tarifa exacta de Wompi)
   const unifiedSettlement = useMemo(() => {
-    const cashSales = Math.max(computedLocalMetrics.completedCashSales, settlementRpc?.periodCashSalesCop || 0);
-    const digitalSales = Math.max(computedLocalMetrics.completedDigitalSales, settlementRpc?.periodDigitalSalesCop || 0);
-    const cashOrdersCount = Math.max(computedLocalMetrics.completedCashOrdersCount, settlementRpc?.periodCashOrdersCount || 0);
-    const digitalOrdersCount = Math.max(computedLocalMetrics.completedDigitalOrdersCount, settlementRpc?.periodDigitalOrdersCount || 0);
-    const cashCommission = Math.max(computedLocalMetrics.completedCashCommission, settlementRpc?.periodCashCommissionCop || 0);
-    const digitalCommission = Math.max(computedLocalMetrics.completedDigitalCommission, settlementRpc?.periodDigitalCommissionCop || 0);
-    const wompiGatewayFee = Math.max(computedLocalMetrics.completedWompiFee, settlementRpc?.periodWompiGatewayFeeCop || 0);
-    const wompiGatewayIva = Math.max(computedLocalMetrics.completedWompiIva, settlementRpc?.periodWompiGatewayIvaCop || 0);
-    const digitalNetAfterFees = Math.max(computedLocalMetrics.completedDigitalNet, settlementRpc?.periodDigitalNet97Cop || 0);
+    const preferRpc = Boolean(
+      settlementRpc &&
+      ((settlementRpc.periodCashOrdersCount + settlementRpc.periodDigitalOrdersCount) >=
+       (computedLocalMetrics.completedCashOrdersCount + computedLocalMetrics.completedDigitalOrdersCount))
+    );
+
+    const cashSales = preferRpc && settlementRpc ? settlementRpc.periodCashSalesCop : computedLocalMetrics.completedCashSales;
+    const digitalSales = preferRpc && settlementRpc ? settlementRpc.periodDigitalSalesCop : computedLocalMetrics.completedDigitalSales;
+    const cashOrdersCount = preferRpc && settlementRpc ? settlementRpc.periodCashOrdersCount : computedLocalMetrics.completedCashOrdersCount;
+    const digitalOrdersCount = preferRpc && settlementRpc ? settlementRpc.periodDigitalOrdersCount : computedLocalMetrics.completedDigitalOrdersCount;
+    const cashCommission = preferRpc && settlementRpc ? settlementRpc.periodCashCommissionCop : computedLocalMetrics.completedCashCommission;
+    const digitalCommission = preferRpc && settlementRpc ? settlementRpc.periodDigitalCommissionCop : computedLocalMetrics.completedDigitalCommission;
+    const wompiGatewayFee = preferRpc && settlementRpc ? settlementRpc.periodWompiGatewayFeeCop : computedLocalMetrics.completedWompiFee;
+    const wompiGatewayIva = preferRpc && settlementRpc ? settlementRpc.periodWompiGatewayIvaCop : computedLocalMetrics.completedWompiIva;
+    const digitalNetAfterFees = preferRpc && settlementRpc ? settlementRpc.periodDigitalNet97Cop : computedLocalMetrics.completedDigitalNet;
 
     // Cruce automático del periodo: cuánto del 3% de efectivo se cubre con el neto digital (ya descontado Wompi + 3% digital)
     const periodAutoOffset = Math.min(digitalNetAfterFees, cashCommission);
     const periodNetPayout = Math.max(0, digitalNetAfterFees - cashCommission);
     const periodNetDebt = Math.max(0, cashCommission - digitalNetAfterFees);
 
-    const allTimeCashFee = Math.max(computedLocalMetrics.allTimeCashCommission, settlementRpc?.allTimeCashCommissionCop || 0);
-    const allTimeDigitalNet = Math.max(computedLocalMetrics.allTimeDigitalNet, settlementRpc?.allTimeDigitalNet97Cop || 0);
+    const allTimeCashFee = preferRpc && settlementRpc ? settlementRpc.allTimeCashCommissionCop : computedLocalMetrics.allTimeCashCommission;
+    const allTimeDigitalNet = preferRpc && settlementRpc ? settlementRpc.allTimeDigitalNet97Cop : computedLocalMetrics.allTimeDigitalNet;
     const payoutsSent = settlementRpc?.totalPayoutsSentToRestaurantCop || 0;
     const paymentsReceived = settlementRpc?.totalPaymentsReceivedFromRestaurantCop || 0;
 

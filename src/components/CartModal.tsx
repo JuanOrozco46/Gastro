@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/useApp';
-import { ShoppingBag, Plus, Minus, Trash2, Bike, Clock, X } from 'lucide-react';
+import { ShoppingBag, Plus, Minus, Trash2, Clock, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CartModalProps {
@@ -18,6 +18,8 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
   const cartTenantId = cart.length > 0 ? cart[0].product.tenantId : null;
   const cartTenant = cartTenantId ? tenants.find(t => t.id === cartTenantId) : null;
   const isCartTenantOpen = (cartTenant?.isOpen ?? true) && cartTenant?.acceptingOrders !== false;
+  const deliveryFee = cartTenant?.deliveryFee ?? 0;
+  const finalTotal = cartTotal + deliveryFee;
 
   return (
     <AnimatePresence>
@@ -114,21 +116,26 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckou
                     <span>${cartTotal.toLocaleString('es-CO')}</span>
                   </div>
                   <div className="gf-cart-row">
-                    <span>Domicilio</span>
-                    <span className="gf-free">Gratis</span>
+                    <span>Domicilio (estimado)</span>
+                    <span className={deliveryFee === 0 ? "gf-free" : undefined}>
+                      {deliveryFee === 0 ? 'Gratis' : `$${deliveryFee.toLocaleString('es-CO')}`}
+                    </span>
                   </div>
                 </div>
                 <div className="gf-cart-modal-total-row">
-                  <strong>Total</strong>
-                  <strong>${cartTotal.toLocaleString('es-CO')} COP</strong>
+                  <strong>Total estimado</strong>
+                  <strong>${finalTotal.toLocaleString('es-CO')} COP</strong>
                 </div>
+                <p style={{ fontSize: '0.72rem', color: '#64748B', textAlign: 'center', margin: '4px 0 10px', lineHeight: 1.3 }}>
+                  Tarifa de envío estimada para domicilio. Si eliges recoger en el local o servicio en mesa, el envío se descuenta a $0 en checkout.
+                </p>
                 {isCartTenantOpen ? (
                   <button
                     type="button"
                     className="gf-checkout-btn"
                     onClick={() => { onClose(); onCheckout(); }}
                   >
-                    <Bike size={18} /> Pagar a Domicilio
+                    <ShoppingBag size={18} /> Continuar al Checkout
                   </button>
                 ) : (
                   <button type="button" disabled className="gf-checkout-btn is-disabled">

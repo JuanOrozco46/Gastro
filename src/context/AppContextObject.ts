@@ -85,7 +85,7 @@ export interface AppContextType {
   }) => Promise<boolean>;
   deleteStoryItem: (storyItemId: string) => Promise<void>;
   addDriver: (driver: Omit<Driver, 'id' | 'tenantId' | 'status'>) => void;
-  deleteDriver?: (driverId: string) => Promise<void>;
+  deleteDriver: (driverId: string) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
   setEquityWeight: (weight: number) => void;
   addToCart: (product: Product) => { success: boolean; requiresClear?: boolean; activeTenantName?: string; } | void;
@@ -95,6 +95,7 @@ export interface AppContextType {
   submitOrderWithPayment: (typeOrDetails: string | CheckoutDetails, method: PaymentMethod, transaction?: Transaction) => Promise<{ success: boolean; isRemote?: boolean; orderId?: string; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }>;
   retryRemotePayment: (orderId: string) => Promise<{ success: boolean; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<boolean>;
+  acceptAndStartCooking: (orderId: string) => Promise<boolean>;
   confirmCashPayment: (paymentId: string, orderId: string) => Promise<{ success: boolean; error?: string }>;
   toggleProductAvailability: (productId: string) => Promise<void> | void;
   addProduct: (product: Omit<Product, 'id' | 'tenantId'>) => Promise<boolean>;

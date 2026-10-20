@@ -52,6 +52,11 @@ const playKitchenChime = () => {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
     osc.connect(gain);
     gain.connect(ctx.destination);
+    osc.onended = () => {
+      try {
+        ctx.close();
+      } catch {}
+    };
     osc.start();
     osc.stop(ctx.currentTime + 0.3);
   } catch {
@@ -64,11 +69,14 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
     cities,
     orders,
     products,
+    drivers,
     currentUser,
     updateOrderStatus,
+    acceptAndStartCooking,
     confirmCashPayment,
     toggleProductAvailability,
     toggleKdsOrderItem,
+    assignDriverToOrder,
     triggerTestOrder
   } = useApp();
   const tenantCityName = cities.find(c => c.id === tenant.cityId)?.name || 'Colombia';
@@ -114,6 +122,11 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
   const tenantProducts = useMemo(
     () => products.filter(p => p.tenantId === tenant.id && !p.isArchived),
     [products, tenant.id]
+  );
+
+  const tenantDrivers = useMemo(
+    () => drivers.filter(d => d.tenantId === tenant.id || !d.tenantId),
+    [drivers, tenant.id]
   );
 
   const isOrderItemChecked = useCallback((order: Order, itemIdx: number): boolean => {
@@ -243,11 +256,8 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
   const handleAcceptAndStartCooking = async (order: Order) => {
     setUpdatingOrderId(order.id);
     try {
-      const step1 = await updateOrderStatus(order.id, 'accepted');
-      if (step1) {
-        await updateOrderStatus(order.id, 'preparing');
-        if (soundEnabled) playKitchenChime();
-      }
+      const ok = await acceptAndStartCooking(order.id);
+      if (ok && soundEnabled) playKitchenChime();
     } finally {
       setUpdatingOrderId(null);
     }
@@ -664,6 +674,21 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
                 </a>
               </div>
             )}
+            {order.driverName && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(37, 99, 235, 0.08)', padding: '5px 8px', borderRadius: '8px', marginTop: '3px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#1D4ED8', fontWeight: 800, fontSize: '0.74rem' }}>
+                  <Bike size={13} /> {order.driverName}
+                </span>
+                {order.driverPhone && (
+                  <a
+                    href={`tel:${order.driverPhone}`}
+                    style={{ color: '#2563EB', fontWeight: 800, fontSize: '0.72rem', textDecoration: 'none' }}
+                  >
+                    📞 {order.driverPhone}
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -783,6 +808,69 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
 
           {columnType === 'ready' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {order.fulfillment === 'restaurant_delivery' && (
+                <div
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    background: order.driverId ? '#EFF6FF' : '#FFFBEB',
+                    border: order.driverId ? '1px solid #BFDBFE' : '1px dashed #FCD34D',
+                    fontSize: '0.78rem',
+                    marginBottom: '2px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                    <span style={{ fontWeight: 800, color: order.driverId ? '#1D4ED8' : '#B45309', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Bike size={14} /> {order.driverId ? 'Domiciliario Asignado' : 'Asignar Domiciliario'}
+                    </span>
+                    {order.driverPhone && (
+                      <span style={{ fontSize: '0.72rem', color: '#2563EB', fontWeight: 700 }}>
+                        {order.driverPhone}
+                      </span>
+                    )}
+                  </div>
+
+                  {isOwner && (
+                    <select
+                      aria-label="Asignar repartidor"
+                      value={order.driverId || ''}
+                      disabled={isBusy}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val && val !== order.driverId) {
+                          assignDriverToOrder(order.id, val);
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '6px 8px',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        background: '#FFFFFF',
+                        fontSize: '0.76rem',
+                        fontWeight: 600,
+                        color: '#334155',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">
+                        {order.driverName ? `Cambiar: ${order.driverName}` : '-- Seleccionar repartidor --'}
+                      </option>
+                      {tenantDrivers.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} {d.vehicle ? `(${d.vehicle})` : ''} — {d.status === 'available' ? '🟢 Disponible' : d.status === 'busy' ? '🟡 Ocupado' : '⚪ Offline'}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {tenantDrivers.length === 0 && (
+                    <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '3px' }}>
+                      Sin repartidores registrados en este restaurante.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {order.status === 'ready' && order.fulfillment === 'restaurant_delivery' && isOwner && (
                 <button
                   type="button"
@@ -1386,6 +1474,11 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
                         <span className="rpa-badge neutral">
                           {getFulfillmentBadgeText(order.fulfillment, order.type)}
                         </span>
+                        {order.driverName && (
+                          <span className="rpa-badge info" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <Bike size={12} /> {order.driverName}
+                          </span>
+                        )}
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                           {order.customerName || 'Cliente'} ·{' '}
                           {new Date(order.createdAt).toLocaleString('es-CO', {

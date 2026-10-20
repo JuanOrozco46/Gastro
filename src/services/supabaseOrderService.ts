@@ -88,7 +88,7 @@ export async function createLiveOrder(
 }
 
 const ORDER_EXTENDED_COLS = `
-  id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, payment_method, subtotal_cop, delivery_fee_cop, total_cop, driver_id, driver_name, driver_phone, kds_checked_items, created_at, updated_at,
+  id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, table_id, restaurant_notes, cancellation_reason, payment_method, subtotal_cop, delivery_fee_cop, total_cop, driver_id, driver_name, driver_phone, kds_checked_items, created_at, updated_at,
   order_items (
     id, order_id, product_id, product_name, unit_price_cop, quantity
   ),
@@ -98,7 +98,7 @@ const ORDER_EXTENDED_COLS = `
 `;
 
 const ORDER_BASE_COLS = `
-  id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, restaurant_notes, cancellation_reason, payment_method, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
+  id, restaurant_id, customer_id, fulfillment, status, customer_name, customer_phone, delivery_address, table_number, table_id, restaurant_notes, cancellation_reason, payment_method, subtotal_cop, delivery_fee_cop, total_cop, created_at, updated_at,
   order_items (
     id, order_id, product_id, product_name, unit_price_cop, quantity
   ),
@@ -174,11 +174,42 @@ export async function fetchLiveOrdersForCustomer(customerId: string): Promise<Or
   }
 }
 
-export async function updateLiveOrderStatus(
+function mapOrderStatusRpcError(message: string | undefined): string {
+  const msg = message || '';
+  if (msg.includes('No autorizado')) return 'No tienes permisos para actualizar este pedido.';
+  if (msg.includes('Transición')) return 'Esta transición de estado no está permitida.';
+  if (msg.includes('pedido finalizado')) return 'No se puede modificar un pedido finalizado.';
+  if (msg.includes('Perfil de usuario no encontrado')) {
+    return 'Tu perfil no está configurado correctamente. Contacta al administrador.';
+  }
+  return msg || 'No fue posible actualizar el pedido.';
+}
+
+function broadcastTableStatus(tableId: string | undefined, orderId: string, status: OrderStatus): void {
+  if (!tableId || !supabase) return;
+  try {
+    const syncChannel = supabase.channel(`table_orders_sync_${tableId}`);
+    void syncChannel.send({
+      type: 'broadcast',
+      event: 'status_changed',
+      payload: { orderId, status }
+    }).finally(() => {
+      supabase?.removeChannel(syncChannel);
+    });
+  } catch {
+    // Silently catch broadcast error
+  }
+}
+
+type OrderStatusRpcResult = { success: boolean; error?: string; missingRpc?: boolean };
+
+async function executeOrderStatusRpc(
+  rpcName: 'update_order_status' | 'accept_and_start_order',
+  params: Record<string, string>,
   orderId: string,
-  newStatus: OrderStatus,
+  finalStatus: OrderStatus,
   tableId?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<OrderStatusRpcResult> {
   if (!isSupabaseConfigured || !supabase) {
     return { success: false, error: 'Supabase no está configurado.' };
   }
@@ -188,50 +219,64 @@ export async function updateLiveOrderStatus(
   }
 
   try {
-    const { data, error } = await supabase.rpc('update_order_status', {
-      p_order_id: orderId,
-      p_next_status: newStatus
-    });
-
-    if (tableId) {
-      // Emitir broadcast para que la mesa reciba actualizaciones sin depender de RLS de SELECT
-      supabase.channel(`table_orders_sync_${tableId}`).send({
-        type: 'broadcast',
-        event: 'status_changed',
-        payload: { orderId, status: newStatus }
-      });
-    }
+    const { error } = await supabase.rpc(rpcName, params);
 
     if (error) {
-      console.error('❌ RPC Error:', error);
-      console.error('   - Message:', error.message);
-      console.error('   - Details:', error.details);
-      console.error('   - Hint:', error.hint);
-      console.error('   - Code:', error.code);
-      
-      // Extraer mensaje específico del RPC
-      let userMessage = error.message;
-      
-      // Si el mensaje contiene una excepción de PostgreSQL, extraerla
-      if (error.message && error.message.includes('No autorizado')) {
-        userMessage = 'No tienes permisos para actualizar este pedido.';
-      } else if (error.message && error.message.includes('Transición')) {
-        userMessage = 'Esta transición de estado no está permitida.';
-      } else if (error.message && error.message.includes('pedido finalizado')) {
-        userMessage = 'No se puede modificar un pedido finalizado.';
-      } else if (error.message && error.message.includes('Perfil de usuario no encontrado')) {
-        userMessage = 'Tu perfil no está configurado correctamente. Contacta al administrador.';
+      // PGRST202 / 42883: la función no existe (migración aún no desplegada)
+      const missingRpc = error.code === 'PGRST202' || error.code === '42883';
+      if (!missingRpc) {
+        console.error('❌ RPC Error:', { rpcName, message: error.message, code: error.code, hint: error.hint });
       }
-      
-      return { success: false, error: userMessage };
+      return { success: false, error: mapOrderStatusRpcError(error.message), missingRpc };
     }
 
-    console.log('✅ Order status updated successfully:', { orderId, newStatus, result: data });
+    // Solo notificar a la mesa cuando el cambio realmente quedó guardado
+    broadcastTableStatus(tableId, orderId, finalStatus);
     return { success: true };
   } catch (err: unknown) {
     console.warn('⚠️ Excepción técnica en actualización de pedido:', err instanceof Error ? err.message : String(err));
     return { success: false, error: 'No fue posible actualizar el pedido.' };
   }
+}
+
+export async function updateLiveOrderStatus(
+  orderId: string,
+  newStatus: OrderStatus,
+  tableId?: string
+): Promise<{ success: boolean; error?: string }> {
+  const res = await executeOrderStatusRpc(
+    'update_order_status',
+    { p_order_id: orderId, p_next_status: newStatus },
+    orderId,
+    newStatus,
+    tableId
+  );
+  return { success: res.success, error: res.error };
+}
+
+/**
+ * Acepta un pedido pendiente y lo pasa a "En preparación" en UNA sola transacción
+ * (RPC accept_and_start_order, migración 061). Si la migración aún no está
+ * desplegada, cae al flujo de dos pasos para no romper el KDS.
+ */
+export async function acceptAndStartLiveOrder(
+  orderId: string,
+  tableId?: string
+): Promise<{ success: boolean; error?: string }> {
+  const res = await executeOrderStatusRpc(
+    'accept_and_start_order',
+    { p_order_id: orderId },
+    orderId,
+    'preparing',
+    tableId
+  );
+  if (res.success || !res.missingRpc) {
+    return { success: res.success, error: res.error };
+  }
+
+  const step1 = await updateLiveOrderStatus(orderId, 'accepted', tableId);
+  if (!step1.success) return step1;
+  return updateLiveOrderStatus(orderId, 'preparing', tableId);
 }
 
 export interface RealtimeOrderChangePayload {

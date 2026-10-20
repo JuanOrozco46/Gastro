@@ -180,6 +180,7 @@ export interface DbOrder {
   customer_phone: string;
   delivery_address: unknown;
   table_number: string | null;
+  table_id?: string | null;
   restaurant_notes: string | null;
   cancellation_reason: string | null;
   payment_method?: string | null;
@@ -263,14 +264,36 @@ export function mapDbRestaurantToTenant(db: DbRestaurant): Tenant {
     wompiMerchantId: db.wompi_merchant_id || undefined,
     cashCommissionLimitCop: db.cash_commission_limit_cop ?? 50000,
     autoLockCashOnLimit: db.auto_lock_cash_on_limit ?? true,
-    hours: db.restaurant_hours ? db.restaurant_hours.map(h => ({
-      id: h.id,
-      restaurantId: db.id,
-      dayOfWeek: h.day_of_week,
-      isOpen: !h.is_closed,
-      openTime: h.open_time,
-      closeTime: h.close_time
-    })) : undefined
+    hours: db.restaurant_hours ? (() => {
+      const map = new Map<number, {
+        id: string;
+        restaurantId: string;
+        dayOfWeek: number;
+        isOpen: boolean;
+        openTime: string;
+        closeTime: string;
+        openTime2?: string;
+        closeTime2?: string;
+      }>();
+
+      for (const h of db.restaurant_hours) {
+        const existing = map.get(h.day_of_week);
+        if (!existing) {
+          map.set(h.day_of_week, {
+            id: h.id,
+            restaurantId: db.id,
+            dayOfWeek: h.day_of_week,
+            isOpen: !h.is_closed,
+            openTime: h.open_time,
+            closeTime: h.close_time
+          });
+        } else if (h.interval_index === 1 && !h.is_closed) {
+          existing.openTime2 = h.open_time || undefined;
+          existing.closeTime2 = h.close_time || undefined;
+        }
+      }
+      return Array.from(map.values()).sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+    })() : undefined
   };
 }
 
@@ -368,6 +391,12 @@ export function mapDbOrderToOrder(db: DbOrder): Order {
     : db.delivery_address;
 
   const rawItems = db.order_items || db.items || [];
+  const rawPayments = db.payments || [];
+  const activePayment = rawPayments.length > 0
+    ? (rawPayments.find(p => p.status === 'approved') ||
+       rawPayments.find(p => p.status === 'pending') ||
+       rawPayments[rawPayments.length - 1])
+    : undefined;
 
   return {
     id: db.id,
@@ -389,10 +418,11 @@ export function mapDbOrderToOrder(db: DbOrder): Order {
     customerId: db.customer_id || undefined,
     deliveryAddress: parsedAddress || undefined,
     tableNumber: db.table_number || undefined,
+    tableId: db.table_id || undefined,
     restaurantNotes: db.restaurant_notes || undefined,
     cancellationReason: db.cancellation_reason || undefined,
-    paymentId: db.payments?.[0]?.id,
-    paymentStatus: db.payments?.[0]?.status,
-    paymentMethod: ((db.payments?.[0]?.provider || db.payment_method) as PaymentMethod) || 'cash'
+    paymentId: activePayment?.id,
+    paymentStatus: activePayment?.status,
+    paymentMethod: ((activePayment?.provider || db.payment_method) as PaymentMethod) || 'cash'
   };
 }

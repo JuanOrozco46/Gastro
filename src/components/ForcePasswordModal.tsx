@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { KeyRound, ShieldAlert } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { supabase } from '../lib/supabase';
+import { validateRegisterPassword, validatePasswordConfirm } from '../utils/formValidation';
 
 export const ForcePasswordModal: React.FC = () => {
   const { currentUser } = useApp();
@@ -19,12 +20,14 @@ export const ForcePasswordModal: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres.');
+    const pwdErr = validateRegisterPassword(password);
+    if (pwdErr) {
+      setError(pwdErr);
       return;
     }
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden.');
+    const confirmErr = validatePasswordConfirm(password, confirmPassword);
+    if (confirmErr) {
+      setError(confirmErr);
       return;
     }
 
