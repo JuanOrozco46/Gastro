@@ -8,7 +8,10 @@ import { NotificationBell } from './NotificationBell';
 import { RestaurantTablesAdmin } from './RestaurantTablesAdmin';
 import { KdsBoard } from './KdsBoard';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
+import { DashboardTab } from './RestaurantAdmin/DashboardTab';
+import '../styles/admin-dashboard.css';
 import {
+  LayoutDashboard,
   QrCode,
   Utensils,
   Truck,
@@ -93,8 +96,8 @@ export const RestaurantAdmin: React.FC = () => {
   const operatingTenant = getOperationalTenant(currentUser, tenants);
 
   const [activeTab, setActiveTab] = useState<
-    'orders' | 'profile' | 'content' | 'menu' | 'reviews' | 'analytics' | 'qr' | 'support' | 'team'
-  >('orders');
+    'dashboard' | 'orders' | 'profile' | 'content' | 'menu' | 'reviews' | 'analytics' | 'qr' | 'support' | 'team'
+  >('dashboard');
   const [supportInitialTicketId, setSupportInitialTicketId] = useState<string | null>(null);
 
   // Driver form state
@@ -448,71 +451,63 @@ export const RestaurantAdmin: React.FC = () => {
       </div>
 
       {/* ── NAVIGATION TABS ── */}
-      <div className="nav-tabs" style={{ marginBottom: '0.25rem' }}>
-        <button
-          type="button"
-          className={`nav-tab ${activeTab === 'orders' ? 'active' : ''}`}
-          onClick={() => setActiveTab('orders')}
-        >
-          <Package size={16} /> Comandas KDS ({activeOrders.length})
-        </button>
-        <button
-          type="button"
-          className={`nav-tab ${activeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setActiveTab('profile')}
-        >
-          <Store size={16} /> Perfil y Horarios
-        </button>
-        <button
-          type="button"
-          className={`nav-tab ${activeTab === 'menu' ? 'active' : ''}`}
-          onClick={() => setActiveTab('menu')}
-        >
-          <Utensils size={16} /> Menú ({tenantProducts.length})
-        </button>
-        <button
-          type="button"
-          className={`nav-tab ${activeTab === 'content' ? 'active' : ''}`}
-          onClick={() => setActiveTab('content')}
-        >
-          <Share2 size={16} /> Publicar Contenido
-        </button>
-        <button
-          type="button"
-          className={`nav-tab ${activeTab === 'reviews' ? 'active' : ''}`}
-          onClick={() => setActiveTab('reviews')}
-        >
-          <Star size={16} /> Reseñas ({operatingTenant.reviewsCount || 0})
-        </button>
-        <button
-          type="button"
-          className={`nav-tab ${activeTab === 'qr' ? 'active' : ''}`}
-          onClick={() => setActiveTab('qr')}
-        >
-          <QrCode size={16} /> QR y Repartidores
-        </button>
-        <button
-          type="button"
-          className={`nav-tab ${activeTab === 'team' ? 'active' : ''}`}
-          onClick={() => setActiveTab('team')}
-        >
-          <Users size={16} /> Empleados
-        </button>
-        <button
-          type="button"
-          className={`nav-tab ${activeTab === 'analytics' ? 'active' : ''}`}
-          onClick={() => setActiveTab('analytics')}
-        >
-          <BarChart3 size={16} /> Finanzas
-        </button>
-        <button
-          type="button"
-          className={`nav-tab ${activeTab === 'support' ? 'active' : ''}`}
-          onClick={() => setActiveTab('support')}
-        >
-          <MessageSquare size={16} /> Soporte
-        </button>
-      </div>
+      <nav className="nav-tabs rpa-nav" aria-label="Secciones del panel" style={{ marginBottom: '0.25rem' }}>
+        {([
+          { key: 'dashboard', label: 'Resumen', icon: LayoutDashboard },
+          { key: 'orders', label: `Comandas KDS (${activeOrders.length})`, icon: Package },
+          { key: 'profile', label: 'Perfil y Horarios', icon: Store },
+          { key: 'menu', label: `Menú (${tenantProducts.length})`, icon: Utensils },
+          { key: 'content', label: 'Publicar Contenido', icon: Share2 },
+          { key: 'reviews', label: `Reseñas (${operatingTenant.reviewsCount || 0})`, icon: Star },
+          { key: 'qr', label: 'QR y Repartidores', icon: QrCode },
+          { key: 'team', label: 'Empleados', icon: Users },
+          { key: 'analytics', label: 'Finanzas', icon: BarChart3 },
+          { key: 'support', label: 'Soporte', icon: MessageSquare }
+        ] as const).map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              aria-current={isActive ? 'page' : undefined}
+              className={`nav-tab ${isActive ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {isActive && (
+                <motion.span
+                  layoutId="rpa-nav-pill"
+                  className="rpa-nav-pill"
+                  transition={{ type: 'spring', stiffness: 420, damping: 38, mass: 0.8 }}
+                />
+              )}
+              <Icon size={16} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={activeTab}
+        className="rpa-tab-stage"
+        initial={{ opacity: 0, y: 8, filter: 'blur(3px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        exit={{ opacity: 0, y: -4, filter: 'blur(2px)' }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      >
+      {/* ── TAB: RESUMEN / DASHBOARD ── */}
+      {activeTab === 'dashboard' && (
+        <DashboardTab
+          tenant={operatingTenant}
+          orders={tenantOrders}
+          products={tenantProducts}
+          posts={tenantPosts}
+          storyItems={tenantStoryItems}
+          onNavigate={setActiveTab}
+        />
+      )}
 
       {/* ── TAB: PERFIL Y HORARIOS ── */}
       {activeTab === 'profile' && <ProfileTab tenant={operatingTenant} />}
@@ -1610,6 +1605,8 @@ export const RestaurantAdmin: React.FC = () => {
           />
         </Suspense>
       )}
+      </motion.div>
+      </AnimatePresence>
     </motion.div>
   );
 };
