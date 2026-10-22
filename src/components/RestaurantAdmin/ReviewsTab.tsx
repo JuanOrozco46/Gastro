@@ -45,6 +45,7 @@ export const ReviewsTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const [replyDraft, setReplyDraft] = useState('');
   const [savingReplyId, setSavingReplyId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmReview, setDeleteConfirmReview] = useState<RestaurantReview | null>(null);
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
 
   const loadReviews = useCallback(async () => {
@@ -180,12 +181,12 @@ export const ReviewsTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     }
   };
 
-  const handleDelete = async (reviewId: string) => {
-    if (!window.confirm('¿Deseas eliminar esta reseña del perfil de tu restaurante?')) return;
-    setDeletingId(reviewId);
+  const executeDeleteReview = async (review: RestaurantReview) => {
+    setDeletingId(review.id);
+    setDeleteConfirmReview(null);
     try {
       if (authMode === 'demo' || !isSupabaseConfigured) {
-        const next = reviews.filter(r => r.id !== reviewId);
+        const next = reviews.filter(r => r.id !== review.id);
         setReviews(next);
         try {
           localStorage.setItem(`gs_reviews_${tenant.id}`, JSON.stringify(next));
@@ -196,12 +197,12 @@ export const ReviewsTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
         return;
       }
 
-      const res = await deleteRestaurantReview(reviewId, tenant.id);
+      const res = await deleteRestaurantReview(review.id, tenant.id);
       if (!res.success) {
         showToast(`⚠️ ${res.error || 'No se pudo eliminar la reseña.'}`);
         return;
       }
-      setReviews(prev => prev.filter(r => r.id !== reviewId));
+      setReviews(prev => prev.filter(r => r.id !== review.id));
       syncTenantRating(tenant.id, res.ratingAvg, res.ratingCount);
       showToast('🗑️ Reseña eliminada y promedio actualizado.');
     } finally {
@@ -588,7 +589,7 @@ export const ReviewsTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                         className="pam-btn-danger"
                         style={{ padding: '7px 10px', fontSize: '0.78rem' }}
                         disabled={deletingId === review.id}
-                        onClick={() => handleDelete(review.id)}
+                        onClick={() => setDeleteConfirmReview(review)}
                         title="Eliminar reseña"
                       >
                         <Trash2 size={14} />
@@ -782,6 +783,63 @@ export const ReviewsTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
             })}
           </div>
         )}
+        {/* Modal de Confirmación para Eliminar Reseña */}
+        <AnimatePresence>
+          {deleteConfirmReview && (
+            <div className="gs-modal-backdrop" onClick={() => setDeleteConfirmReview(null)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="gs-modal-card"
+                onClick={e => e.stopPropagation()}
+                style={{ maxWidth: '420px' }}
+              >
+                <div className="gs-modal-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="rpa-card-icon" style={{ width: '32px', height: '32px', background: '#FEE2E2', color: '#DC2626' }}>
+                      <Trash2 size={16} />
+                    </div>
+                    <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>
+                      Eliminar Reseña
+                    </strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="rpa-icon-btn"
+                    onClick={() => setDeleteConfirmReview(null)}
+                    aria-label="Cerrar modal"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="gs-modal-body">
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+                    ¿Deseas eliminar la reseña de <strong>{deleteConfirmReview.userName}</strong> ({deleteConfirmReview.rating}★)? El promedio de satisfacción del restaurante se recalculará automáticamente.
+                  </p>
+                </div>
+
+                <div className="gs-modal-footer">
+                  <button
+                    type="button"
+                    className="pam-btn-ghost"
+                    onClick={() => setDeleteConfirmReview(null)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="pam-btn-danger"
+                    onClick={() => executeDeleteReview(deleteConfirmReview)}
+                  >
+                    Sí, eliminar reseña
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Lightbox Modal for Review Photo */}

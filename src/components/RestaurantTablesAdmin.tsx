@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   QrCode,
@@ -10,13 +10,14 @@ import {
   Copy,
   CheckCircle,
   AlertCircle,
-  Sparkles,
   Check,
   Users,
   Hash,
   MapPin,
   X,
-  Save
+  Save,
+  Printer,
+  RefreshCw
 } from 'lucide-react';
 import {
   fetchRestaurantTables,
@@ -31,6 +32,16 @@ interface Props {
   tenant: Tenant;
 }
 
+interface ConfirmState {
+  isOpen: boolean;
+  type: 'archive' | 'regenerate';
+  table: RestaurantTable | null;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  isDestructive: boolean;
+}
+
 export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,6 +53,20 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
   const [formData, setFormData] = useState({ tableNumber: '', displayName: '', capacity: '' });
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Confirmation modal state
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmState>({
+    isOpen: false,
+    type: 'archive',
+    table: null,
+    title: '',
+    description: '',
+    confirmLabel: '',
+    isDestructive: false
+  });
+
+  // Printable Tent Card Modal
+  const [printingTable, setPrintingTable] = useState<RestaurantTable | null>(null);
 
   const loadTables = useCallback(async () => {
     const data = await fetchRestaurantTables(tenant.id);
@@ -120,16 +145,41 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
     loadTables();
   };
 
-  const handleArchive = async (id: string) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar esta mesa? Los pedidos anteriores se conservarán.')) {
-      await archiveRestaurantTable(id);
-      loadTables();
-    }
+  const openArchiveConfirm = (table: RestaurantTable) => {
+    setConfirmDialog({
+      isOpen: true,
+      type: 'archive',
+      table,
+      title: 'Eliminar Mesa',
+      description: `¿Estás seguro de que deseas eliminar la Mesa #${table.tableNumber}? Los pedidos anteriores se conservarán intactos.`,
+      confirmLabel: 'Sí, eliminar mesa',
+      isDestructive: true
+    });
   };
 
-  const handleRegenerate = async (id: string) => {
-    if (window.confirm('¿Regenerar el QR? El código QR anterior quedará invalidado y dejará de funcionar inmediatamente.')) {
-      await regenerateTableToken(id);
+  const openRegenerateConfirm = (table: RestaurantTable) => {
+    setConfirmDialog({
+      isOpen: true,
+      type: 'regenerate',
+      table,
+      title: 'Regenerar Código QR',
+      description: `¿Regenerar el código QR de la Mesa #${table.tableNumber}? El código QR actual impreso dejará de funcionar inmediatamente.`,
+      confirmLabel: 'Regenerar nuevo QR',
+      isDestructive: true
+    });
+  };
+
+  const executeConfirmedAction = async () => {
+    const { type, table } = confirmDialog;
+    if (!table) return;
+
+    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+
+    if (type === 'archive') {
+      await archiveRestaurantTable(table.id);
+      loadTables();
+    } else if (type === 'regenerate') {
+      await regenerateTableToken(table.id);
       loadTables();
     }
   };
@@ -152,6 +202,14 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
 
   const stepDone = Boolean(formData.tableNumber.trim());
 
+  // Metrics
+  const metrics = useMemo(() => {
+    const total = tables.length;
+    const active = tables.filter(t => t.isActive).length;
+    const totalPax = tables.reduce((acc, t) => acc + (t.capacity || 0), 0);
+    return { total, active, totalPax };
+  }, [tables]);
+
   return (
     <div className="rpa-card">
       <div className="rpa-card-header">
@@ -160,12 +218,9 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
             <QrCode size={22} />
           </div>
           <div>
-            <span className="pam-eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>
-              <Sparkles size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Servicio en Mesa Digital
-            </span>
             <h3 className="rpa-card-title">Mesas y Códigos QR ({tables.length})</h3>
             <p className="rpa-card-subtitle">
-              Tus clientes escanean el QR en su mesa y ordenan directo a cocina sin esperas.
+              Tus comensales escanean el código en su mesa y ordenan directo a cocina sin esperas ni fricción.
             </p>
           </div>
         </div>
@@ -182,30 +237,69 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
         >
           {showForm ? (
             <>
-              <X size={16} /> Cancelar
+              <X size={16} /> Cerrar Formulario
             </>
           ) : (
             <>
-              <Plus size={16} /> Nueva Mesa QR
+              <Plus size={16} /> Registrar Mesa
             </>
           )}
         </button>
       </div>
 
       <div className="rpa-card-body">
+        {/* Metric Badges */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '12px',
+            marginBottom: '1rem'
+          }}
+        >
+          <div className="pam-section" style={{ padding: '12px 14px', margin: 0 }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+              Mesas Configuradas
+            </span>
+            <strong style={{ fontSize: '1.4rem', color: 'var(--text-main)', fontWeight: 900, display: 'block', marginTop: '2px' }}>
+              {metrics.total}
+            </strong>
+          </div>
+
+          <div className="pam-section" style={{ padding: '12px 14px', margin: 0 }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+              Mesas Habilitadas
+            </span>
+            <strong style={{ fontSize: '1.4rem', color: '#059669', fontWeight: 900, display: 'block', marginTop: '2px' }}>
+              {metrics.active}
+            </strong>
+          </div>
+
+          <div className="pam-section" style={{ padding: '12px 14px', margin: 0 }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+              Capacidad Total Salón
+            </span>
+            <strong style={{ fontSize: '1.4rem', color: 'var(--primary)', fontWeight: 900, display: 'block', marginTop: '2px' }}>
+              {metrics.totalPax > 0 ? `${metrics.totalPax} personas` : 'Sin registrar'}
+            </strong>
+          </div>
+        </div>
+
         {error && (
-          <div className="pam-callout error">
+          <div className="pam-callout error" style={{ marginBottom: '12px' }}>
             <AlertCircle size={18} />
             <span>{error}</span>
           </div>
         )}
 
+        {/* Create / Edit Form */}
         <AnimatePresence>
           {showForm && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
+              style={{ marginBottom: '1.25rem' }}
             >
               <form onSubmit={handleSubmit} noValidate>
                 <section className="pam-section">
@@ -222,7 +316,7 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
                   <div className="pam-grid">
                     <div className="pam-field">
                       <label>
-                        Número de Mesa <em>*</em>
+                        Número o Identificador de Mesa <em>*</em>
                       </label>
                       <div className="pam-input-wrap">
                         <Hash size={16} className="pam-icon" />
@@ -257,7 +351,7 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
 
                     <div className="pam-field pam-span-2">
                       <label>
-                        Ubicación / Alias de la Mesa <span className="pam-opt">Opcional</span>
+                        Ubicación o Alias de la Mesa <span className="pam-opt">Opcional</span>
                       </label>
                       <div className="pam-input-wrap">
                         <MapPin size={16} className="pam-icon" />
@@ -293,7 +387,8 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
 
         {isLoading ? (
           <div className="pam-section" style={{ alignItems: 'center', textAlign: 'center', padding: '2rem' }}>
-            <p style={{ color: 'var(--text-muted)', margin: 0 }}>Cargando mesas configuradas...</p>
+            <RefreshCw size={24} className="spin" style={{ color: 'var(--primary)', marginBottom: '6px' }} />
+            <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '0.85rem' }}>Cargando mesas configuradas...</p>
           </div>
         ) : tables.length === 0 ? (
           <div className="pam-section" style={{ alignItems: 'center', textAlign: 'center', padding: '2.5rem 1.5rem' }}>
@@ -306,7 +401,7 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
             </p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
             {tables.map(table => {
               const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(getQRUrl(table.publicToken))}`;
 
@@ -314,9 +409,9 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
                 <div
                   key={table.id}
                   className="pam-section"
-                  style={{ padding: '1rem', gap: '12px', justifyContent: 'space-between' }}
+                  style={{ padding: '1.1rem', gap: '12px', justifyContent: 'space-between', margin: 0 }}
                 >
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
                     <img
                       src={qrImageUrl}
                       alt={`QR Mesa ${table.tableNumber}`}
@@ -333,11 +428,11 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
 
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                        <strong style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                        <strong style={{ fontSize: '1.08rem', fontWeight: 900, color: 'var(--text-main)' }}>
                           Mesa #{table.tableNumber}
                         </strong>
                         <span className={`rpa-badge ${table.isActive ? 'success' : 'neutral'}`}>
-                          {table.isActive ? 'Activa' : 'Inactiva'}
+                          {table.isActive ? 'Activa' : 'Pausada'}
                         </span>
                       </div>
 
@@ -348,7 +443,7 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
                       )}
                       {table.capacity && (
                         <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          👥 Capacidad: {table.capacity} personas
+                          👥 {table.capacity} personas
                         </div>
                       )}
 
@@ -356,8 +451,16 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
                         <button
                           type="button"
                           className="rpa-icon-btn"
+                          onClick={() => setPrintingTable(table)}
+                          title="Ver tarjeta imprimible para mesa"
+                        >
+                          <Printer size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="rpa-icon-btn"
                           onClick={() => downloadQR(table.publicToken)}
-                          title="Descargar QR en alta resolución"
+                          title="Descargar imagen QR"
                         >
                           <Download size={14} />
                         </button>
@@ -365,7 +468,7 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
                           type="button"
                           className="rpa-icon-btn"
                           onClick={() => copyUrl(table.publicToken, table.id)}
-                          title="Copiar enlace directo de la mesa"
+                          title="Copiar enlace directo"
                         >
                           {copiedId === table.id ? (
                             <CheckCircle size={14} color="#059669" />
@@ -376,10 +479,10 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
                         <button
                           type="button"
                           className="rpa-icon-btn"
-                          onClick={() => handleRegenerate(table.id)}
+                          onClick={() => openRegenerateConfirm(table)}
                           title="Regenerar token QR"
                         >
-                          <QrCode size={14} />
+                          <RefreshCw size={14} />
                         </button>
                       </div>
                     </div>
@@ -413,7 +516,7 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
                     <button
                       type="button"
                       className="rpa-icon-btn danger"
-                      onClick={() => handleArchive(table.id)}
+                      onClick={() => openArchiveConfirm(table)}
                       title="Eliminar mesa"
                     >
                       <Trash2 size={14} />
@@ -424,6 +527,147 @@ export const RestaurantTablesAdmin: React.FC<Props> = ({ tenant }) => {
             })}
           </div>
         )}
+
+        {/* PRINTABLE QR TENT CARD MODAL */}
+        <AnimatePresence>
+          {printingTable && (
+            <div className="gs-modal-backdrop" onClick={() => setPrintingTable(null)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="gs-modal-card gs-printable-sheet"
+                onClick={e => e.stopPropagation()}
+                style={{ maxWidth: '440px' }}
+              >
+                <div className="gs-modal-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Printer size={18} color="var(--primary)" />
+                    <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>
+                      Tarjeta Imprimible para Mesa #{printingTable.tableNumber}
+                    </strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="rpa-icon-btn"
+                    onClick={() => setPrintingTable(null)}
+                    aria-label="Cerrar modal"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="gs-modal-body" style={{ background: '#F8F6F0', padding: '2rem 1.5rem' }}>
+                  <div className="gs-qr-tent-preview">
+                    <span style={{ fontSize: '0.78rem', letterSpacing: '2px', textTransform: 'uppercase', color: '#8B6F47', fontWeight: 800 }}>
+                      {tenant.name}
+                    </span>
+                    <h2 style={{ fontSize: '1.65rem', fontWeight: 900, margin: '6px 0 14px', color: '#2C2520' }}>
+                      Mesa #{printingTable.tableNumber}
+                    </h2>
+
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(getQRUrl(printingTable.publicToken))}`}
+                      alt={`QR Mesa ${printingTable.tableNumber}`}
+                      style={{
+                        width: '160px',
+                        height: '160px',
+                        borderRadius: '12px',
+                        padding: '8px',
+                        background: '#FFFFFF',
+                        border: '1px solid #EAE2D6',
+                        margin: '0 auto 12px'
+                      }}
+                    />
+
+                    <p style={{ margin: '0 0 6px', fontSize: '0.84rem', fontWeight: 700, color: '#2C2520' }}>
+                      📱 Escanea para ver el menú y pedir
+                    </p>
+                    <span style={{ fontSize: '0.7rem', color: '#8B6F47' }}>
+                      Powered by GastroSync
+                    </span>
+                  </div>
+                </div>
+
+                <div className="gs-modal-footer">
+                  <button
+                    type="button"
+                    className="pam-btn-ghost"
+                    onClick={() => setPrintingTable(null)}
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    className="pam-btn-primary"
+                    onClick={() => window.print()}
+                  >
+                    <Printer size={15} />
+                    <span>Imprimir Tarjeta</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* CUSTOM CONFIRMATION MODAL */}
+        <AnimatePresence>
+          {confirmDialog.isOpen && (
+            <div className="gs-modal-backdrop" onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="gs-modal-card"
+                onClick={e => e.stopPropagation()}
+                style={{ maxWidth: '420px' }}
+              >
+                <div className="gs-modal-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="rpa-card-icon" style={{ width: '32px', height: '32px', background: '#FEE2E2', color: '#DC2626' }}>
+                      <AlertCircle size={16} />
+                    </div>
+                    <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>
+                      {confirmDialog.title}
+                    </strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="rpa-icon-btn"
+                    onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                    aria-label="Cerrar modal"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="gs-modal-body">
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+                    {confirmDialog.description}
+                  </p>
+                </div>
+
+                <div className="gs-modal-footer">
+                  <button
+                    type="button"
+                    className="pam-btn-ghost"
+                    onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="pam-btn-danger"
+                    onClick={executeConfirmedAction}
+                  >
+                    {confirmDialog.confirmLabel}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

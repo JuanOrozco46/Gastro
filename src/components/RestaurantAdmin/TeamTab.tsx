@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/useApp';
 import type { Tenant, RestaurantMember } from '../../types';
 import {
@@ -13,10 +13,26 @@ import {
   UserPlus,
   ShieldCheck,
   AlertCircle,
-  X
+  X,
+  Search,
+  CheckCircle2,
+  Table,
+  Lock,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { validateEmail } from '../../utils/formValidation';
+
+interface ConfirmationDialogState {
+  isOpen: boolean;
+  action: 'resend' | 'suspend' | 'reactivate' | 'revoke';
+  member: RestaurantMember | null;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  isDestructive: boolean;
+}
 
 export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const {
@@ -33,10 +49,23 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const [members, setMembers] = useState<RestaurantMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInviteForm, setShowInviteForm] = useState(false);
+  const [showPermissionsMatrix, setShowPermissionsMatrix] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Custom confirmation modal (replaces window.confirm)
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmationDialogState>({
+    isOpen: false,
+    action: 'resend',
+    member: null,
+    title: '',
+    description: '',
+    confirmLabel: '',
+    isDestructive: false
+  });
 
   const isOwner =
     members.find(m => m.userId === currentUser?.id && m.status === 'active')?.role === 'owner' ||
@@ -87,18 +116,60 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     setInviting(false);
   };
 
-  const handleAction = async (
+  const openConfirmation = (
     action: 'resend' | 'suspend' | 'reactivate' | 'revoke',
     member: RestaurantMember
   ) => {
-    let confirmMsg = '';
-    if (action === 'revoke') confirmMsg = '¿Deseas revocar el acceso de este empleado de forma permanente?';
-    if (action === 'suspend') confirmMsg = '¿Deseas suspender temporalmente el acceso de este empleado?';
-    if (action === 'resend') confirmMsg = '¿Deseas reenviar la invitación a su correo?';
+    if (action === 'revoke') {
+      setConfirmDialog({
+        isOpen: true,
+        action,
+        member,
+        title: 'Revocar Acceso Permanente',
+        description: `¿Estás seguro de revocar el acceso de ${member.email}? Esta acción no se puede deshacer y el empleado perderá el acceso a KDS y pedidos.`,
+        confirmLabel: 'Sí, revocar acceso',
+        isDestructive: true
+      });
+    } else if (action === 'suspend') {
+      setConfirmDialog({
+        isOpen: true,
+        action,
+        member,
+        title: 'Suspender Acceso Temporal',
+        description: `¿Deseas suspender a ${member.email}? El colaborador no podrá ingresar al panel operativo hasta que reactives su cuenta.`,
+        confirmLabel: 'Suspender colaborador',
+        isDestructive: true
+      });
+    } else if (action === 'reactivate') {
+      setConfirmDialog({
+        isOpen: true,
+        action,
+        member,
+        title: 'Reactivar Acceso',
+        description: `¿Deseas reactivar el acceso de ${member.email}? Podrá volver a gestionar la cocina y mesas inmediatamente.`,
+        confirmLabel: 'Reactivar colaborador',
+        isDestructive: false
+      });
+    } else if (action === 'resend') {
+      setConfirmDialog({
+        isOpen: true,
+        action,
+        member,
+        title: 'Reenviar Invitación',
+        description: `Enviaremos nuevamente el correo de bienvenida a ${member.email} con el enlace de vinculación.`,
+        confirmLabel: 'Reenviar correo',
+        isDestructive: false
+      });
+    }
+  };
 
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
+  const executeConfirmedAction = async () => {
+    const { action, member } = confirmDialog;
+    if (!member) return;
 
     setProcessingId(member.id);
+    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+
     let res: { success: boolean; error?: string } = { success: false };
 
     if (action === 'resend') res = await resendStaffInvitation(member.id);
@@ -107,7 +178,7 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     if (action === 'revoke') res = await revokeRestaurantMember(member.id);
 
     if (res.success) {
-      showToast('Estado del miembro actualizado.');
+      showToast('Estado del colaborador actualizado correctamente.');
       await loadMembers();
     } else {
       showToast(`⚠️ Error: ${res.error}`);
@@ -115,9 +186,17 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     setProcessingId(null);
   };
 
-  const activeMembers = members.filter(m => m.status === 'active');
-  const invitedMembers = members.filter(m => m.status === 'invited');
-  const otherMembers = members.filter(m => m.status === 'suspended' || m.status === 'revoked');
+  const filteredMembers = useMemo(() => {
+    if (!searchQuery.trim()) return members;
+    const q = searchQuery.toLowerCase();
+    return members.filter(
+      m => m.email.toLowerCase().includes(q) || m.role.toLowerCase().includes(q)
+    );
+  }, [members, searchQuery]);
+
+  const activeMembers = filteredMembers.filter(m => m.status === 'active');
+  const invitedMembers = filteredMembers.filter(m => m.status === 'invited');
+  const otherMembers = filteredMembers.filter(m => m.status === 'suspended' || m.status === 'revoked');
 
   const emailValid = Boolean(inviteEmail.trim() && !validateEmail(inviteEmail));
 
@@ -130,46 +209,163 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
             <Users size={22} />
           </div>
           <div>
-            <span className="pam-eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>
-              <Sparkles size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> Gestión de Personal y Accesos
-            </span>
-            <h3 className="rpa-card-title">Equipo y Empleados de {tenant.name}</h3>
+            <h3 className="rpa-card-title">Equipo y Personal de {tenant.name}</h3>
             <p className="rpa-card-subtitle">
-              Administra quién tiene acceso operativo a pedidos, cocina (KDS) y atención en mesas.
+              Administra colaboradores operativos, permisos en cocina (KDS), pedidos en vivo y atención en salón.
             </p>
           </div>
         </div>
 
-        {isOwner && (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             type="button"
-            className={showInviteForm ? 'pam-btn-ghost' : 'pam-btn-primary'}
-            onClick={() => {
-              setShowInviteForm(!showInviteForm);
-              setEmailError(null);
-            }}
+            className="pam-btn-ghost"
+            onClick={() => setShowPermissionsMatrix(!showPermissionsMatrix)}
           >
-            {showInviteForm ? (
-              <>
-                <X size={16} /> Cancelar
-              </>
-            ) : (
-              <>
-                <UserPlus size={16} /> Vincular Empleado
-              </>
-            )}
+            <Table size={15} />
+            <span>{showPermissionsMatrix ? 'Ocultar Permisos' : 'Ver Matriz de Roles'}</span>
+            {showPermissionsMatrix ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
-        )}
+
+          {isOwner && (
+            <button
+              type="button"
+              className={showInviteForm ? 'pam-btn-ghost' : 'pam-btn-primary'}
+              onClick={() => {
+                setShowInviteForm(!showInviteForm);
+                setEmailError(null);
+              }}
+            >
+              {showInviteForm ? (
+                <>
+                  <X size={16} /> Cerrar
+                </>
+              ) : (
+                <>
+                  <UserPlus size={16} /> Invitar Colaborador
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="rpa-card-body">
-        {/* Formulario de Invitación con formato .pam-* */}
+        {/* KPI Summary Strip */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '12px',
+            marginBottom: '1rem'
+          }}
+        >
+          <div className="pam-section" style={{ padding: '12px 14px', margin: 0 }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+              Colaboradores Activos
+            </span>
+            <strong style={{ fontSize: '1.4rem', color: '#059669', fontWeight: 900, display: 'block', marginTop: '2px' }}>
+              {members.filter(m => m.status === 'active').length}
+            </strong>
+          </div>
+
+          <div className="pam-section" style={{ padding: '12px 14px', margin: 0 }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+              Invitaciones Pendientes
+            </span>
+            <strong style={{ fontSize: '1.4rem', color: '#D97706', fontWeight: 900, display: 'block', marginTop: '2px' }}>
+              {members.filter(m => m.status === 'invited').length}
+            </strong>
+          </div>
+
+          <div className="pam-section" style={{ padding: '12px 14px', margin: 0 }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+              Accesos Inactivos
+            </span>
+            <strong style={{ fontSize: '1.4rem', color: 'var(--text-muted)', fontWeight: 900, display: 'block', marginTop: '2px' }}>
+              {members.filter(m => m.status === 'suspended' || m.status === 'revoked').length}
+            </strong>
+          </div>
+        </div>
+
+        {/* Permissions Comparison Matrix */}
+        <AnimatePresence>
+          {showPermissionsMatrix && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              style={{ overflow: 'hidden', marginBottom: '1.25rem' }}
+            >
+              <div className="pam-section" style={{ padding: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <ShieldCheck size={18} color="var(--primary)" />
+                  <strong style={{ fontSize: '0.96rem', color: 'var(--text-main)' }}>
+                    Matriz de Privilegios por Perfil
+                  </strong>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="gs-permission-table">
+                    <thead>
+                      <tr>
+                        <th>Módulo / Funcionalidad</th>
+                        <th style={{ width: '180px' }}>👑 Propietario / Admin</th>
+                        <th style={{ width: '180px' }}>👨‍🍳 Staff Operativo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Monitor de Cocina (KDS) & Tiempo Real</strong></td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Acceso Total</td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Acceso Total</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Gestión y Despacho de Pedidos</strong></td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Acceso Total</td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Acceso Total</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Atención de Mesas QR en Salón</strong></td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Acceso Total</td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Acceso Total</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Pausar / Habilitar Platos Inmediatamente</strong></td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Permitido</td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Permitido</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Crear y Editar Precios en la Carta</strong></td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Permitido</td>
+                        <td><span style={{ color: 'var(--text-muted)' }}>⚠️ Solo Consulta</span></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Finanzas, Dispersión Wompi y Cuentas Bancarias</strong></td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Acceso Exclusivo</td>
+                        <td><span style={{ color: '#DC2626', display: 'flex', alignItems: 'center', gap: '4px' }}><Lock size={13} /> Bloqueado</span></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Invitar, Suspender o Revocar Empleados</strong></td>
+                        <td><CheckCircle2 size={16} color="#059669" /> Permitido</td>
+                        <td><span style={{ color: '#DC2626', display: 'flex', alignItems: 'center', gap: '4px' }}><Lock size={13} /> Bloqueado</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Invite Form */}
         <AnimatePresence>
           {showInviteForm && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
+              style={{ marginBottom: '1.25rem' }}
             >
               <form onSubmit={handleInvite} noValidate>
                 <section className="pam-section">
@@ -178,27 +374,11 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                       {emailValid ? <Check size={15} strokeWidth={3} /> : 1}
                     </div>
                     <div>
-                      <h4>Invitar Empleado / Staff Operativo</h4>
+                      <h4>Vincular Colaborador a la Operación</h4>
                       <p>
-                        El colaborador recibirá acceso inmediato al panel operativo de <strong>{tenant.name}</strong> sin ver métricas financieras sensibles.
+                        El colaborador recibirá un correo de acceso al panel de <strong>{tenant.name}</strong> para gestionar pedidos y cocina sin acceso a métricas bancarias.
                       </p>
                     </div>
-                  </div>
-
-                  {/* Permisos del rol Staff */}
-                  <div className="pam-chips">
-                    <span className="rpa-badge success">
-                      <Check size={11} /> Gestión de Pedidos en Vivo
-                    </span>
-                    <span className="rpa-badge success">
-                      <Check size={11} /> Monitor de Cocina (KDS)
-                    </span>
-                    <span className="rpa-badge success">
-                      <Check size={11} /> Mesas QR y Repartidores
-                    </span>
-                    <span className="rpa-badge neutral">
-                      <ShieldCheck size={11} /> Sin acceso a Finanzas Críticas
-                    </span>
                   </div>
 
                   {emailError && (
@@ -211,7 +391,7 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                   <div className="pam-grid">
                     <div className="pam-field pam-span-2">
                       <label>
-                        Correo Electrónico del Empleado <em>*</em>
+                        Correo Electrónico del Colaborador <em>*</em>
                       </label>
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                         <div className="pam-input-wrap" style={{ flex: 1, minWidth: '240px' }}>
@@ -219,7 +399,7 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                           <input
                             type="email"
                             className={`pam-input ${emailError ? 'has-error' : ''}`}
-                            placeholder="empleado@correo.com"
+                            placeholder="colaborador@correo.com"
                             value={inviteEmail}
                             onChange={e => {
                               setInviteEmail(e.target.value);
@@ -241,17 +421,31 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
           )}
         </AnimatePresence>
 
-        {/* Listado de Miembros */}
+        {/* Search Bar */}
+        {members.length > 3 && (
+          <div className="pam-input-wrap" style={{ marginBottom: '1rem', maxWidth: '360px' }}>
+            <Search size={15} className="pam-icon" />
+            <input
+              type="text"
+              className="pam-input"
+              placeholder="Buscar colaborador por correo o rol..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Member Listings */}
         {loading ? (
           <div className="pam-section" style={{ alignItems: 'center', padding: '2.5rem', textAlign: 'center' }}>
             <RefreshCw size={24} className="spin" style={{ color: 'var(--primary)' }} />
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', margin: 0 }}>
-              Cargando equipo de {tenant.name}...
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', margin: '8px 0 0' }}>
+              Cargando colaboradores de {tenant.name}...
             </p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {/* Miembros Activos */}
+            {/* Active Members */}
             <section className="pam-section">
               <div className="pam-section-head" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -260,7 +454,7 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                   </div>
                   <div>
                     <h4>Colaboradores Activos ({activeMembers.length})</h4>
-                    <p>Miembros con acceso habilitado al restaurante</p>
+                    <p>Miembros con acceso operativo al restaurante</p>
                   </div>
                 </div>
                 <span className="rpa-badge success">{activeMembers.length} activos</span>
@@ -268,7 +462,7 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
 
               {activeMembers.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
-                  Aún no hay miembros activos registrados.
+                  {searchQuery ? 'No se encontraron colaboradores que coincidan con la búsqueda.' : 'Aún no hay colaboradores activos registrados.'}
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -277,7 +471,7 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                       key={m.id}
                       member={m}
                       isOwner={isOwner}
-                      onAction={handleAction}
+                      onAction={openConfirmation}
                       processingId={processingId}
                     />
                   ))}
@@ -285,13 +479,13 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
               )}
             </section>
 
-            {/* Invitaciones Pendientes */}
+            {/* Pending Invitations */}
             {invitedMembers.length > 0 && (
               <section className="pam-section">
                 <div className="pam-section-head" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <h4>Invitaciones Pendientes ({invitedMembers.length})</h4>
-                    <p>Colaboradores que aún no han aceptado su invitación</p>
+                    <p>Colaboradores que aún no han aceptado su invitación por correo</p>
                   </div>
                   <span className="rpa-badge warning">{invitedMembers.length} pendientes</span>
                 </div>
@@ -302,7 +496,7 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                       key={m.id}
                       member={m}
                       isOwner={isOwner}
-                      onAction={handleAction}
+                      onAction={openConfirmation}
                       processingId={processingId}
                     />
                   ))}
@@ -310,13 +504,13 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
               </section>
             )}
 
-            {/* Suspendidos o Revocados */}
+            {/* Inactive / Revoked */}
             {otherMembers.length > 0 && (
               <section className="pam-section">
                 <div className="pam-section-head" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <h4>Historial de Accesos Inactivos ({otherMembers.length})</h4>
-                    <p>Miembros suspendidos temporalmente o con acceso revocado</p>
+                    <p>Colaboradores suspendidos temporalmente o con acceso revocado</p>
                   </div>
                   <span className="rpa-badge neutral">{otherMembers.length} inactivos</span>
                 </div>
@@ -327,7 +521,7 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                       key={m.id}
                       member={m}
                       isOwner={isOwner}
-                      onAction={handleAction}
+                      onAction={openConfirmation}
                       processingId={processingId}
                     />
                   ))}
@@ -336,6 +530,72 @@ export const TeamTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
             )}
           </div>
         )}
+
+        {/* CUSTOM ANIMATED CONFIRMATION MODAL */}
+        <AnimatePresence>
+          {confirmDialog.isOpen && (
+            <div className="gs-modal-backdrop" onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="gs-modal-card"
+                onClick={e => e.stopPropagation()}
+                style={{ maxWidth: '440px' }}
+              >
+                <div className="gs-modal-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div
+                      className="rpa-card-icon"
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        background: confirmDialog.isDestructive ? '#FEE2E2' : 'var(--primary-light)',
+                        color: confirmDialog.isDestructive ? '#DC2626' : 'var(--primary)'
+                      }}
+                    >
+                      {confirmDialog.isDestructive ? <AlertCircle size={18} /> : <Sparkles size={18} />}
+                    </div>
+                    <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>
+                      {confirmDialog.title}
+                    </strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="rpa-icon-btn"
+                    onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                    aria-label="Cerrar modal"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="gs-modal-body">
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+                    {confirmDialog.description}
+                  </p>
+                </div>
+
+                <div className="gs-modal-footer">
+                  <button
+                    type="button"
+                    className="pam-btn-ghost"
+                    onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className={confirmDialog.isDestructive ? 'pam-btn-danger' : 'pam-btn-primary'}
+                    onClick={executeConfirmedAction}
+                  >
+                    {confirmDialog.confirmLabel}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -368,9 +628,9 @@ const MemberRow: React.FC<{
               {member.email}
             </strong>
             {member.role === 'owner' ? (
-              <span className="rpa-badge primary">Propietario</span>
+              <span className="rpa-badge primary">👑 Propietario</span>
             ) : (
-              <span className="rpa-badge neutral">Staff Operativo</span>
+              <span className="rpa-badge neutral">👨‍🍳 Staff Operativo</span>
             )}
 
             {member.status === 'active' && <span className="rpa-badge success">Activo</span>}

@@ -1,6 +1,7 @@
 import React, { useState, Suspense } from 'react';
 import { useApp } from '../context/useApp';
 import { getOperationalTenant } from '../utils/tenantHelpers';
+import type { Post, Driver } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileUploadInput } from './FileUploadInput';
 import { ProfileTab } from './RestaurantAdmin/ProfileTab';
@@ -116,6 +117,8 @@ export const RestaurantAdmin: React.FC = () => {
   const [postDesc, setPostDesc] = useState('');
   const [postHashtags, setPostHashtags] = useState('#GastroSync #ComidaArtesanal #SaborLocal');
   const [isDeletingPost, setIsDeletingPost] = useState<string | null>(null);
+  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
+  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
   const [postFormError, setPostFormError] = useState<string | null>(null);
   const [postMediaType, setPostMediaType] = useState<'photo' | 'video'>('video');
@@ -402,48 +405,62 @@ export const RestaurantAdmin: React.FC = () => {
               </button>
               <button
                 type="button"
-                className="pam-btn-primary"
-                style={{
-                  background: operatingTenant.isOpen
-                    ? 'linear-gradient(135deg, #059669 0%, #10B981 100%)'
-                    : 'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)',
-                  boxShadow: operatingTenant.isOpen
-                    ? '0 6px 16px rgba(16, 185, 129, 0.35)'
-                    : '0 6px 16px rgba(239, 68, 68, 0.35)',
-                  minWidth: '145px',
-                  padding: '10px 18px'
-                }}
+                className={`rpa-status-btn ${operatingTenant.isOpen ? 'open' : 'closed'}`}
                 onClick={() => toggleTenantOpenStatus(operatingTenant.id)}
+                title={operatingTenant.isOpen ? 'Haz clic para pausar pedidos temporalmente' : 'Haz clic para abrir el restaurante'}
               >
-                <Power size={16} />
-                <span>{operatingTenant.isOpen ? '🟢 ABIERTO' : '🔴 CERRADO'}</span>
+                <span className="rpa-status-dot" />
+                <Power size={14} />
+                <span>{operatingTenant.isOpen ? 'Local Abierto' : 'Local Cerrado'}</span>
               </button>
             </div>
           </div>
 
           {/* KPI Quick-Navigation Cards */}
           <div className="rpa-kpis">
-            <div className="rpa-kpi" onClick={() => setActiveTab('orders')}>
-              <span className="rpa-kpi-label">Pedidos Activos</span>
+            <div
+              className={`rpa-kpi ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('dashboard')}
+            >
+              <span className="rpa-kpi-label">Resumen Ejecutivo</span>
               <strong className="rpa-kpi-val" style={{ color: '#F0A483' }}>
-                {activeOrders.length} en proceso
+                Panel Central
               </strong>
             </div>
 
-            <div className="rpa-kpi" onClick={() => setActiveTab('menu')}>
+            <div
+              className={`rpa-kpi ${activeTab === 'orders' ? 'active' : ''}`}
+              onClick={() => setActiveTab('orders')}
+            >
+              <span className="rpa-kpi-label">Pedidos Activos</span>
+              <strong className="rpa-kpi-val" style={{ color: activeOrders.length > 0 ? '#F0A483' : '#FFFFFF' }}>
+                {activeOrders.length} en cocina
+              </strong>
+            </div>
+
+            <div
+              className={`rpa-kpi ${activeTab === 'menu' ? 'active' : ''}`}
+              onClick={() => setActiveTab('menu')}
+            >
               <span className="rpa-kpi-label">Carta Digital</span>
               <strong className="rpa-kpi-val">{tenantProducts.length} platos</strong>
             </div>
 
-            <div className="rpa-kpi" onClick={() => setActiveTab('content')}>
-              <span className="rpa-kpi-label">Publicaciones</span>
+            <div
+              className={`rpa-kpi ${activeTab === 'content' ? 'active' : ''}`}
+              onClick={() => setActiveTab('content')}
+            >
+              <span className="rpa-kpi-label">Contenido Social</span>
               <strong className="rpa-kpi-val">{tenantPosts.length} en feed</strong>
             </div>
 
-            <div className="rpa-kpi" onClick={() => setActiveTab('reviews')}>
+            <div
+              className={`rpa-kpi ${activeTab === 'reviews' ? 'active' : ''}`}
+              onClick={() => setActiveTab('reviews')}
+            >
               <span className="rpa-kpi-label">Reputación</span>
               <strong className="rpa-kpi-val" style={{ color: '#FBBF24' }}>
-                ⭐ {Number(operatingTenant.rating || 5).toFixed(1)} ({operatingTenant.reviewsCount || 0})
+                ★ {Number(operatingTenant.rating || 5).toFixed(1)} ({operatingTenant.reviewsCount || 0})
               </strong>
             </div>
           </div>
@@ -1354,15 +1371,7 @@ export const RestaurantAdmin: React.FC = () => {
                           type="button"
                           className="rpa-icon-btn danger"
                           disabled={isDeletingPost === p.id}
-                          onClick={async () => {
-                            const confirmMessage =
-                              '¿Deseas eliminar o archivar esta publicación del feed público?';
-                            if (!window.confirm(confirmMessage)) return;
-
-                            setIsDeletingPost(p.id);
-                            await deletePost(p.id);
-                            setIsDeletingPost(null);
-                          }}
+                          onClick={() => setPostToDelete(p)}
                           title="Eliminar publicación"
                         >
                           {isDeletingPost === p.id ? (
@@ -1568,13 +1577,7 @@ export const RestaurantAdmin: React.FC = () => {
                         <button
                           type="button"
                           className="rpa-icon-btn danger"
-                          onClick={() => {
-                            if (window.confirm(`¿Deseas desvincular al repartidor ${driver.name}?`)) {
-                              if (typeof deleteDriver === 'function') {
-                                void deleteDriver(driver.id);
-                              }
-                            }
-                          }}
+                          onClick={() => setDriverToDelete(driver)}
                           title="Eliminar repartidor"
                         >
                           <Trash2 size={15} />
@@ -1605,6 +1608,134 @@ export const RestaurantAdmin: React.FC = () => {
           />
         </Suspense>
       )}
+
+      {/* Modal de Confirmación para Eliminar Publicación */}
+      <AnimatePresence>
+        {postToDelete && (
+          <div className="gs-modal-backdrop" onClick={() => setPostToDelete(null)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="gs-modal-card"
+              onClick={e => e.stopPropagation()}
+              style={{ maxWidth: '420px' }}
+            >
+              <div className="gs-modal-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className="rpa-card-icon" style={{ width: '32px', height: '32px', background: '#FEE2E2', color: '#DC2626' }}>
+                    <Trash2 size={16} />
+                  </div>
+                  <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>
+                    Eliminar Publicación
+                  </strong>
+                </div>
+                <button
+                  type="button"
+                  className="rpa-icon-btn"
+                  onClick={() => setPostToDelete(null)}
+                  aria-label="Cerrar modal"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="gs-modal-body">
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+                  ¿Deseas eliminar permanentemente la publicación de <strong>{postToDelete.dishName}</strong> del feed de GastroSync?
+                </p>
+              </div>
+
+              <div className="gs-modal-footer">
+                <button
+                  type="button"
+                  className="pam-btn-ghost"
+                  onClick={() => setPostToDelete(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="pam-btn-danger"
+                  disabled={Boolean(isDeletingPost)}
+                  onClick={async () => {
+                    if (!postToDelete) return;
+                    setIsDeletingPost(postToDelete.id);
+                    await deletePost(postToDelete.id);
+                    setIsDeletingPost(null);
+                    setPostToDelete(null);
+                  }}
+                >
+                  {isDeletingPost ? 'Eliminando...' : 'Sí, eliminar'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Confirmación para Desvincular Repartidor */}
+      <AnimatePresence>
+        {driverToDelete && (
+          <div className="gs-modal-backdrop" onClick={() => setDriverToDelete(null)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="gs-modal-card"
+              onClick={e => e.stopPropagation()}
+              style={{ maxWidth: '420px' }}
+            >
+              <div className="gs-modal-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className="rpa-card-icon" style={{ width: '32px', height: '32px', background: '#FEE2E2', color: '#DC2626' }}>
+                    <Trash2 size={16} />
+                  </div>
+                  <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>
+                    Desvincular Repartidor
+                  </strong>
+                </div>
+                <button
+                  type="button"
+                  className="rpa-icon-btn"
+                  onClick={() => setDriverToDelete(null)}
+                  aria-label="Cerrar modal"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="gs-modal-body">
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+                  ¿Deseas desvincular a <strong>{driverToDelete.name}</strong> ({driverToDelete.vehicle}) del equipo de repartidores del restaurante?
+                </p>
+              </div>
+
+              <div className="gs-modal-footer">
+                <button
+                  type="button"
+                  className="pam-btn-ghost"
+                  onClick={() => setDriverToDelete(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="pam-btn-danger"
+                  onClick={() => {
+                    if (typeof deleteDriver === 'function' && driverToDelete) {
+                      void deleteDriver(driverToDelete.id);
+                    }
+                    setDriverToDelete(null);
+                  }}
+                >
+                  Sí, desvincular
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       </motion.div>
       </AnimatePresence>
     </motion.div>

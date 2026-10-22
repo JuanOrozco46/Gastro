@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useApp } from '../../context/useApp';
 import type { Tenant, Product } from '../../types';
 import {
@@ -22,7 +22,8 @@ import {
   FileText,
   Tag,
   AlertCircle,
-  Upload
+  Upload,
+  Search
 } from 'lucide-react';
 import { uploadMediaFile } from '../../services/supabaseStorageService';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -65,14 +66,19 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const [tempIngredients, setTempIngredients] = useState('');
   const [tempAllergens, setTempAllergens] = useState('');
 
-  const tenantProducts = products
-    .filter(p => p.tenantId === tenant.id)
-    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const tenantProducts = useMemo(() => {
+    return products
+      .filter(p => p.tenantId === tenant.id)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  }, [products, tenant.id]);
 
-  const activeProducts = tenantProducts.filter(p => !p.isArchived);
-  const archivedProducts = tenantProducts.filter(p => p.isArchived);
+  const activeProducts = useMemo(() => tenantProducts.filter(p => !p.isArchived), [tenantProducts]);
+  const archivedProducts = useMemo(() => tenantProducts.filter(p => p.isArchived), [tenantProducts]);
 
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'archived'>('active');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [deleteConfirmProduct, setDeleteConfirmProduct] = useState<Product | null>(null);
 
   const openNewForm = () => {
     setEditingProduct(null);
@@ -236,6 +242,22 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
   const step1Done = Boolean(formData.name.trim() && formData.category);
   const step2Done = Boolean(Number.isFinite(formData.price) && formData.price > 0);
   const displayedProducts = activeSubTab === 'active' ? activeProducts : archivedProducts;
+
+  const filteredProducts = useMemo(() => {
+    const list = activeSubTab === 'active' ? activeProducts : archivedProducts;
+    return list.filter(p => {
+      if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = p.name.toLowerCase().includes(q);
+        const matchDesc = (p.desc || '').toLowerCase().includes(q);
+        const matchTags = (p.tags || []).some(t => t.toLowerCase().includes(q));
+        const matchIng = (p.ingredients || []).some(i => i.toLowerCase().includes(q));
+        return matchName || matchDesc || matchTags || matchIng;
+      }
+      return true;
+    });
+  }, [activeSubTab, activeProducts, archivedProducts, selectedCategory, searchQuery]);
 
   return (
     <div className="rpa-card">
@@ -561,24 +583,74 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
           )}
         </AnimatePresence>
 
+        {/* Filtros de Categoría y Búsqueda */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '10px',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1rem'
+          }}
+        >
+          <div className="pam-chips" style={{ margin: 0 }}>
+            <button
+              type="button"
+              className={`pam-chip ${selectedCategory === 'all' ? 'active' : ''}`}
+              onClick={() => setSelectedCategory('all')}
+            >
+              Todos ({displayedProducts.length})
+            </button>
+            {DISH_CATEGORIES.map(cat => {
+              const count = displayedProducts.filter(p => p.category === cat.value).length;
+              return (
+                <button
+                  key={cat.value}
+                  type="button"
+                  className={`pam-chip ${selectedCategory === cat.value ? 'active' : ''}`}
+                  onClick={() => setSelectedCategory(cat.value)}
+                >
+                  {cat.label} ({count})
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="pam-input-wrap" style={{ minWidth: '220px', flex: '0 1 280px' }}>
+            <Search size={15} className="pam-icon" />
+            <input
+              type="text"
+              className="pam-input"
+              placeholder="Buscar plato o ingrediente..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
         {/* Lista de Platos */}
-        {displayedProducts.length === 0 ? (
+        {filteredProducts.length === 0 ? (
           <div className="pam-section" style={{ alignItems: 'center', textAlign: 'center', padding: '2.5rem 1.5rem' }}>
             <Utensils size={36} style={{ color: 'var(--primary)', opacity: 0.6 }} />
             <h4 style={{ margin: '6px 0 2px', color: 'var(--text-main)', fontWeight: 800 }}>
-              {activeSubTab === 'active'
-                ? 'Aún no tienes platos activos en tu menú'
-                : 'No tienes platos archivados'}
+              {displayedProducts.length === 0
+                ? activeSubTab === 'active'
+                  ? 'Aún no tienes platos activos en tu menú'
+                  : 'No tienes platos archivados'
+                : 'No se encontraron platos para el filtro seleccionado'}
             </h4>
             <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-              {activeSubTab === 'active'
-                ? 'Haz clic en "Nuevo Plato" arriba a la derecha para agregar tu primera especialidad.'
-                : 'Los platos que archives aparecerán aquí por si deseas restaurarlos más adelante.'}
+              {displayedProducts.length === 0
+                ? activeSubTab === 'active'
+                  ? 'Haz clic en "Nuevo Plato" arriba a la derecha para agregar tu primera especialidad.'
+                  : 'Los platos que archives aparecerán aquí por si deseas restaurarlos más adelante.'
+                : 'Prueba cambiando la categoría activa o limpiando el término de búsqueda.'}
             </p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {displayedProducts.map((product, index) => (
+            {filteredProducts.map((product, index) => (
               <div key={product.id} className="rpa-item-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
                   {activeSubTab === 'active' && (
@@ -714,11 +786,7 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                         type="button"
                         className="rpa-icon-btn danger"
                         title="Eliminar definitivamente"
-                        onClick={() => {
-                          if (window.confirm('¿Eliminar este plato definitivamente del menú?')) {
-                            deleteProduct(product.id);
-                          }
-                        }}
+                        onClick={() => setDeleteConfirmProduct(product)}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -729,6 +797,67 @@ export const MenuTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
             ))}
           </div>
         )}
+
+        {/* Modal de Confirmación para Eliminar Plato */}
+        <AnimatePresence>
+          {deleteConfirmProduct && (
+            <div className="gs-modal-backdrop" onClick={() => setDeleteConfirmProduct(null)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="gs-modal-card"
+                onClick={e => e.stopPropagation()}
+                style={{ maxWidth: '420px' }}
+              >
+                <div className="gs-modal-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="rpa-card-icon" style={{ width: '32px', height: '32px', background: '#FEE2E2', color: '#DC2626' }}>
+                      <Trash2 size={16} />
+                    </div>
+                    <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>
+                      Eliminar Plato Definitivamente
+                    </strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="rpa-icon-btn"
+                    onClick={() => setDeleteConfirmProduct(null)}
+                    aria-label="Cerrar modal"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="gs-modal-body">
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+                    ¿Estás seguro de que deseas eliminar permanentemente <strong>{deleteConfirmProduct.name}</strong> de la carta gastronómica? Esta acción no se puede deshacer.
+                  </p>
+                </div>
+
+                <div className="gs-modal-footer">
+                  <button
+                    type="button"
+                    className="pam-btn-ghost"
+                    onClick={() => setDeleteConfirmProduct(null)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="pam-btn-danger"
+                    onClick={() => {
+                      deleteProduct(deleteConfirmProduct.id);
+                      setDeleteConfirmProduct(null);
+                    }}
+                  >
+                    Sí, eliminar plato
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
