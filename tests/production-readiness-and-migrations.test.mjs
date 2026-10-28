@@ -189,5 +189,15 @@ describe('GastroSync Production Readiness — Migrations 060/061, Dispatch & Fin
     const tablePublicCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'TablePublicView.tsx'), 'utf8');
     assert.match(tablePublicCode, /var\(--neutral-surface\)/, 'TablePublicView debe usar tokens Warm Gastronomy');
     assert.match(tablePublicCode, /encodeURIComponent\(restaurant\.googlePlaceId!\)/, 'TablePublicView debe codificar googlePlaceId en URL externa con noopener,noreferrer');
+
+    const storiesCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'StoriesBar.tsx'), 'utf8');
+    assert.match(storiesCode, /orderedStories/, 'StoriesBar debe ordenar historias no vistas primero estilo Instagram');
+    assert.match(storiesCode, /gf-story-peek-card/, 'StoriesBar debe mostrar tarjetas peek laterales en escritorio');
+    assert.match(storiesCode, /is-ui-hidden/, 'StoriesBar debe ocultar UI suavemente al mantener presionado (hold-to-pause)');
+
+    const feedCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'CustomerDeliveryApp.tsx'), 'utf8');
+    assert.match(feedCode, /IntersectionObserver/, 'PostCard debe reproducir y pausar videos inline según visibilidad en viewport');
+    assert.match(feedCode, /gf-ig-shop-tag/, 'PostCard debe incluir etiqueta flotante estilo Instagram Shopping');
+    assert.match(feedCode, /gf-inline-comment-form/, 'PostCard debe permitir agregar comentario rápido inline');
   });
 });

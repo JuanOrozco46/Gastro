@@ -13,7 +13,7 @@ import {
   TrendingUp, MapPin, Trash2, Plus, Minus,
   Package, Play, Eye, X, ExternalLink,
   Bookmark, Zap, Search, SlidersHorizontal, CheckCircle2, Building2, Clock, User,
-  AlertCircle, Info, ShieldCheck, ChevronDown, LogOut
+  AlertCircle, Info, ShieldCheck, ChevronDown, LogOut, Volume2, VolumeX, Maximize2
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { toggleRemoteSave, fetchRemoteSavedPosts } from '../services/supabaseDataService';
@@ -106,6 +106,7 @@ interface PostCardProps {
   post: Post;
   tenant?: Tenant;
   product?: Product;
+  hasActiveStory?: boolean;
   onLike: (id: string) => void;
   onOrder: (productId: string, tenantSlug: string) => void;
   onPlayVideo: (post: Post) => void;
@@ -114,16 +115,65 @@ interface PostCardProps {
   onOpenComments: (post: Post) => void;
   onOpenProfile: (tenantId: string) => void;
   onShare: (post: Post) => void;
+  onQuickComment?: (postId: string, text: string) => Promise<boolean>;
 }
 
 const PostCard: React.FC<PostCardProps> = ({
-  post, tenant, product, onLike, onOrder, onPlayVideo, saved, onSave, onOpenComments, onOpenProfile, onShare
+  post,
+  tenant,
+  product,
+  hasActiveStory = false,
+  onLike,
+  onOrder,
+  onPlayVideo,
+  saved,
+  onSave,
+  onOpenComments,
+  onOpenProfile,
+  onShare,
+  onQuickComment
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [showHeartBurst, setShowHeartBurst] = useState(false);
+  const [isMediaLoaded, setIsMediaLoaded] = useState(false);
+  const [isInlineMuted, setIsInlineMuted] = useState(true);
+  const [quickComment, setQuickComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
   const lastTapRef = useRef(0);
   const heartTimerRef = useRef<number | null>(null);
+  const mediaWrapperRef = useRef<HTMLDivElement | null>(null);
+  const inlineVideoRef = useRef<HTMLVideoElement | null>(null);
+
   const isVideo = post.mediaType === 'video';
+  const hasInlineVideo = Boolean(isVideo && post.mediaUrl);
+  const canDirectOrder = Boolean(
+    post.productId && post.productId !== post.id && product && product.available
+  );
+
+  // Autoplay inline video when 60% visible in viewport (Instagram Feed / Reels pattern)
+  useEffect(() => {
+    if (!hasInlineVideo) return;
+    const containerEl = mediaWrapperRef.current;
+    const videoEl = inlineVideoRef.current;
+    if (!containerEl || !videoEl || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            videoEl.play().catch(() => {});
+          } else {
+            videoEl.pause();
+          }
+        });
+      },
+      { threshold: [0, 0.6, 1] }
+    );
+
+    observer.observe(containerEl);
+    return () => observer.disconnect();
+  }, [hasInlineVideo]);
 
   // Doble tap sobre la media = like (patrón Instagram), con animación de corazón.
   const handleMediaTap = () => {
@@ -139,20 +189,33 @@ const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
+  const handleQuickCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = quickComment.trim();
+    if (!trimmed || !onQuickComment || isSubmittingComment) return;
+    setIsSubmittingComment(true);
+    const ok = await onQuickComment(post.id, trimmed);
+    if (ok) {
+      setQuickComment('');
+    }
+    setIsSubmittingComment(false);
+  };
+
   const handle = `@${post.tenantName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
+  const recentComments = (post.comments || []).slice(-2);
 
   return (
     <motion.article
       className="gf-post-card"
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
     >
 
-      {/* ── Header (autor con anillo editorial) ── */}
+      {/* ── Header (autor con anillo estilo Instagram) ── */}
       <header className="gf-post-header">
         <div className="gf-post-author" onClick={() => onOpenProfile(post.tenantId)}>
-          <div className="gf-post-avatar-ring">
+          <div className={`gf-post-avatar-ring ${hasActiveStory ? 'has-story' : ''}`}>
             <div className={`gf-author-avatar ${tenant?.logoUrl ? 'has-logo' : ''}`}>
               {tenant?.logoUrl ? (
                 <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant.name} className="gf-author-avatar-img" />
@@ -166,7 +229,7 @@ const PostCard: React.FC<PostCardProps> = ({
               <strong className="gf-author-name">{tenant?.name || post.tenantName}</strong>
               <span className="gf-author-sep">·</span>
               <span className="gf-post-time">{post.timeAgo}</span>
-              {isVideo && <span className="gf-video-chip"><Play size={8} fill="currentColor" /> VIDEO</span>}
+              {isVideo && <span className="gf-video-chip"><Play size={8} fill="currentColor" /> REEL</span>}
             </div>
             <div className="gf-author-sub">
               <span className="gf-category-pill">{tenant?.category || post.tenantCategory}</span>
@@ -176,25 +239,102 @@ const PostCard: React.FC<PostCardProps> = ({
             </div>
           </div>
         </div>
+
+        <button
+          type="button"
+          className="gf-post-header-action"
+          onClick={() => onOpenProfile(post.tenantId)}
+          aria-label={`Ver carta de ${tenant?.name || post.tenantName}`}
+        >
+          Ver carta
+        </button>
       </header>
 
-      {/* ── Media cuadrada 4:5 a sangrado completo, doble tap = like ── */}
-      <div className="gf-media-wrapper" onClick={handleMediaTap}>
-        <img loading="lazy" decoding="async" src={post.image} alt={post.dishName} className="gf-media-img" />
-
-        {/* Video overlay */}
-        {isVideo && (
-          <button
-            className="gf-play-overlay"
-            onClick={(e) => { e.stopPropagation(); onPlayVideo(post); }}
-            aria-label={`Reproducir video de ${post.dishName}`}
-          >
-            <div className="gf-play-btn">
-              <Play size={24} fill="currentColor" />
-            </div>
-            {post.duration && (
-              <span className="gf-video-duration">0:{post.duration}</span>
+      {/* ── Media 4:5 a sangrado completo, video inline autoplay y doble tap = like ── */}
+      <div ref={mediaWrapperRef} className="gf-media-wrapper" onClick={handleMediaTap}>
+        {hasInlineVideo ? (
+          <>
+            <video
+              ref={inlineVideoRef}
+              poster={post.image}
+              src={post.mediaUrl}
+              muted={isInlineMuted}
+              loop
+              playsInline
+              preload="metadata"
+              onLoadedData={() => setIsMediaLoaded(true)}
+              className={`gf-media-img ${isMediaLoaded ? 'is-loaded' : ''}`}
+            />
+            <button
+              type="button"
+              className="gf-inline-audio-btn"
+              onClick={e => {
+                e.stopPropagation();
+                setIsInlineMuted(m => !m);
+              }}
+              aria-label={isInlineMuted ? 'Activar sonido' : 'Silenciar video'}
+              title={isInlineMuted ? 'Activar sonido' : 'Silenciar video'}
+            >
+              {isInlineMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+            </button>
+            <button
+              type="button"
+              className="gf-inline-expand-btn"
+              onClick={e => {
+                e.stopPropagation();
+                onPlayVideo(post);
+              }}
+              aria-label={`Abrir video de ${post.dishName} en pantalla completa`}
+              title="Expandir video"
+            >
+              <Maximize2 size={14} />
+            </button>
+          </>
+        ) : (
+          <>
+            <img
+              loading="lazy"
+              decoding="async"
+              src={post.image}
+              alt={post.dishName}
+              onLoad={() => setIsMediaLoaded(true)}
+              className={`gf-media-img ${isMediaLoaded ? 'is-loaded' : ''}`}
+            />
+            {isVideo && (
+              <button
+                className="gf-play-overlay"
+                onClick={(e) => { e.stopPropagation(); onPlayVideo(post); }}
+                aria-label={`Reproducir video de ${post.dishName}`}
+              >
+                <div className="gf-play-btn">
+                  <Play size={24} fill="currentColor" />
+                </div>
+                {post.duration && (
+                  <span className="gf-video-duration">0:{post.duration}</span>
+                )}
+              </button>
             )}
+          </>
+        )}
+
+        {/* Etiqueta flotante estilo Instagram Shopping */}
+        {canDirectOrder && (
+          <button
+            type="button"
+            className="gf-ig-shop-tag"
+            onClick={e => {
+              e.stopPropagation();
+              onOrder(post.productId, post.tenantId);
+            }}
+            aria-label={`Pedir ${post.dishName} por $${post.price.toLocaleString('es-CO')}`}
+          >
+            <span className="gf-ig-shop-icon">
+              <ShoppingBag size={13} />
+            </span>
+            <span className="gf-ig-shop-copy">
+              <strong>{post.dishName}</strong>
+              <span>${post.price.toLocaleString('es-CO')} · Pedir</span>
+            </span>
           </button>
         )}
 
@@ -221,7 +361,7 @@ const PostCard: React.FC<PostCardProps> = ({
         )}
       </div>
 
-      {/* ── Actions ── */}
+      {/* ── Actions Row (Instagram Icon Bar) ── */}
       <div className="gf-actions-row">
         <div className="gf-actions-left">
           <button
@@ -247,15 +387,16 @@ const PostCard: React.FC<PostCardProps> = ({
         </button>
       </div>
 
-      {/* ── Likes + Caption ── */}
+      {/* ── Likes + Caption + Inline Comments Preview ── */}
       <div className="gf-caption-block">
-        <div className="gf-likes-count">{fmt(post.likes)} Me gusta</div>
-
-        {post.ordersFromPost && post.ordersFromPost > 10 && (
-          <div className="gf-orders-badge">
-            <Zap size={11} /> {post.ordersFromPost} personas pidieron esto hoy
-          </div>
-        )}
+        <div className="gf-likes-meta-row">
+          <span className="gf-likes-count">{fmt(post.likes)} Me gusta</span>
+          {post.ordersFromPost && post.ordersFromPost > 10 && (
+            <span className="gf-orders-badge">
+              <Zap size={11} /> {post.ordersFromPost} pedidos hoy
+            </span>
+          )}
+        </div>
 
         <p className="gf-caption-text">
           <strong className="gf-handle" onClick={() => onOpenProfile(post.tenantId)}>
@@ -281,6 +422,17 @@ const PostCard: React.FC<PostCardProps> = ({
             ? `Ver los ${post.commentsCount} comentarios`
             : 'Escribir el primer comentario'}
         </button>
+
+        {recentComments.length > 0 && (
+          <div className="gf-inline-comments-preview">
+            {recentComments.map(c => (
+              <p key={c.id} className="gf-inline-comment-line">
+                <strong>{c.userHandle ? `@${c.userHandle}` : c.userName}</strong>{' '}
+                <span>{c.text}</span>
+              </p>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── CTA ── */}
@@ -325,6 +477,29 @@ const PostCard: React.FC<PostCardProps> = ({
         </div>
       )}
 
+      {/* ── Inline Comment Input (Instagram Bottom Row) ── */}
+      {onQuickComment && (
+        <form className="gf-inline-comment-form" onSubmit={handleQuickCommentSubmit}>
+          <input
+            type="text"
+            className="gf-inline-comment-input"
+            placeholder="Agrega un comentario..."
+            value={quickComment}
+            onChange={e => setQuickComment(e.target.value)}
+            maxLength={400}
+          />
+          {quickComment.trim().length > 0 && (
+            <button
+              type="submit"
+              className="gf-inline-comment-submit"
+              disabled={isSubmittingComment}
+            >
+              {isSubmittingComment ? '...' : 'Publicar'}
+            </button>
+          )}
+        </form>
+      )}
+
     </motion.article>
   );
 };
@@ -333,7 +508,7 @@ const PostCard: React.FC<PostCardProps> = ({
 export const CustomerDeliveryApp: React.FC = () => {
   const {
     cities, zones, selectedCityId, selectedZoneId, setSelectedZone,
-    tenants, posts, toggleLikePost, products,
+    tenants, posts, stories, toggleLikePost, addComment, products,
     addToCart, removeFromCart, cart, setCurrentTenantBySlug, orders,
     isCatalogLoading, catalogError, showToast, currentUser, authMode,
     remotePosts, logout
@@ -909,6 +1084,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                     post={post}
                     tenant={tenants.find(t => t.id === post.tenantId)}
                     product={products.find(p => p.id === post.productId)}
+                    hasActiveStory={stories.some(s => (s.tenantId === post.tenantId) && (s.items || []).length > 0)}
                     onLike={toggleLikePost}
                     onOrder={handleOrder}
                     onPlayVideo={setVideoPost}
@@ -917,6 +1093,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                     onOpenComments={(post) => setSelectedCommentsPostId(post.id)}
                     onOpenProfile={setSelectedTenantProfile}
                     onShare={handleShare}
+                    onQuickComment={addComment}
                   />
                 ))
               )}
