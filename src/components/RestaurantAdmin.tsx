@@ -4,12 +4,8 @@ import { getOperationalTenant } from '../utils/tenantHelpers';
 import type { Post, Driver } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileUploadInput } from './FileUploadInput';
-import { ProfileTab } from './RestaurantAdmin/ProfileTab';
 import { NotificationBell } from './NotificationBell';
-import { RestaurantTablesAdmin } from './RestaurantTablesAdmin';
-import { KdsBoard } from './KdsBoard';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
-import { DashboardTab } from './RestaurantAdmin/DashboardTab';
 import '../styles/admin-dashboard.css';
 import {
   LayoutDashboard,
@@ -45,6 +41,18 @@ import {
   Star
 } from 'lucide-react';
 
+const DashboardTab = lazyWithRetry(() =>
+  import('./RestaurantAdmin/DashboardTab').then(m => ({ default: m.DashboardTab }))
+);
+const ProfileTab = lazyWithRetry(() =>
+  import('./RestaurantAdmin/ProfileTab').then(m => ({ default: m.ProfileTab }))
+);
+const RestaurantTablesAdmin = lazyWithRetry(() =>
+  import('./RestaurantTablesAdmin').then(m => ({ default: m.RestaurantTablesAdmin }))
+);
+const KdsBoard = lazyWithRetry(() =>
+  import('./KdsBoard').then(m => ({ default: m.KdsBoard }))
+);
 const FinancialAnalytics = lazyWithRetry(() =>
   import('./FinancialAnalytics').then(m => ({ default: m.FinancialAnalytics }))
 );
@@ -516,18 +524,24 @@ export const RestaurantAdmin: React.FC = () => {
       >
       {/* ── TAB: RESUMEN / DASHBOARD ── */}
       {activeTab === 'dashboard' && (
-        <DashboardTab
-          tenant={operatingTenant}
-          orders={tenantOrders}
-          products={tenantProducts}
-          posts={tenantPosts}
-          storyItems={tenantStoryItems}
-          onNavigate={setActiveTab}
-        />
+        <Suspense fallback={<FallbackLoader message="Cargando resumen ejecutivo..." />}>
+          <DashboardTab
+            tenant={operatingTenant}
+            orders={tenantOrders}
+            products={tenantProducts}
+            posts={tenantPosts}
+            storyItems={tenantStoryItems}
+            onNavigate={setActiveTab}
+          />
+        </Suspense>
       )}
 
       {/* ── TAB: PERFIL Y HORARIOS ── */}
-      {activeTab === 'profile' && <ProfileTab tenant={operatingTenant} />}
+      {activeTab === 'profile' && (
+        <Suspense fallback={<FallbackLoader message="Cargando perfil y horarios..." />}>
+          <ProfileTab tenant={operatingTenant} />
+        </Suspense>
+      )}
 
       {/* ── TAB: RESEÑAS Y REPUTACIÓN ── */}
       {activeTab === 'reviews' && (
@@ -537,7 +551,11 @@ export const RestaurantAdmin: React.FC = () => {
       )}
 
       {/* ── TAB: COMANDAS KDS & PEDIDOS EN TIEMPO REAL ── */}
-      {activeTab === 'orders' && <KdsBoard tenant={operatingTenant} showMenuSidebar={false} />}
+      {activeTab === 'orders' && (
+        <Suspense fallback={<FallbackLoader message="Cargando tablero KDS en vivo..." />}>
+          <KdsBoard tenant={operatingTenant} showMenuSidebar={false} />
+        </Suspense>
+      )}
 
       {/* ── TAB: PUBLICADOR DE CONTENIDO (FOTOS, REELS E HISTORIAS 24H) ── */}
       {activeTab === 'content' && (
@@ -1407,7 +1425,9 @@ export const RestaurantAdmin: React.FC = () => {
       {/* ── TAB: QR DE MESAS & REPARTIDORES PROPIOS ── */}
       {activeTab === 'qr' && (
         <div className="grid-2" style={{ gap: '1.5rem', alignItems: 'start' }}>
-          <RestaurantTablesAdmin tenant={operatingTenant} />
+          <Suspense fallback={<FallbackLoader message="Cargando gestor de mesas QR..." />}>
+            <RestaurantTablesAdmin tenant={operatingTenant} />
+          </Suspense>
 
           {/* Repartidores Propios con el mismo formato .pam-* */}
           <div className="rpa-card">

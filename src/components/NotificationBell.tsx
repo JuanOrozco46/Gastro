@@ -53,7 +53,7 @@ export const NotificationBell: React.FC<Props> = ({
   onNavigate,
   variant = 'light'
 }) => {
-  const { currentUser, userRole, orders, tenants } = useApp();
+  const { currentUser, userRole, orders, tenants, authMode } = useApp();
   const [supportNotifications, setSupportNotifications] = useState<SupportNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -85,8 +85,10 @@ export const NotificationBell: React.FC<Props> = ({
   useEffect(() => {
     let isMounted = true;
     const poll = () => {
-      setNow(Date.now());
-      if (!currentUser) {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      if (!currentUser || authMode === 'demo') {
         if (isMounted) {
           setSupportNotifications([]);
           setLoading(false);
@@ -97,6 +99,7 @@ export const NotificationBell: React.FC<Props> = ({
         .then(({ data }) => {
           if (isMounted) {
             setSupportNotifications(data || []);
+            setNow(Date.now());
             setLoading(false);
           }
         })
@@ -113,7 +116,7 @@ export const NotificationBell: React.FC<Props> = ({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [currentUser]);
+  }, [currentUser, authMode]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

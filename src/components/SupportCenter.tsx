@@ -185,8 +185,8 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', minHeight: '100vh', paddingBottom: '100px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)', fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
           <MessageSquare style={{ color: 'var(--primary)' }} />
           Centro de Soporte Humano
         </h1>
@@ -201,15 +201,15 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
         )}
       </div>
 
-      <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '12px', borderRadius: '12px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-        <Info size={24} style={{ color: '#3B82F6', flexShrink: 0 }} />
-        <p style={{ fontSize: '0.9rem', color: '#E2E8F0', lineHeight: 1.5 }}>
+      <div style={{ background: 'var(--neutral-surface-alt)', border: '1px solid var(--neutral-border)', padding: '14px 16px', borderRadius: 'var(--radius-md)', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+        <Info size={22} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: '2px' }} />
+        <p style={{ fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: 1.5, margin: 0 }}>
           <strong>Atención Real y Transparente.</strong> Nuestro equipo revisa cada caso personalmente. No usamos respuestas automáticas para cerrar solicitudes. Si tu caso requiere revisión, te responderemos dentro de nuestro horario de atención habitual.
         </p>
       </div>
 
       {error && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+        <div style={{ background: 'var(--danger-light)', border: '1px solid rgba(185, 28, 28, 0.25)', color: 'var(--danger)', padding: '12px 14px', borderRadius: 'var(--radius-sm)', marginBottom: '16px', fontWeight: 600 }}>
           {error}
         </div>
       )}
@@ -219,12 +219,12 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
         <AnimatePresence>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {loading ? (
-              <p>Cargando tickets...</p>
+              <p style={{ color: 'var(--text-muted)' }}>Cargando tickets...</p>
             ) : tickets.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', background: 'var(--glass-overlay)', borderRadius: '16px' }}>
-                <MessageSquare size={48} style={{ color: '#64748b', margin: '0 auto 16px' }} />
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>No tienes tickets activos</h3>
-                <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>Si necesitas ayuda, puedes abrir una solicitud en cualquier momento.</p>
+              <div className="card" style={{ textAlign: 'center', padding: '40px', background: 'var(--neutral-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--neutral-border)' }}>
+                <MessageSquare size={48} style={{ color: 'var(--text-light)', margin: '0 auto 16px' }} />
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px' }}>No tienes tickets activos</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: 0 }}>Si necesitas ayuda, puedes abrir una solicitud en cualquier momento.</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -232,17 +232,18 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
                   <div 
                     key={ticket.id} 
                     onClick={() => loadConversation(ticket.id)}
+                    className="card"
                     style={{ 
-                      background: 'var(--glass-medium)', padding: '16px', borderRadius: '16px', 
-                      cursor: 'pointer', border: '1px solid rgba(255,255,255,0.05)',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                      background: 'var(--neutral-surface)', padding: '16px 18px', borderRadius: 'var(--radius-lg)', 
+                      cursor: 'pointer', border: '1px solid var(--neutral-border)',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px'
                     }}
                   >
                     <div>
-                      <h4 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '4px' }}>{ticket.subject}</h4>
-                      <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Creado el {new Date(ticket.created_at).toLocaleDateString()}</p>
+                      <h4 style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-main)', marginBottom: '4px' }}>{ticket.subject}</h4>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>Creado el {new Date(ticket.created_at).toLocaleDateString('es-CO')}</p>
                     </div>
-                    <div style={{ background: getStatusColor(ticket.status) + '20', color: getStatusColor(ticket.status), padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 800 }}>
+                    <div style={{ background: getStatusColor(ticket.status) + '18', color: getStatusColor(ticket.status), padding: '6px 12px', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 800, flexShrink: 0 }}>
                       {getStatusText(ticket.status)}
                     </div>
                   </div>
@@ -255,16 +256,16 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
 
       {/* CREATE TICKET */}
       {activeView === 'create' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card" style={{ padding: '24px' }}>
-          <button onClick={() => setActiveView('list')} style={{ background: 'none', border: 'none', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', cursor: 'pointer', padding: 0 }}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card" style={{ padding: '24px', background: 'var(--neutral-surface)', border: '1px solid var(--neutral-border)', borderRadius: 'var(--radius-lg)' }}>
+          <button onClick={() => setActiveView('list')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', cursor: 'pointer', padding: 0 }}>
             <ArrowLeft size={16} /> Volver a mis tickets
           </button>
           
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '20px' }}>Cuéntanos qué ocurrió</h2>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '20px' }}>Cuéntanos qué ocurrió</h2>
           
           <form onSubmit={handleCreateTicket} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '0.9rem' }}>Categoría</label>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}>Categoría</label>
               <select className="form-input" value={category} onChange={e => setCategory(e.target.value as TicketCategory)} required>
                 <option value="order">Problema general con Pedido</option>
                 <option value="missing_item">Artículo Faltante</option>
@@ -285,19 +286,19 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
             </div>
 
             {relatedOrderId && (
-              <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
-                <span style={{ fontSize: '0.85rem', color: '#38BDF8', fontWeight: 700 }}>Asociado al Pedido #{relatedOrderId.slice(0, 8)}</span>
-                <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px' }}>Este ticket se vinculará directamente a tu pedido para una revisión más rápida.</p>
+              <div style={{ background: 'var(--primary-light)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--primary-border)' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 800 }}>Asociado al Pedido #{relatedOrderId.slice(0, 8)}</span>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>Este ticket se vinculará directamente a tu pedido para una revisión más rápida.</p>
               </div>
             )}
             
             <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '0.9rem' }}>Asunto</label>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}>Asunto</label>
               <input type="text" className="form-input" value={subject} onChange={e => setSubject(e.target.value)} required placeholder="Breve resumen del problema" maxLength={250} />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '0.9rem' }}>Descripción detallada</label>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}>Descripción detallada</label>
               <textarea 
                 className="form-input" 
                 value={description} 
@@ -320,49 +321,53 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
       {activeView === 'conversation' && activeTicket && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <button onClick={() => { setActiveView('list'); setActiveTicket(null); setMessages([]); }} style={{ background: 'none', border: 'none', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: 0 }}>
+            <button onClick={() => { setActiveView('list'); setActiveTicket(null); setMessages([]); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: 0 }}>
               <ArrowLeft size={16} /> Volver
             </button>
-            <div style={{ background: getStatusColor(activeTicket.status) + '20', color: getStatusColor(activeTicket.status), padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 800 }}>
+            <div style={{ background: getStatusColor(activeTicket.status) + '18', color: getStatusColor(activeTicket.status), padding: '6px 12px', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 800 }}>
               {getStatusText(activeTicket.status)}
             </div>
           </div>
 
-          <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px' }}>{activeTicket.subject}</h2>
-            <p style={{ color: '#E2E8F0', whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: '0.95rem' }}>{activeTicket.description}</p>
-            <div style={{ marginTop: '16px', fontSize: '0.8rem', color: '#94a3b8' }}>
+          <div className="card" style={{ padding: '20px', marginBottom: '20px', background: 'var(--neutral-surface)', border: '1px solid var(--neutral-border)', borderRadius: 'var(--radius-lg)' }}>
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px' }}>{activeTicket.subject}</h2>
+            <p style={{ color: 'var(--text-main)', whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: '0.95rem', margin: 0 }}>{activeTicket.description}</p>
+            <div style={{ marginTop: '16px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
               Ticket creado el {safeFormatDate(activeTicket.created_at)}
             </div>
           </div>
 
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px' }}>Conversación</h3>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '16px' }}>Conversación</h3>
           
           {loadingConv ? (
-            <p>Cargando mensajes...</p>
+            <p style={{ color: 'var(--text-muted)' }}>Cargando mensajes...</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
               {messages.length === 0 && (
-                <p style={{ color: '#94a3b8', textAlign: 'center', padding: '20px' }}>Tu caso está siendo revisado. Aún no hay respuestas.</p>
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px', background: 'var(--neutral-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--neutral-border)' }}>
+                  Tu caso está siendo revisado. Aún no hay respuestas.
+                </p>
               )}
               {messages.map(msg => {
                 const isMine = msg.author_user_id === currentUserId;
                 return (
                   <div key={msg.id} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start' }}>
                     <div style={{
-                      background: isMine ? 'var(--primary)' : 'rgba(255,255,255,0.1)',
-                      color: 'white',
+                      background: isMine ? 'var(--primary)' : 'var(--neutral-surface)',
+                      color: isMine ? '#FFFFFF' : 'var(--text-main)',
+                      border: isMine ? 'none' : '1px solid var(--neutral-border)',
                       padding: '12px 16px',
-                      borderRadius: '16px',
-                      borderBottomRightRadius: isMine ? '4px' : '16px',
-                      borderBottomLeftRadius: !isMine ? '4px' : '16px',
-                      maxWidth: '85%'
+                      borderRadius: 'var(--radius-lg)',
+                      borderBottomRightRadius: isMine ? '4px' : 'var(--radius-lg)',
+                      borderBottomLeftRadius: !isMine ? '4px' : 'var(--radius-lg)',
+                      maxWidth: '85%',
+                      boxShadow: 'var(--shadow-card)'
                     }}>
-                      <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '4px', fontWeight: 600 }}>
+                      <div style={{ fontSize: '0.75rem', opacity: isMine ? 0.85 : 0.75, marginBottom: '4px', fontWeight: 700, color: isMine ? '#FFFFFF' : 'var(--primary)' }}>
                         {isMine ? 'Tú' : 'Agente de Soporte'}
                       </div>
-                      <p style={{ whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.4, fontSize: '0.95rem' }}>{msg.body}</p>
-                      <div style={{ fontSize: '0.65rem', opacity: 0.6, marginTop: '8px', textAlign: 'right' }}>
+                      <p style={{ whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.45, fontSize: '0.95rem' }}>{msg.body}</p>
+                      <div style={{ fontSize: '0.68rem', opacity: 0.7, marginTop: '8px', textAlign: 'right' }}>
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
@@ -391,8 +396,8 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
           )}
 
           {(activeTicket.status === 'resolved' || activeTicket.status === 'closed') ? (
-            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px', textAlign: 'center', marginTop: '20px' }}>
-              <p style={{ marginBottom: '16px', color: '#E2E8F0' }}>Este caso ha sido marcado como {activeTicket.status === 'resolved' ? 'resuelto' : 'cerrado'}.</p>
+            <div style={{ background: 'var(--neutral-surface-alt)', border: '1px solid var(--neutral-border)', padding: '20px', borderRadius: 'var(--radius-md)', textAlign: 'center', marginTop: '20px' }}>
+              <p style={{ marginBottom: '16px', color: 'var(--text-main)', fontWeight: 600 }}>Este caso ha sido marcado como {activeTicket.status === 'resolved' ? 'resuelto' : 'cerrado'}.</p>
               <button onClick={() => handleChangeStatus('open')} className="btn btn-secondary" disabled={isSubmitting}>
                 <RefreshCcw size={16} style={{ marginRight: '8px' }} />
                 Reabrir si el problema continúa
@@ -404,7 +409,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ initialOrderId, in
             </div>
           ) : (
             <div style={{ textAlign: 'center', marginTop: '24px' }}>
-              <button onClick={() => handleChangeStatus('closed')} className="btn btn-secondary" disabled={isSubmitting} style={{ background: 'transparent', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <button onClick={() => handleChangeStatus('closed')} className="btn btn-secondary" disabled={isSubmitting} style={{ background: 'var(--neutral-surface)', color: 'var(--text-muted)', border: '1px solid var(--neutral-border)' }}>
                 <CheckCircle size={16} style={{ marginRight: '6px' }} />
                 Cerrar Ticket (Mi problema se solucionó)
               </button>

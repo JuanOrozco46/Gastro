@@ -77,10 +77,22 @@ async function calculateWompiIntegrity(
 }
 
 serve(async (req) => {
+  if (!isOriginAllowed(req.headers.get('Origin'))) {
+    return new Response(JSON.stringify({ error: 'Origen CORS no autorizado' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json', 'Vary': 'Origin' },
+    });
+  }
   const corsHeaders = getCorsHeaders(req);
   // CORS options preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Método no permitido' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {

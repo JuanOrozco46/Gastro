@@ -189,12 +189,18 @@ function broadcastTableStatus(tableId: string | undefined, orderId: string, stat
   if (!tableId || !supabase) return;
   try {
     const syncChannel = supabase.channel(`table_orders_sync_${tableId}`);
-    void syncChannel.send({
-      type: 'broadcast',
-      event: 'status_changed',
-      payload: { orderId, status }
-    }).finally(() => {
-      supabase?.removeChannel(syncChannel);
+    syncChannel.subscribe((subStatus) => {
+      if (subStatus === 'SUBSCRIBED') {
+        void syncChannel
+          .send({
+            type: 'broadcast',
+            event: 'status_changed',
+            payload: { orderId, status }
+          })
+          .finally(() => {
+            supabase?.removeChannel(syncChannel);
+          });
+      }
     });
   } catch {
     // Silently catch broadcast error
@@ -450,12 +456,24 @@ export async function fetchLiveOrdersForTable(tableId: string): Promise<Order[]>
 export function subscribeToTableOrders(tableId: string, onUpdate: () => void): () => void {
   if (!isSupabaseConfigured || !supabase || !tableId) return () => {};
 
-  // Escuchamos broadcasts emitidos por la cocina cuando cambian el estado del pedido
+  // Escuchamos tanto broadcasts emitidos por la cocina como cambios directos en PostgreSQL
   const channel = supabase
     .channel(`table_orders_sync_${tableId}`)
     .on(
       'broadcast',
       { event: 'status_changed' },
+      () => {
+        onUpdate();
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `table_id=eq.${tableId}`
+      },
       () => {
         onUpdate();
       }

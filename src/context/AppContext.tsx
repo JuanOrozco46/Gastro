@@ -182,7 +182,7 @@ const location = useLocationSlice();
 
     const pruneExpiredStories = () => {
       const now = Date.now();
-      setStoryReferenceNow(now);
+      let didPruneAny = false;
 
       setCustomStoryItems((prev) => {
         const active = prev.filter(
@@ -191,7 +191,11 @@ const location = useLocationSlice();
             Number.isFinite(item.createdAt) &&
             now - item.createdAt < storyTtlMs
         );
-        return active.length === prev.length ? prev : active;
+        if (active.length !== prev.length) {
+          didPruneAny = true;
+          return active;
+        }
+        return prev;
       });
 
       setRemotePosts((prev) => {
@@ -203,7 +207,11 @@ const location = useLocationSlice();
             now - p.createdAt < storyTtlMs
           );
         });
-        return active.length === prev.length ? prev : active;
+        if (active.length !== prev.length) {
+          didPruneAny = true;
+          return active;
+        }
+        return prev;
       });
 
       setPosts((prev) => {
@@ -215,8 +223,14 @@ const location = useLocationSlice();
             now - p.createdAt < storyTtlMs
           );
         });
-        return active.length === prev.length ? prev : active;
+        if (active.length !== prev.length) {
+          didPruneAny = true;
+          return active;
+        }
+        return prev;
       });
+
+      setStoryReferenceNow((prevNow) => (didPruneAny || now - prevNow >= 5 * 60_000 ? now : prevNow));
     };
 
     const intervalId = window.setInterval(pruneExpiredStories, 30_000);

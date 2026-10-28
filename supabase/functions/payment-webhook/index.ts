@@ -54,13 +54,19 @@ async function verifyWompiChecksum(payload: any, eventsSecret: string): Promise<
 }
 
 serve(async (req) => {
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Método no permitido' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   try {
     const payload = await req.json();
     
     // 1. Validar firma del Webhook
-    const wompiEventsSecret = Deno.env.get('WOMPI_EVENTS_SECRET');
-    const sandboxSignature = req.headers.get('x-sandbox-signature');
-    const webhookSecret = Deno.env.get('WEBHOOK_SECRET');
+    const wompiEventsSecret = Deno.env.get('WOMPI_EVENTS_SECRET')?.trim();
+    const sandboxSignature = req.headers.get('x-sandbox-signature')?.trim();
+    const webhookSecret = Deno.env.get('WEBHOOK_SECRET')?.trim();
 
     let isValid = false;
 
@@ -68,8 +74,13 @@ serve(async (req) => {
     if (payload.signature && wompiEventsSecret) {
       isValid = await verifyWompiChecksum(payload, wompiEventsSecret);
     } 
-    // B. Fallback a firma simulada para testing interno local (comparación timing-safe)
-    else if (sandboxSignature && webhookSecret && timingSafeEqualStrings(sandboxSignature, webhookSecret)) {
+    // B. Fallback a firma simulada para testing interno local (comparación timing-safe con secreto explícito)
+    else if (
+      sandboxSignature &&
+      webhookSecret &&
+      webhookSecret.length >= 16 &&
+      timingSafeEqualStrings(sandboxSignature, webhookSecret)
+    ) {
       isValid = true;
     }
 

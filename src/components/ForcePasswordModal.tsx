@@ -56,7 +56,7 @@ export const ForcePasswordModal: React.FC = () => {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 100000,
-      background: 'rgba(8, 12, 20, 0.95)', backdropFilter: 'blur(24px)',
+      background: 'var(--glass-overlay)', backdropFilter: 'blur(16px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem'
     }}>
       <motion.div
@@ -64,24 +64,25 @@ export const ForcePasswordModal: React.FC = () => {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="card"
         style={{
-          width: '100%', maxWidth: '420px', background: 'var(--glass-dark)',
-          border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '24px', padding: '2rem'
+          width: '100%', maxWidth: '420px', background: 'var(--neutral-surface)',
+          border: '1px solid var(--neutral-border)', borderRadius: 'var(--radius-xl)', padding: '2rem',
+          boxShadow: 'var(--shadow-hover)'
         }}
       >
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ width: '56px', height: '56px', background: 'rgba(16, 185, 129, 0.15)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: '#10B981' }}>
-            <KeyRound size={32} />
+          <div style={{ width: '56px', height: '56px', background: 'var(--secondary-light)', borderRadius: '999px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: 'var(--secondary-hover)' }}>
+            <KeyRound size={28} />
           </div>
-          <h2 style={{ fontSize: '1.3rem', fontWeight: 900, color: 'white', margin: '0 0 8px' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', margin: '0 0 8px' }}>
             Protege tu cuenta
           </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
             ¡Bienvenido a GastroSync! Por motivos de seguridad, debes configurar una contraseña permanente para tu restaurante antes de continuar.
           </p>
         </div>
 
         {error && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px', borderRadius: '12px', color: '#FCA5A5', fontSize: '0.8rem', display: 'flex', gap: '8px', marginBottom: '1rem' }}>
+          <div style={{ background: 'var(--danger-light)', border: '1px solid var(--primary-border)', padding: '12px', borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: '0.875rem', display: 'flex', gap: '8px', marginBottom: '1rem' }}>
             <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
             <span>{error}</span>
           </div>
@@ -89,10 +90,10 @@ export const ForcePasswordModal: React.FC = () => {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }}>NUEVA CONTRASEÑA</label>
+            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '0.6px' }}>NUEVA CONTRASEÑA</label>
             <input
               type="password"
-              className="input-field"
+              className="form-input"
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="Mín. 8 caracteres"
@@ -100,10 +101,10 @@ export const ForcePasswordModal: React.FC = () => {
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }}>CONFIRMAR CONTRASEÑA</label>
+            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '0.6px' }}>CONFIRMAR CONTRASEÑA</label>
             <input
               type="password"
-              className="input-field"
+              className="form-input"
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
               placeholder="Repite tu contraseña"
@@ -113,8 +114,8 @@ export const ForcePasswordModal: React.FC = () => {
           
           <button
             type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '12px', fontWeight: 800, borderRadius: '12px', marginTop: '0.5rem', background: '#10B981', borderColor: '#10B981', color: 'white' }}
+            className="btn btn-primary btn-full"
+            style={{ padding: '12px', fontWeight: 700, borderRadius: 'var(--radius-md)', marginTop: '0.5rem', justifyContent: 'center' }}
             disabled={loading}
           >
             {loading ? 'Guardando...' : 'Guardar y Continuar'}

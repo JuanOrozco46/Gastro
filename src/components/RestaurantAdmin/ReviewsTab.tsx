@@ -660,10 +660,9 @@ export const ReviewsTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                   {review.ownerReply && !isReplying && (
                     <div
                       style={{
-                        background: '#FBF8F3',
-                        border: '1px solid #E5DEC9',
-                        borderLeft: '3px solid var(--primary)',
-                        borderRadius: '12px',
+                        background: 'var(--neutral-surface-alt)',
+                        border: '1px solid var(--neutral-border-strong)',
+                        borderRadius: 'var(--radius-md)',
                         padding: '12px 14px',
                         display: 'flex',
                         flexDirection: 'column',

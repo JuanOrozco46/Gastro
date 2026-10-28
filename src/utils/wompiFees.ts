@@ -150,18 +150,18 @@ export function downloadSettlementReceiptHtml(data: SettlementReceiptData): void
   <meta charset="UTF-8" />
   <title>Acta de Liquidación ${safeRef} - ${safeRestName}</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #0f172a; padding: 32px; }
-    .sheet { max-width: 720px; margin: 0 auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 16px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 20px; }
-    .brand { font-size: 22px; font-weight: 900; color: #0f172a; }
-    .badge { display: inline-block; background: #dcfce7; color: #166534; font-weight: 800; font-size: 12px; padding: 4px 10px; border-radius: 999px; }
-    table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-    th { background: #f1f5f9; font-weight: 700; color: #334155; }
+    body { font-family: 'Figtree', system-ui, -apple-system, sans-serif; background: #FAF7F2; color: #2C2520; padding: 32px; }
+    .sheet { max-width: 720px; margin: 0 auto; background: #FFFFFF; border: 1px solid #E8E2D8; border-radius: 14px; padding: 32px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05); }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2C2520; padding-bottom: 16px; margin-bottom: 20px; }
+    .brand { font-size: 1.15rem; font-weight: 900; color: #2C2520; font-family: 'Playfair Display', Georgia, serif; }
+    .badge { display: inline-block; background: rgba(107, 140, 106, 0.12); color: #6B8C6A; font-weight: 800; font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 0.875rem; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #E8E2D8; text-align: left; }
+    th { background: #F5F0E8; font-weight: 700; color: #2C2520; }
     .right { text-align: right; }
-    .total-box { background: #0f172a; color: #ffffff; padding: 18px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
-    .note { margin-top: 18px; font-size: 12px; color: #475569; line-height: 1.5; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
-    @media print { body { background: #fff; padding: 0; } .sheet { box-shadow: none; border: none; } }
+    .total-box { background: #2C2520; color: #FFFFFF; padding: 18px 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+    .note { margin-top: 18px; font-size: 0.72rem; color: #78706A; line-height: 1.5; background: #F5F0E8; padding: 12px; border-radius: 8px; border: 1px solid #E8E2D8; }
+    @media print { body { background: #FFFFFF; padding: 0; } .sheet { box-shadow: none; border: none; } }
   </style>
 </head>
 <body>
@@ -169,16 +169,16 @@ export function downloadSettlementReceiptHtml(data: SettlementReceiptData): void
     <div class="header">
       <div>
         <div class="brand">GASTROSYNC COLOMBIA · ACTA DE LIQUIDACIÓN</div>
-        <div style="font-size: 13px; color: #475569; margin-top: 4px;">Soporte Contable de Cruce Automático (Efectivo vs. Pasarela Wompi)</div>
+        <div style="font-size: 0.72rem; color: #78706A; margin-top: 4px;">Soporte Contable de Cruce Automático (Efectivo vs. Pasarela Wompi)</div>
       </div>
       <div style="text-align: right;">
         <span class="badge">CONCILIADO</span>
-        <div style="font-size: 13px; font-weight: 800; margin-top: 6px;">Ref: ${safeRef}</div>
-        <div style="font-size: 12px; color: #64748b;">Fecha: ${escapeReceiptHtml(new Date(data.createdAt).toLocaleString('es-CO'))}</div>
+        <div style="font-size: 0.875rem; font-weight: 800; margin-top: 6px;">Ref: ${safeRef}</div>
+        <div style="font-size: 0.72rem; color: #78706A;">Fecha: ${escapeReceiptHtml(new Date(data.createdAt).toLocaleString('es-CO'))}</div>
       </div>
     </div>
 
-    <div style="font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+    <div style="font-size: 0.875rem; line-height: 1.6; margin-bottom: 16px;">
       <div><strong>Restaurante Aliado:</strong> ${safeRestName}</div>
       <div><strong>Tipo de Operación:</strong> ${typeLabel}</div>
       <div><strong>Canal Bancario / Pasarela:</strong> ${safeChannel}</div>
@@ -227,10 +227,10 @@ export function downloadSettlementReceiptHtml(data: SettlementReceiptData): void
 
     <div class="total-box">
       <div>
-        <div style="font-size: 12px; text-transform: uppercase; color: #94a3b8; font-weight: 700;">Monto Neto Liquidado en esta Operación</div>
-        <div style="font-size: 13px; color: #cbd5e1;">Comisión Total Libre GastroSync (3%): ${fmt(data.cashCommissionCop + data.digitalCommissionCop)}</div>
+        <div style="font-size: 0.72rem; text-transform: uppercase; color: #B0A89E; font-weight: 700;">Monto Neto Liquidado en esta Operación</div>
+        <div style="font-size: 0.875rem; color: #FAF7F2;">Comisión Total Libre GastroSync (3%): ${fmt(data.cashCommissionCop + data.digitalCommissionCop)}</div>
       </div>
-      <div style="font-size: 24px; font-weight: 900; color: #4ade80;">${fmt(data.netAmountCop)}</div>
+      <div style="font-size: 1.25rem; font-weight: 900; color: #6B8C6A;">${fmt(data.netAmountCop)}</div>
     </div>
 
     <div class="note">

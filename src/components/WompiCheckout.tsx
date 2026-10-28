@@ -35,9 +35,18 @@ export const WompiCheckout: React.FC<WompiCheckoutProps> = ({ config, onWidgetCl
       try {
         if (!(window as unknown as { WidgetCheckout: unknown }).WidgetCheckout) {
           await new Promise<void>((resolve, reject) => {
+            const existingScript = document.querySelector<HTMLScriptElement>(
+              'script[src="https://checkout.wompi.co/widget.js"]'
+            );
+            if (existingScript) {
+              existingScript.addEventListener('load', () => resolve(), { once: true });
+              existingScript.addEventListener('error', () => reject(new Error('Failed to load Wompi script')), { once: true });
+              return;
+            }
             const script = document.createElement('script');
             script.src = 'https://checkout.wompi.co/widget.js';
             script.async = true;
+            script.crossOrigin = 'anonymous';
             script.onload = () => resolve();
             script.onerror = () => reject(new Error('Failed to load Wompi script'));
             document.body.appendChild(script);

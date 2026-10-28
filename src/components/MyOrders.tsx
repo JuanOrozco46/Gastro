@@ -692,20 +692,19 @@ const OrderCard: React.FC<OrderCardProps> = ({
                   style={{
                     marginTop: '4px',
                     padding: '10px 12px',
-                    borderRadius: '12px',
-                    background: 'rgba(15, 23, 42, 0.72)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderLeft: '3px solid var(--primary)'
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--neutral-surface-alt)',
+                    border: '1px solid var(--neutral-border)'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
                     <CornerDownRight size={13} style={{ color: 'var(--primary)' }} />
                     <Store size={13} style={{ color: 'var(--primary)' }} />
-                    <strong style={{ fontSize: '0.76rem', color: '#FBBF24' }}>
+                    <strong style={{ fontSize: '0.76rem', color: 'var(--primary)' }}>
                       Respuesta oficial de {tenantName}:
                     </strong>
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#E2E8F0', lineHeight: 1.45 }}>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: 1.45 }}>
                     {existingReview.ownerReply}
                   </p>
                 </div>

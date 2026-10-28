@@ -402,9 +402,9 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
                 style={{
                   fontSize: '1.08rem',
                   fontWeight: 900,
-                  color: '#0F172A',
+                  color: 'var(--text-main)',
                   letterSpacing: '-0.3px',
-                  fontFamily: 'Outfit, sans-serif'
+                  fontFamily: 'var(--font-family)'
                 }}
               >
                 #{order.id.slice(0, 6).toUpperCase()}
@@ -426,7 +426,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
                 {channel.icon} {channel.label}
               </span>
             </div>
-            <span style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600 }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>
               {new Date(order.createdAt).toLocaleTimeString('es-CO', {
                 hour: '2-digit',
                 minute: '2-digit'
@@ -442,7 +442,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
               alignItems: 'center',
               gap: '5px',
               padding: '4px 9px',
-              borderRadius: '10px',
+              borderRadius: 'var(--radius-md)',
               background: sla.bg,
               border: `1px solid ${sla.border}`,
               color: sla.color,
@@ -464,9 +464,9 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: '6px 10px',
-            borderRadius: '10px',
-            background: '#F8FAFC',
-            border: '1px solid #E2E8F0',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--neutral-surface-alt)',
+            border: '1px solid var(--neutral-border)',
             fontSize: '0.75rem'
           }}
         >
@@ -493,7 +493,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
               ? 'Pago Digital Aprobado'
               : 'Pago Digital'}
           </span>
-          <strong style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0F172A' }}>
+          <strong style={{ fontSize: '0.88rem', fontWeight: 900, color: 'var(--text-main)' }}>
             ${order.total.toLocaleString('es-CO')}
           </strong>
         </div>
@@ -504,8 +504,7 @@ export const KdsBoard: React.FC<KdsBoardProps> = ({ tenant, showMenuSidebar = fa
             style={{
               background: '#FFFBEB',
               border: '1px solid #FCD34D',
-              borderLeft: '4px solid #F59E0B',
-              borderRadius: '10px',
+              borderRadius: 'var(--radius-md)',
               padding: '8px 10px',
               fontSize: '0.76rem',
               color: '#92400E',

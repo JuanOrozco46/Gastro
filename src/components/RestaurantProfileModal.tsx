@@ -1090,22 +1090,22 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                           style={{
                             marginTop: '4px',
                             padding: '10px 12px',
-                            borderRadius: '12px',
-                            background: 'rgba(212, 163, 89, 0.08)',
-                            borderLeft: '3px solid #d4a359',
+                            borderRadius: 'var(--radius-md)',
+                            background: 'var(--neutral-surface-alt)',
+                            border: '1px solid var(--neutral-border)',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '4px'
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <CornerDownRight size={13} style={{ color: '#f3d29c' }} />
-                            <Store size={13} style={{ color: '#f3d29c' }} />
-                            <strong style={{ fontSize: '0.76rem', color: '#f3d29c' }}>
+                            <CornerDownRight size={13} style={{ color: 'var(--primary)' }} />
+                            <Store size={13} style={{ color: 'var(--primary)' }} />
+                            <strong style={{ fontSize: '0.76rem', color: 'var(--primary)' }}>
                               Respuesta oficial de {tenant.name}
                             </strong>
                           </div>
-                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#E2E8F0', lineHeight: 1.45 }}>
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: 1.45 }}>
                             {review.ownerReply}
                           </p>
                         </div>

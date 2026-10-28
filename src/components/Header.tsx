@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useApp } from '../context/useApp';
 import { LogOut, User, Sparkles, ShieldCheck, ChefHat, BarChart3, Bike, QrCode, Scale } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { UserProfileModal } from './UserProfileModal';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { openLegalCenter } from '../utils/legalNavigation';
+
+const UserProfileModal = lazyWithRetry(() => import('./UserProfileModal').then(m => ({ default: m.UserProfileModal })));
 
 const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   client_delivery: { label: 'Cliente', icon: <Bike size={13} />, color: 'var(--primary)' },
@@ -159,10 +161,14 @@ export const Header: React.FC = () => {
         </div>
       </motion.header>
 
-      <UserProfileModal
-        isOpen={showProfileModal}
-        onClose={() => setShowProfileModal(false)}
-      />
+      {showProfileModal && (
+        <Suspense fallback={null}>
+          <UserProfileModal
+            isOpen={showProfileModal}
+            onClose={() => setShowProfileModal(false)}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

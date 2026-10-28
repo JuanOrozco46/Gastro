@@ -51,88 +51,162 @@ export const SupportFeedbackForm: React.FC<Props> = ({ ticketId }) => {
   };
 
   if (loading) {
-    return <div className="p-4 text-center text-sm text-gray-500">Cargando...</div>;
+    return (
+      <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+        Cargando calificación...
+      </div>
+    );
   }
 
   if (existingFeedback) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center mt-6">
-        <div className="flex justify-center mb-3">
-          <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
-            <CheckCircle size={24} />
-          </div>
+      <div
+        style={{
+          background: 'var(--secondary-light)',
+          border: '1px solid var(--neutral-border)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '1.5rem',
+          textAlign: 'center',
+          marginTop: '1.25rem'
+        }}
+      >
+        <div
+          style={{
+            width: '44px',
+            height: '44px',
+            borderRadius: '999px',
+            background: 'var(--neutral-surface)',
+            color: 'var(--secondary-hover)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 0.75rem',
+            border: '1px solid var(--neutral-border)'
+          }}
+        >
+          <CheckCircle size={22} />
         </div>
-        <h4 className="text-lg font-bold text-gray-900 mb-2">¡Gracias por tu retroalimentación!</h4>
-        <div className="flex justify-center gap-1 mb-3">
+        <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+          ¡Gracias por tu retroalimentación!
+        </h4>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', marginBottom: '0.75rem' }}>
           {[1, 2, 3, 4, 5].map((star) => (
-            <Star 
-              key={star} 
-              size={20} 
-              className={star <= existingFeedback.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} 
+            <Star
+              key={star}
+              size={20}
+              fill={star <= existingFeedback.rating ? 'var(--tertiary)' : 'transparent'}
+              color={star <= existingFeedback.rating ? 'var(--tertiary)' : 'var(--neutral-border-strong)'}
             />
           ))}
         </div>
         {existingFeedback.comment && (
-          <p className="text-gray-600 italic text-sm">"{existingFeedback.comment}"</p>
+          <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.875rem', margin: 0 }}>
+            «{existingFeedback.comment}»
+          </p>
         )}
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6 mt-6">
-      <h4 className="text-lg font-bold text-gray-900 mb-2">Califica nuestra atención</h4>
-      <p className="text-gray-500 text-sm mb-6">Tu caso ha sido cerrado. ¿Cómo evaluarías la solución brindada?</p>
-      
+    <div
+      className="card"
+      style={{
+        background: 'var(--neutral-surface)',
+        border: '1px solid var(--neutral-border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '1.5rem',
+        marginTop: '1.25rem',
+        boxShadow: 'var(--shadow-card)'
+      }}
+    >
+      <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '4px' }}>
+        Califica nuestra atención
+      </h4>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
+        Tu caso ha sido cerrado. ¿Cómo evaluarías la solución brindada?
+      </p>
+
       <form onSubmit={handleSubmit}>
-        <div className="flex justify-center gap-2 mb-6">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              type="button"
-              onClick={() => setRating(star)}
-              onMouseEnter={() => setHoverRating(star)}
-              onMouseLeave={() => setHoverRating(0)}
-              className="focus:outline-none transition-transform hover:scale-110"
-            >
-              <Star 
-                size={32} 
-                className={star <= (hoverRating || rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'} 
-              />
-            </button>
-          ))}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '1.25rem' }}>
+          {[1, 2, 3, 4, 5].map((star) => {
+            const active = star <= (hoverRating || rating);
+            return (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setRating(star)}
+                onMouseEnter={() => setHoverRating(star)}
+                onMouseLeave={() => setHoverRating(0)}
+                aria-label={`Calificar con ${star} estrella${star !== 1 ? 's' : ''}`}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  transition: 'transform 0.15s ease'
+                }}
+              >
+                <Star
+                  size={30}
+                  fill={active ? 'var(--tertiary)' : 'transparent'}
+                  color={active ? 'var(--tertiary)' : 'var(--neutral-border-strong)'}
+                />
+              </button>
+            );
+          })}
         </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 700,
+              color: 'var(--text-main)',
+              marginBottom: '6px'
+            }}
+          >
             Comentario (opcional)
           </label>
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 text-sm"
+            className="form-input"
             rows={3}
             placeholder="Cuéntanos más sobre tu experiencia..."
             maxLength={500}
+            style={{ width: '100%' }}
           />
         </div>
-        
+
         {error && (
-          <div className="mb-4 text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">
+          <div
+            style={{
+              marginBottom: '1rem',
+              fontSize: '0.875rem',
+              color: 'var(--danger)',
+              background: 'var(--danger-light)',
+              padding: '10px 12px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--primary-border)'
+            }}
+          >
             {error}
           </div>
         )}
-        
+
         <button
           type="submit"
           disabled={isSubmitting || rating === 0}
-          className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="btn btn-primary btn-full"
+          style={{ justifyContent: 'center' }}
         >
           {isSubmitting ? (
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <span>Enviando...</span>
           ) : (
             <>
-              <Send size={18} />
+              <Send size={16} />
               <span>Enviar calificación</span>
             </>
           )}

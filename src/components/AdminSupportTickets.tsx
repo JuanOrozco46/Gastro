@@ -171,18 +171,18 @@ const AdminSupportTicketsContent: React.FC = () => {
   });
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 150px)', background: 'var(--bg-color)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', minHeight: 'calc(100vh - 150px)', background: 'var(--neutral-surface)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--neutral-border)', boxShadow: 'var(--shadow-card)' }}>
       
       {/* LEFT PANEL: Ticket List */}
-      <div style={{ width: '400px', borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ flex: '1 1 320px', maxWidth: '100%', borderRight: '1px solid var(--neutral-border)', display: 'flex', flexDirection: 'column', background: 'var(--neutral-surface)' }}>
+        <div style={{ padding: '20px', borderBottom: '1px solid var(--neutral-border)' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <MessageSquare size={20} color="var(--primary)" /> Tickets
           </h2>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 type="text"
                 placeholder="Buscar ticket o ID..."
@@ -193,7 +193,7 @@ const AdminSupportTicketsContent: React.FC = () => {
               />
             </div>
             
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <select className="form-input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ flex: 1, height: '36px', fontSize: '0.85rem' }}>
                 <option value="all">Todos los estados</option>
                 <option value="active">Solo Activos</option>
@@ -210,11 +210,11 @@ const AdminSupportTicketsContent: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px', maxHeight: '70vh' }}>
           {loading ? (
-            <p style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>Cargando...</p>
+            <p style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Cargando...</p>
           ) : filteredTickets.length === 0 ? (
-            <p style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No se encontraron tickets.</p>
+            <p style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No se encontraron tickets.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filteredTickets.map(t => (
@@ -223,24 +223,24 @@ const AdminSupportTicketsContent: React.FC = () => {
                   onClick={() => loadConversation(t)}
                   style={{
                     padding: '12px',
-                    borderRadius: '12px',
+                    borderRadius: 'var(--radius-md)',
                     cursor: 'pointer',
-                    background: activeTicket?.id === t.id ? 'var(--glass-overlay)' : 'transparent',
-                    border: activeTicket?.id === t.id ? '1px solid var(--primary)' : '1px solid transparent'
+                    background: activeTicket?.id === t.id ? 'var(--primary-light)' : 'var(--neutral-surface-alt)',
+                    border: activeTicket?.id === t.id ? '1px solid var(--primary)' : '1px solid var(--neutral-border)'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>#{t.id.slice(0,6)}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>#{t.id.slice(0,6)}</span>
                     <span style={{ fontSize: '0.75rem', color: getStatusColor(t.status), fontWeight: 800 }}>{getStatusText(t.status)}</span>
                   </div>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {t.subject}
                   </h4>
                   <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem' }}>
-                    {t.priority === 'urgent' && <span style={{ color: '#EF4444', fontWeight: 800 }}><AlertTriangle size={10} /> Urgente</span>}
-                    {t.priority === 'high' && <span style={{ color: '#F59E0B', fontWeight: 800 }}>Alta</span>}
-                    {t.assigned_to === currentUserId && <span style={{ color: 'var(--primary)', fontWeight: 800 }}><User size={10} /> Mío</span>}
-                    {!t.assigned_to && <span style={{ color: '#64748b' }}>Sin Asignar</span>}
+                    {t.priority === 'urgent' && <span style={{ color: 'var(--danger)', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}><AlertTriangle size={10} /> Urgente</span>}
+                    {t.priority === 'high' && <span style={{ color: 'var(--warning)', fontWeight: 800 }}>Alta</span>}
+                    {t.assigned_to === currentUserId && <span style={{ color: 'var(--primary)', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}><User size={10} /> Mío</span>}
+                    {!t.assigned_to && <span style={{ color: 'var(--text-muted)' }}>Sin Asignar</span>}
                   </div>
                 </div>
               ))}
@@ -250,30 +250,30 @@ const AdminSupportTicketsContent: React.FC = () => {
       </div>
 
       {/* RIGHT PANEL: Ticket Details & Conversation */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.2)' }}>
+      <div style={{ flex: '2 1 440px', display: 'flex', flexDirection: 'column', background: 'var(--neutral-bg)' }}>
         {!activeTicket ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexDirection: 'column', gap: '16px' }}>
-            <MessageSquare size={48} />
-            <p>Selecciona un ticket para ver los detalles</p>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', flexDirection: 'column', gap: '16px', padding: '40px' }}>
+            <MessageSquare size={48} style={{ color: 'var(--text-light)' }} />
+            <p style={{ margin: 0, fontWeight: 600 }}>Selecciona un ticket para ver los detalles</p>
           </div>
         ) : (
           <>
-            <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'var(--glass-medium)', display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ padding: '20px', borderBottom: '1px solid var(--neutral-border)', background: 'var(--neutral-surface)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>{activeTicket.subject}</h3>
-                  <div style={{ background: getStatusColor(activeTicket.status) + '20', color: getStatusColor(activeTicket.status), padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{activeTicket.subject}</h3>
+                  <div style={{ background: getStatusColor(activeTicket.status) + '18', color: getStatusColor(activeTicket.status), padding: '4px 10px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 800 }}>
                     {getStatusText(activeTicket.status)}
                   </div>
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'flex', gap: '16px' }}>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                   <span>ID: {activeTicket.id}</span>
                   <span>Cat: {activeTicket.category}</span>
                   <span>Creado: {safeFormatDate(activeTicket.created_at)}</span>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <select 
                   className="form-input" 
                   style={{ width: 'auto', height: '36px', fontSize: '0.85rem', padding: '0 30px 0 10px' }}
@@ -315,40 +315,40 @@ const AdminSupportTicketsContent: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', maxHeight: '60vh' }}>
               {error && (
-                <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#FCA5A5', padding: '12px', borderRadius: '10px', marginBottom: '16px', fontSize: '0.85rem' }}>
+                <div style={{ background: 'var(--danger-light)', border: '1px solid rgba(185, 28, 28, 0.25)', color: 'var(--danger)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '0.85rem', fontWeight: 600 }}>
                   {error}
                 </div>
               )}
 
               {/* Contexto del Pedido si existe */}
               {activeOrder && (
-                <div style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
-                  <h4 style={{ fontSize: '0.9rem', color: '#38BDF8', fontWeight: 800, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ background: 'var(--neutral-surface)', border: '1px solid var(--neutral-border)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
+                  <h4 style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 800, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Search size={14} /> Contexto del Pedido Asociado
                   </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', fontSize: '0.85rem' }}>
                     <div>
-                      <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Cliente</span>
-                      <strong style={{ color: 'white' }}>{activeOrder.customerName}</strong> ({activeOrder.customerPhone})
+                      <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Cliente</span>
+                      <strong style={{ color: 'var(--text-main)' }}>{activeOrder.customerName}</strong> <span style={{ color: 'var(--text-muted)' }}>({activeOrder.customerPhone})</span>
                     </div>
                     <div>
-                      <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Total y Pago</span>
-                      <strong style={{ color: 'white' }}>{formatCop(activeOrder.total)}</strong> · {activeOrder.paymentMethod || 'N/A'}
+                      <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Total y Pago</span>
+                      <strong style={{ color: 'var(--text-main)' }}>{formatCop(activeOrder.total)}</strong> · <span style={{ color: 'var(--text-muted)' }}>{activeOrder.paymentMethod || 'N/A'}</span>
                     </div>
                     <div>
-                      <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Estado</span>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Estado</span>
                       <span className="badge badge-secondary" style={{ display: 'inline-block', fontSize: '0.75rem' }}>{activeOrder.status}</span>
                     </div>
                     <div>
-                      <span style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Tipo</span>
-                      <strong style={{ color: 'white' }}>{activeOrder.type}</strong>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Tipo</span>
+                      <strong style={{ color: 'var(--text-main)' }}>{activeOrder.type}</strong>
                     </div>
                   </div>
                   {activeOrder.items && activeOrder.items.length > 0 && (
-                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(56, 189, 248, 0.15)', fontSize: '0.8rem', color: '#cbd5e1' }}>
-                      <strong style={{ color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Ítems del pedido:</strong>
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--neutral-border)', fontSize: '0.8rem', color: 'var(--text-main)' }}>
+                      <strong style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Ítems del pedido:</strong>
                       {activeOrder.items.map((it, idx) => (
                         <div key={`${it.id}_${idx}`}>
                           {it.qty}x {it.name} ({formatCop(it.price * it.qty)})
@@ -359,18 +359,18 @@ const AdminSupportTicketsContent: React.FC = () => {
                 </div>
               )}
 
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '12px', marginBottom: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '8px', fontWeight: 600 }}>Descripción original:</div>
-                <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: '0.95rem' }}>{activeTicket.description}</p>
+              <div style={{ background: 'var(--neutral-surface)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '24px', border: '1px solid var(--neutral-border)' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 700 }}>Descripción original:</div>
+                <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: '0.95rem', color: 'var(--text-main)', margin: 0 }}>{activeTicket.description}</p>
                 {activeTicket.related_order_id && (
-                  <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                    <span style={{ fontWeight: 600 }}>Pedido relacionado:</span> {activeTicket.related_order_id}
+                  <div style={{ marginTop: '12px', padding: '8px 10px', background: 'var(--neutral-surface-alt)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', color: 'var(--text-main)' }}>
+                    <span style={{ fontWeight: 700 }}>Pedido relacionado:</span> {activeTicket.related_order_id}
                   </div>
                 )}
               </div>
 
               {loadingConv ? (
-                <p style={{ textAlign: 'center', color: '#64748b' }}>Cargando mensajes...</p>
+                <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Cargando mensajes...</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {messages.map(msg => {
@@ -380,21 +380,22 @@ const AdminSupportTicketsContent: React.FC = () => {
                     return (
                       <div key={msg.id} style={{ display: 'flex', justifyContent: isSystemOrMe ? 'flex-end' : 'flex-start' }}>
                         <div style={{
-                          background: isInternal ? 'rgba(245, 158, 11, 0.15)' : (isSystemOrMe ? 'var(--primary)' : 'rgba(255,255,255,0.1)'),
-                          border: isInternal ? '1px solid rgba(245, 158, 11, 0.3)' : 'none',
-                          color: isInternal ? '#FCD34D' : 'white',
+                          background: isInternal ? 'var(--warning-light)' : (isSystemOrMe ? 'var(--primary)' : 'var(--neutral-surface)'),
+                          border: isInternal ? '1px solid rgba(180, 83, 9, 0.3)' : (isSystemOrMe ? 'none' : '1px solid var(--neutral-border)'),
+                          color: isInternal ? 'var(--warning)' : (isSystemOrMe ? '#FFFFFF' : 'var(--text-main)'),
                           padding: '12px 16px',
-                          borderRadius: '16px',
-                          borderBottomRightRadius: isSystemOrMe ? '4px' : '16px',
-                          borderBottomLeftRadius: !isSystemOrMe ? '4px' : '16px',
-                          maxWidth: '85%'
+                          borderRadius: 'var(--radius-lg)',
+                          borderBottomRightRadius: isSystemOrMe ? '4px' : 'var(--radius-lg)',
+                          borderBottomLeftRadius: !isSystemOrMe ? '4px' : 'var(--radius-lg)',
+                          maxWidth: '85%',
+                          boxShadow: 'var(--shadow-card)'
                         }}>
-                          <div style={{ fontSize: '0.75rem', opacity: 0.8, marginBottom: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ fontSize: '0.75rem', opacity: 0.85, marginBottom: '4px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                             {isInternal && <Lock size={10} />}
                             {isInternal ? 'Nota Interna (Oculta)' : (isSystemOrMe ? 'Nosotros (Soporte)' : 'Usuario / Restaurante')}
                           </div>
-                          <p style={{ whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.4, fontSize: '0.95rem' }}>{msg.body}</p>
-                          <div style={{ fontSize: '0.65rem', opacity: 0.6, marginTop: '8px', textAlign: 'right' }}>
+                          <p style={{ whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.45, fontSize: '0.95rem' }}>{msg.body}</p>
+                          <div style={{ fontSize: '0.68rem', opacity: 0.7, marginTop: '8px', textAlign: 'right' }}>
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
@@ -405,14 +406,14 @@ const AdminSupportTicketsContent: React.FC = () => {
               )}
             </div>
 
-            <div style={{ padding: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'var(--glass-medium)' }}>
+            <div style={{ padding: '20px', borderTop: '1px solid var(--neutral-border)', background: 'var(--neutral-surface)' }}>
               <form onSubmit={handleSendMessage}>
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 600 }}>
                     <input type="radio" checked={!isInternal} onChange={() => setIsInternal(false)} />
                     Respuesta al usuario (Pública)
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', color: '#FCD34D' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--warning)', fontWeight: 700 }}>
                     <input type="radio" checked={isInternal} onChange={() => setIsInternal(true)} />
                     <Lock size={12} /> Nota Interna (Solo Admins)
                   </label>

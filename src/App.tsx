@@ -3,9 +3,7 @@ import { AppProvider } from './context/AppContext';
 import { useApp } from './context/useApp';
 import { Header } from './components/Header';
 import { Toast } from './components/Toast';
-import { ForcePasswordModal } from './components/ForcePasswordModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { LegalCenterModal } from './components/LegalCenterModal';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 
@@ -17,6 +15,8 @@ const KitchenPanel = lazyWithRetry(() => import('./components/KitchenPanel').the
 const RestaurantAdmin = lazyWithRetry(() => import('./components/RestaurantAdmin').then(m => ({ default: m.RestaurantAdmin })));
 const TablePublicView = lazyWithRetry(() => import('./components/TablePublicView').then(m => ({ default: m.TablePublicView })));
 const SuperAdminView = lazyWithRetry(() => import('./components/SuperAdminView').then(m => ({ default: m.SuperAdminView })));
+const ForcePasswordModal = lazyWithRetry(() => import('./components/ForcePasswordModal').then(m => ({ default: m.ForcePasswordModal })));
+const LegalCenterModal = lazyWithRetry(() => import('./components/LegalCenterModal').then(m => ({ default: m.LegalCenterModal })));
 
 const ViewLoader: React.FC = () => (
   <div className="gs-view-loader" role="status" aria-live="polite">
@@ -37,7 +37,7 @@ const MainContent: React.FC = () => {
   if (path.startsWith('/auth/callback')) {
     return (
       <main>
-        <div style={{ minHeight: '100vh', background: 'var(--bg-main)', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', textAlign: 'center' }}>
+        <div style={{ minHeight: '100vh', background: 'var(--neutral-bg)', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', textAlign: 'center' }}>
           <ViewLoader />
           <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Verificando sesión, por favor espera...</p>
         </div>
@@ -97,10 +97,14 @@ export function App() {
     <AppProvider>
       <div className="app-layout">
         <Header />
-        <ForcePasswordModal />
+        <Suspense fallback={null}>
+          <ForcePasswordModal />
+        </Suspense>
         <MainContent />
         <Toast />
-        <LegalCenterModal />
+        <Suspense fallback={null}>
+          <LegalCenterModal />
+        </Suspense>
         <CookieConsentBanner />
       </div>
     </AppProvider>

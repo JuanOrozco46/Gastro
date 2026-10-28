@@ -39,13 +39,11 @@ export const KitchenPanel: React.FC = () => {
       <div
         className="rpa-card"
         style={{
-          background: operatingTenant.isOpen
-            ? 'linear-gradient(135deg, #064E3B 0%, #0F172A 100%)'
-            : 'linear-gradient(135deg, #7F1D1D 0%, #0F172A 100%)',
+          background: 'var(--neutral-dark)',
           border: operatingTenant.isOpen
-            ? '1px solid rgba(16, 185, 129, 0.35)'
-            : '1px solid rgba(239, 68, 68, 0.45)',
-          color: '#FFFFFF'
+            ? '1px solid var(--secondary)'
+            : '1px solid var(--primary)',
+          color: '#FAFAF8'
         }}
       >
         <div
@@ -65,23 +63,23 @@ export const KitchenPanel: React.FC = () => {
               <span
                 style={{
                   fontSize: '0.72rem',
-                  fontWeight: 800,
-                  color: '#FCD34D',
+                  fontWeight: 700,
+                  color: '#B0A89E',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
+                  letterSpacing: '0.6px',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '5px'
                 }}
               >
-                <Sparkles size={12} /> CENTRO DE COMANDAS KDS • {operatingTenant.name}
+                <Sparkles size={12} style={{ color: 'var(--primary)' }} /> CENTRO DE COMANDAS KDS • {operatingTenant.name}
               </span>
             </div>
             <h2
               style={{
-                fontSize: '1.3rem',
-                fontWeight: 900,
-                color: '#FFFFFF',
+                fontSize: '1.25rem',
+                fontWeight: 700,
+                color: '#FAFAF8',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
@@ -94,9 +92,8 @@ export const KitchenPanel: React.FC = () => {
                     style={{
                       width: '10px',
                       height: '10px',
-                      borderRadius: '50%',
-                      background: '#10B981',
-                      boxShadow: '0 0 12px #10B981'
+                      borderRadius: '999px',
+                      background: '#10B981'
                     }}
                   />
                   <span>ABIERTO Y RECIBIENDO COMANDAS EN VIVO</span>
@@ -107,16 +104,15 @@ export const KitchenPanel: React.FC = () => {
                     style={{
                       width: '10px',
                       height: '10px',
-                      borderRadius: '50%',
-                      background: '#EF4444',
-                      boxShadow: '0 0 12px #EF4444'
+                      borderRadius: '999px',
+                      background: '#C85A38'
                     }}
                   />
                   <span>LOCAL CERRADO TEMPORALMENTE</span>
                 </>
               )}
             </h2>
-            <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.75)', margin: '4px 0 0' }}>
+            <p style={{ fontSize: '0.875rem', color: 'rgba(250, 250, 248, 0.78)', margin: '4px 0 0' }}>
               {operatingTenant.isOpen
                 ? 'Las comandas entran automáticamente en tiempo real en el tablero Kanban.'
                 : 'Al estar cerrado no entran nuevos pedidos, pero puedes terminar de despachar las órdenes activas.'}
@@ -126,15 +122,13 @@ export const KitchenPanel: React.FC = () => {
           {isOwner ? (
             <button
               type="button"
-              className="pam-btn-primary"
+              className="btn btn-secondary"
               style={{
-                background: operatingTenant.isOpen
-                  ? 'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)'
-                  : 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
-                padding: '10px 20px',
-                fontSize: '0.88rem',
-                fontWeight: 800,
-                borderRadius: '12px'
+                background: operatingTenant.isOpen ? 'var(--primary)' : 'var(--secondary)',
+                padding: '10px 18px',
+                fontSize: '0.875rem',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-sm)'
               }}
               onClick={() => toggleTenantOpenStatus(operatingTenant.id)}
             >
@@ -145,14 +139,14 @@ export const KitchenPanel: React.FC = () => {
             <span
               style={{
                 padding: '8px 14px',
-                fontSize: '0.78rem',
+                fontSize: '0.72rem',
                 fontWeight: 700,
                 borderRadius: '999px',
-                background: 'rgba(255,255,255,0.12)',
-                color: '#FFFFFF'
+                background: 'rgba(250, 250, 248, 0.12)',
+                color: '#FAFAF8'
               }}
             >
-              🔒 Estado gestionado por el Administrador
+              Estado gestionado por el Administrador
             </span>
           )}
         </div>

@@ -34,11 +34,11 @@ export const SupportMetricsPanel: React.FC = () => {
   }, [startDate, endDate]);
 
   if (loading && !metrics) {
-    return <div style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}>Cargando métricas...</div>;
+    return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>Cargando métricas...</div>;
   }
 
   if (error) {
-    return <div style={{ padding: '32px', textAlign: 'center', color: '#EF4444' }}>{error}</div>;
+    return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--danger)' }}>{error}</div>;
   }
 
   if (!metrics) return null;
@@ -46,91 +46,93 @@ export const SupportMetricsPanel: React.FC = () => {
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
           <BarChart3 size={24} style={{ color: 'var(--primary)' }} /> 
           Métricas de Soporte
         </h2>
-        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <input
             type="date"
             className="form-input"
-            style={{ padding: '8px', fontSize: '0.875rem' }}
+            style={{ padding: '8px 12px', fontSize: '0.875rem', width: 'auto' }}
             value={startDate}
             onChange={e => setStartDate(e.target.value)}
           />
           <input
             type="date"
             className="form-input"
-            style={{ padding: '8px', fontSize: '0.875rem' }}
+            style={{ padding: '8px 12px', fontSize: '0.875rem', width: 'auto' }}
             value={endDate}
             onChange={e => setEndDate(e.target.value)}
           />
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '28px' }}>
         {/* KPI 1 */}
-        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60A5FA' }}>
+        <div className="card" style={{ background: 'var(--neutral-surface)', border: '1px solid var(--neutral-border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
               <Ticket size={20} />
             </div>
-            <h3 style={{ color: '#94A3B8', fontWeight: 600, fontSize: '0.875rem', margin: 0 }}>Tickets Totales</h3>
+            <h3 style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.875rem', margin: 0 }}>Tickets Totales</h3>
           </div>
-          <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', margin: 0 }}>{metrics.total_created}</p>
-          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '8px' }}>
-            <span style={{ color: '#60A5FA' }}>{metrics.total_open}</span> abiertos actualmente
+          <p style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>{metrics.total_created}</p>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+            <strong style={{ color: 'var(--primary)' }}>{metrics.total_open}</strong> abiertos actualmente
           </div>
         </div>
 
         {/* KPI 2 */}
-        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34D399' }}>
+        <div className="card" style={{ background: 'var(--neutral-surface)', border: '1px solid var(--neutral-border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--secondary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--secondary)' }}>
               <CheckCircle size={20} />
             </div>
-            <h3 style={{ color: '#94A3B8', fontWeight: 600, fontSize: '0.875rem', margin: 0 }}>Resueltos / Cerrados</h3>
+            <h3 style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.875rem', margin: 0 }}>Resueltos / Cerrados</h3>
           </div>
-          <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', margin: 0 }}>{metrics.total_resolved + metrics.total_closed}</p>
-          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '8px' }}>
-            Tasa de resolución: {metrics.total_created > 0 ? Math.round(((metrics.total_resolved + metrics.total_closed) / metrics.total_created) * 100) : 0}%
+          <p style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>{metrics.total_resolved + metrics.total_closed}</p>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+            Tasa de resolución: <strong>{metrics.total_created > 0 ? Math.round(((metrics.total_resolved + metrics.total_closed) / metrics.total_created) * 100) : 0}%</strong>
           </div>
         </div>
 
         {/* KPI 3 */}
-        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FBBF24' }}>
+        <div className="card" style={{ background: 'var(--neutral-surface)', border: '1px solid var(--neutral-border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--warning-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--warning)' }}>
               <Star size={20} />
             </div>
-            <h3 style={{ color: '#94A3B8', fontWeight: 600, fontSize: '0.875rem', margin: 0 }}>CSAT Promedio</h3>
+            <h3 style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.875rem', margin: 0 }}>CSAT Promedio</h3>
           </div>
-          <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', margin: 0 }}>{Number(metrics.avg_rating ?? 0).toFixed(1)} <span style={{ fontSize: '1.125rem', color: '#64748B' }}>/ 5.0</span></p>
-          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '8px' }}>
+          <p style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
+            {Number(metrics.avg_rating ?? 0).toFixed(1)} <span style={{ fontSize: '1.05rem', color: 'var(--text-muted)', fontWeight: 600 }}>/ 5.0</span>
+          </p>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '8px' }}>
             Basado en {metrics.total_ratings} calificaciones
           </div>
         </div>
 
         {/* KPI 4 */}
-        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A78BFA' }}>
+        <div className="card" style={{ background: 'var(--neutral-surface)', border: '1px solid var(--neutral-border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--tertiary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--tertiary)' }}>
               <Clock size={20} />
             </div>
-            <h3 style={{ color: '#94A3B8', fontWeight: 600, fontSize: '0.875rem', margin: 0 }}>Tiempo de Resolución</h3>
+            <h3 style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.875rem', margin: 0 }}>Tiempo de Resolución</h3>
           </div>
-          <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', margin: 0 }}>
-            {metrics.avg_resolution_seconds ? (metrics.avg_resolution_seconds / 3600).toFixed(1) : '-'} <span style={{ fontSize: '1.125rem', color: '#64748B' }}>hrs</span>
+          <p style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
+            {metrics.avg_resolution_seconds ? (metrics.avg_resolution_seconds / 3600).toFixed(1) : '-'} <span style={{ fontSize: '1.05rem', color: 'var(--text-muted)', fontWeight: 600 }}>hrs</span>
           </p>
-          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '8px' }}>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '8px' }}>
             1ra respuesta: {metrics.avg_first_response_seconds ? (metrics.avg_first_response_seconds / 60).toFixed(0) : '-'} minutos
           </div>
         </div>
       </div>
       
       {/* Futuro: Gráficos con Recharts, exportar CSV, etc */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '16px', padding: '32px', textAlign: 'center', color: '#94A3B8' }}>
-        <p>Más analíticas detalladas y exportación de reportes próximamente.</p>
+      <div style={{ background: 'var(--neutral-surface-alt)', border: '1px dashed var(--neutral-border-strong)', borderRadius: 'var(--radius-lg)', padding: '28px', textAlign: 'center', color: 'var(--text-muted)' }}>
+        <p style={{ margin: 0, fontWeight: 600 }}>Más analíticas detalladas y exportación de reportes próximamente.</p>
       </div>
     </div>
   );

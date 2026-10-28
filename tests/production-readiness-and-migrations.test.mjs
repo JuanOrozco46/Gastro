@@ -164,4 +164,30 @@ describe('GastroSync Production Readiness — Migrations 060/061, Dispatch & Fin
     assert.ok(wompiFee.totalGatewayFeeCop > 0);
     assert.equal(wompiFee.baseFeeCop + wompiFee.ivaCop, wompiFee.totalGatewayFeeCop);
   });
+
+  it('Hardening, Code Splitting & Warm Gastronomy: cabeceras CSP/HSTS, Origin 403, chunks diferidos y tokens visuales', () => {
+    const vercelConfig = fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8');
+    assert.match(vercelConfig, /Content-Security-Policy/i, 'vercel.json debe definir Content-Security-Policy');
+    assert.match(vercelConfig, /Strict-Transport-Security/i, 'vercel.json debe definir Strict-Transport-Security');
+    assert.match(vercelConfig, /Cross-Origin-Opener-Policy/i, 'vercel.json debe definir Cross-Origin-Opener-Policy');
+
+    const createPaymentCode = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'create-payment', 'index.ts'), 'utf8');
+    assert.match(createPaymentCode, /!isOriginAllowed\(req\.headers\.get\('Origin'\)\)/, 'create-payment debe validar activamente isOriginAllowed');
+    assert.match(createPaymentCode, /status:\s*403/, 'create-payment debe rechazar orígenes no autorizados con HTTP 403');
+
+    const approveRestCode = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'approve_restaurant', 'index.ts'), 'utf8');
+    assert.match(approveRestCode, /!isOriginAllowed\(req\.headers\.get\('Origin'\)\)/, 'approve_restaurant debe validar activamente isOriginAllowed');
+    assert.match(approveRestCode, /status:\s*403/, 'approve_restaurant debe rechazar orígenes no autorizados con HTTP 403');
+
+    const viteConfig = fs.readFileSync(path.join(ROOT, 'vite.config.ts'), 'utf8');
+    assert.match(viteConfig, /vendor-charts/, 'vite.config.ts debe aislar recharts/d3 en el chunk vendor-charts');
+
+    const restAdminCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'RestaurantAdmin.tsx'), 'utf8');
+    assert.match(restAdminCode, /lazyWithRetry\(\(\)\s*=>\s*import\(['"]\.\/RestaurantAdmin\/DashboardTab['"]\)/, 'DashboardTab debe cargarse con lazyWithRetry');
+    assert.match(restAdminCode, /lazyWithRetry\(\(\)\s*=>\s*import\(['"]\.\/KdsBoard['"]\)/, 'KdsBoard debe cargarse con lazyWithRetry');
+
+    const tablePublicCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'TablePublicView.tsx'), 'utf8');
+    assert.match(tablePublicCode, /var\(--neutral-surface\)/, 'TablePublicView debe usar tokens Warm Gastronomy');
+    assert.match(tablePublicCode, /encodeURIComponent\(restaurant\.googlePlaceId!\)/, 'TablePublicView debe codificar googlePlaceId en URL externa con noopener,noreferrer');
+  });
 });
