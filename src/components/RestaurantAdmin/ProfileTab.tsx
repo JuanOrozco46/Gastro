@@ -23,7 +23,9 @@ import {
   Plus,
   Trash2,
   Upload,
-  ShieldCheck
+  ShieldCheck,
+  Landmark,
+  User
 } from 'lucide-react';
 import { uploadMediaFile } from '../../services/supabaseStorageService';
 import { ensureColombiaCityAndZone } from '../../services/supabaseDataService';
@@ -113,7 +115,14 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
     deliveryFee: tenant.deliveryFee?.toString() || '0',
     minOrder: tenant.minOrder?.toString() || '0',
     deliveryRadiusKm: tenant.deliveryRadiusKm?.toString() || '5',
-    specialties: tenant.specialties ? tenant.specialties.join(', ') : ''
+    specialties: tenant.specialties ? tenant.specialties.join(', ') : '',
+    payoutBankName: tenant.payoutBankName || 'Bancolombia',
+    payoutAccountType: tenant.payoutAccountType || 'ahorros',
+    payoutAccountNumber: tenant.payoutAccountNumber || '',
+    payoutAccountHolder: tenant.payoutAccountHolder || tenant.name || '',
+    payoutDocumentType: tenant.payoutDocumentType || 'NIT',
+    payoutDocumentNumber: tenant.payoutDocumentNumber || '',
+    wompiMerchantId: tenant.wompiMerchantId || ''
   });
 
   const [deliveryModes, setDeliveryModes] = useState<RestaurantDeliveryMode[]>(
@@ -351,6 +360,13 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
           .split(',')
           .map(s => s.trim())
           .filter(s => s.length > 0),
+        payoutBankName: formData.payoutBankName.trim() || 'Bancolombia',
+        payoutAccountType: formData.payoutAccountType.trim() || 'ahorros',
+        payoutAccountNumber: formData.payoutAccountNumber.trim(),
+        payoutAccountHolder: formData.payoutAccountHolder.trim(),
+        payoutDocumentType: formData.payoutDocumentType.trim() || 'NIT',
+        payoutDocumentNumber: formData.payoutDocumentNumber.trim(),
+        wompiMerchantId: formData.wompiMerchantId.trim(),
         deliveryModes,
         hours
       });
@@ -1015,6 +1031,168 @@ export const ProfileTab: React.FC<{ tenant: Tenant }> = ({ tenant }) => {
                       min="0.5"
                     />
                     <span className="pam-suffix">km</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-sección: Cuenta Bancaria de Desembolso y Wompi Split */}
+              <div
+                style={{
+                  marginTop: '1.25rem',
+                  paddingTop: '1.25rem',
+                  borderTop: '1px solid var(--neutral-border)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '0.85rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 10,
+                        background: 'var(--primary-subtle)',
+                        color: 'var(--primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Landmark size={18} />
+                    </div>
+                    <div>
+                      <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                        🏦 Cuenta Bancaria o Billetera para Recibir tus Pagos (Wompi / Dispersión)
+                      </h5>
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Aquí se transfiere el 97% neto de tus ventas digitales (descontando 3% GastroSync + tarifa de pasarela Wompi).
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`rpa-badge ${formData.payoutAccountNumber.trim() ? 'success' : 'neutral'}`}
+                  >
+                    {formData.payoutAccountNumber.trim()
+                      ? `✅ ${formData.payoutBankName} configurada`
+                      : '⚠️ Cuenta pendiente'}
+                  </span>
+                </div>
+
+                <div className="pam-grid">
+                  <div className="pam-field">
+                    <label>Entidad Bancaria o Billetera</label>
+                    <div className="pam-input-wrap">
+                      <Landmark size={16} className="pam-icon" />
+                      <select
+                        name="payoutBankName"
+                        value={formData.payoutBankName}
+                        onChange={handleChange}
+                        className="pam-input"
+                      >
+                        <option value="Bancolombia">Bancolombia</option>
+                        <option value="Nequi">Nequi</option>
+                        <option value="Daviplata">Daviplata</option>
+                        <option value="Llave Bre-B">Llave Bre-B (Banco de la República)</option>
+                        <option value="Davivienda">Davivienda</option>
+                        <option value="Banco de Bogotá">Banco de Bogotá</option>
+                        <option value="BBVA Colombia">BBVA Colombia</option>
+                        <option value="Scotiabank Colpatria">Scotiabank Colpatria</option>
+                        <option value="Banco de Occidente">Banco de Occidente</option>
+                        <option value="Lulo Bank">Lulo Bank</option>
+                        <option value="Nu Colombia">Nu Colombia</option>
+                        <option value="RappiPay">RappiPay</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pam-field">
+                    <label>Tipo de Producto</label>
+                    <div className="pam-input-wrap">
+                      <Landmark size={16} className="pam-icon" />
+                      <select
+                        name="payoutAccountType"
+                        value={formData.payoutAccountType}
+                        onChange={handleChange}
+                        className="pam-input"
+                      >
+                        <option value="ahorros">Cuenta de Ahorros</option>
+                        <option value="corriente">Cuenta Corriente</option>
+                        <option value="billetera_digital">Billetera Digital (Nequi / Daviplata)</option>
+                        <option value="llave_breb">Llave Bre-B (Inmediata)</option>
+                        <option value="wompi_split">Dispersión Automática Wompi Split</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pam-field">
+                    <label>Número de Cuenta / Celular / Llave Bre-B</label>
+                    <div className="pam-input-wrap">
+                      <Landmark size={16} className="pam-icon" />
+                      <input
+                        type="text"
+                        name="payoutAccountNumber"
+                        value={formData.payoutAccountNumber}
+                        onChange={handleChange}
+                        className="pam-input"
+                        placeholder="Ej. 3145550199 o 40291827364"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pam-field">
+                    <label>Nombre del Titular o Razón Social</label>
+                    <div className="pam-input-wrap">
+                      <User size={16} className="pam-icon" />
+                      <input
+                        type="text"
+                        name="payoutAccountHolder"
+                        value={formData.payoutAccountHolder}
+                        onChange={handleChange}
+                        className="pam-input"
+                        placeholder="Ej. Inversiones Gastronómicas S.A.S."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pam-field">
+                    <label>Documento del Titular (NIT / CC)</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select
+                        name="payoutDocumentType"
+                        value={formData.payoutDocumentType}
+                        onChange={handleChange}
+                        className="pam-input no-icon"
+                        style={{ width: '92px', flexShrink: 0 }}
+                      >
+                        <option value="NIT">NIT</option>
+                        <option value="CC">CC</option>
+                        <option value="CE">CE</option>
+                      </select>
+                      <input
+                        type="text"
+                        name="payoutDocumentNumber"
+                        value={formData.payoutDocumentNumber}
+                        onChange={handleChange}
+                        className="pam-input no-icon"
+                        placeholder="Ej. 901.442.881-2"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pam-field">
+                    <label>
+                      ID Comercio Wompi Split <span className="pam-opt">Opcional</span>
+                    </label>
+                    <div className="pam-input-wrap">
+                      <ShieldCheck size={16} className="pam-icon" />
+                      <input
+                        type="text"
+                        name="wompiMerchantId"
+                        value={formData.wompiMerchantId}
+                        onChange={handleChange}
+                        className="pam-input"
+                        placeholder="pub_prod_xxxxxxxxxxxx"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../context/useApp';
 import type { Post, PostComment, Tenant } from '../types';
 import { X, Send, Heart, MessageCircle, Trash2 } from 'lucide-react';
@@ -25,6 +25,22 @@ function getInitials(name: string): string {
 export const CommentsModal: React.FC<CommentsModalProps> = ({ post, tenant, onClose }) => {
   const { addComment, deleteComment, currentUser } = useApp();
   const [commentText, setCommentText] = useState('');
+  const [likedComments, setLikedComments] = useState<Record<string, boolean>>({});
+  const commentInputRef = useRef<HTMLInputElement>(null);
+
+  const toggleCommentLike = (commentId: string) => {
+    setLikedComments(prev => ({
+      ...prev,
+      [commentId]: !prev[commentId]
+    }));
+  };
+
+  const handleReply = (c: PostComment) => {
+    const handle = c.userHandle || suggestUsernameFromName(c.userName);
+    const mention = `@${handle || c.userName} `;
+    setCommentText(prev => (prev.startsWith(mention) ? prev : `${mention}${prev}`));
+    commentInputRef.current?.focus();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,11 +154,31 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ post, tenant, onCl
                       <span className="gf-comment-time">{c.timeAgo}</span>
                     </div>
                     <p className="gf-comment-text">{c.text}</p>
+                    <div className="gf-comment-footer-row">
+                      <button
+                        type="button"
+                        className="gf-comment-reply-action"
+                        onClick={() => handleReply(c)}
+                      >
+                        Responder
+                      </button>
+                    </div>
                   </div>
                   <div className="gf-comment-actions-col">
-                    <button className="gf-comment-like-btn" type="button" aria-label="Me gusta comentario">
-                      <Heart size={14} />
-                      {c.likes > 0 && <span>{c.likes}</span>}
+                    <button
+                      className={`gf-comment-like-btn ${likedComments[c.id] ? 'is-liked' : ''}`}
+                      type="button"
+                      onClick={() => toggleCommentLike(c.id)}
+                      aria-label="Me gusta comentario"
+                    >
+                      <Heart
+                        size={14}
+                        fill={likedComments[c.id] ? 'currentColor' : 'none'}
+                        color={likedComments[c.id] ? 'var(--primary)' : 'currentColor'}
+                      />
+                      {(c.likes + (likedComments[c.id] ? 1 : 0)) > 0 && (
+                        <span>{c.likes + (likedComments[c.id] ? 1 : 0)}</span>
+                      )}
                     </button>
                     {deletable && (
                       <button
@@ -180,6 +216,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ post, tenant, onCl
             </div>
           )}
           <input
+            ref={commentInputRef}
             type="text"
             className="gf-comment-input"
             placeholder={

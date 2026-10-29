@@ -114,6 +114,7 @@ interface PostCardProps {
   onSave: (id: string) => void;
   onOpenComments: (post: Post) => void;
   onOpenProfile: (tenantId: string) => void;
+  onOpenStory?: (tenantId: string) => void;
   onShare: (post: Post) => void;
   onQuickComment?: (postId: string, text: string) => Promise<boolean>;
 }
@@ -130,6 +131,7 @@ const PostCard: React.FC<PostCardProps> = ({
   onSave,
   onOpenComments,
   onOpenProfile,
+  onOpenStory,
   onShare,
   onQuickComment
 }) => {
@@ -214,8 +216,22 @@ const PostCard: React.FC<PostCardProps> = ({
 
       {/* ── Header (autor con anillo estilo Instagram) ── */}
       <header className="gf-post-header">
-        <div className="gf-post-author" onClick={() => onOpenProfile(post.tenantId)}>
-          <div className={`gf-post-avatar-ring ${hasActiveStory ? 'has-story' : ''}`}>
+        <div className="gf-post-author">
+          <div
+            className={`gf-post-avatar-ring ${hasActiveStory ? 'has-story' : ''}`}
+            onClick={(e) => {
+              if (hasActiveStory && onOpenStory) {
+                e.stopPropagation();
+                onOpenStory(post.tenantId);
+              } else {
+                onOpenProfile(post.tenantId);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            title={hasActiveStory ? `Ver historias de ${tenant?.name || post.tenantName}` : `Ver perfil de ${tenant?.name || post.tenantName}`}
+            aria-label={hasActiveStory ? `Ver historias de ${tenant?.name || post.tenantName}` : `Ver perfil de ${tenant?.name || post.tenantName}`}
+          >
             <div className={`gf-author-avatar ${tenant?.logoUrl ? 'has-logo' : ''}`}>
               {tenant?.logoUrl ? (
                 <img loading="lazy" decoding="async" src={tenant.logoUrl} alt={tenant.name} className="gf-author-avatar-img" />
@@ -224,7 +240,12 @@ const PostCard: React.FC<PostCardProps> = ({
               )}
             </div>
           </div>
-          <div className="gf-author-meta">
+          <div
+            className="gf-author-meta"
+            onClick={() => onOpenProfile(post.tenantId)}
+            role="button"
+            tabIndex={0}
+          >
             <div className="gf-author-top">
               <strong className="gf-author-name">{tenant?.name || post.tenantName}</strong>
               <span className="gf-author-sep">·</span>
@@ -525,6 +546,7 @@ export const CustomerDeliveryApp: React.FC = () => {
   const [selectedCommentsPostId, setSelectedCommentsPostId] = useState<string | null>(null);
   const [selectedTenantProfile, setSelectedTenantProfile] = useState<string | null>(null);
   const [selectedTenantInitialTab, setSelectedTenantInitialTab] = useState<'menu' | 'content' | 'reviews' | 'info'>('menu');
+  const [openStoryTenantId, setOpenStoryTenantId] = useState<string | null>(null);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -869,7 +891,12 @@ export const CustomerDeliveryApp: React.FC = () => {
       {activeTab === 'feed' && (
         <>
           {/* ── Dynamic Reels & Stories Bar (Restaurantes de tu ciudad) ── */}
-          <StoriesBar onOrderProduct={handleOrder} />
+          <StoriesBar
+            onOrderProduct={handleOrder}
+            onOpenRestaurantProfile={setSelectedTenantProfile}
+            targetTenantStoryId={openStoryTenantId}
+            onTargetTenantStoryConsumed={() => setOpenStoryTenantId(null)}
+          />
 
           {/* ── Search & Advanced Filters (Compact single-row capsule) ── */}
           <div className="gf-search-wrapper">
@@ -1016,10 +1043,28 @@ export const CustomerDeliveryApp: React.FC = () => {
             {/* Posts column */}
             <div className="gf-posts-column">
               {isCatalogLoading ? (
-                <div className="gf-state-panel">
-                  <div className="gf-spinner-ring" />
-                  <h3 className="gf-state-title">Cargando catálogo...</h3>
-                  <p className="gf-state-desc">Estamos preparando las mejores opciones gastronómicas para ti.</p>
+                <div className="gf-feed-skeleton" aria-label="Cargando publicaciones...">
+                  {[1, 2].map(idx => (
+                    <div key={idx} className="gf-skeleton-post-card">
+                      <div className="gf-skeleton-header">
+                        <div className="gf-skeleton-avatar gf-shimmer-pulse" />
+                        <div className="gf-skeleton-meta">
+                          <div className="gf-skeleton-line short gf-shimmer-pulse" />
+                          <div className="gf-skeleton-line tiny gf-shimmer-pulse" />
+                        </div>
+                      </div>
+                      <div className="gf-skeleton-media gf-shimmer-pulse" />
+                      <div className="gf-skeleton-footer">
+                        <div className="gf-skeleton-actions-row">
+                          <div className="gf-skeleton-action gf-shimmer-pulse" />
+                          <div className="gf-skeleton-action gf-shimmer-pulse" />
+                          <div className="gf-skeleton-action gf-shimmer-pulse" />
+                        </div>
+                        <div className="gf-skeleton-line medium gf-shimmer-pulse" />
+                        <div className="gf-skeleton-line long gf-shimmer-pulse" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : catalogError ? (
                 <div className="gf-state-panel">
@@ -1092,6 +1137,7 @@ export const CustomerDeliveryApp: React.FC = () => {
                     onSave={toggleSave}
                     onOpenComments={(post) => setSelectedCommentsPostId(post.id)}
                     onOpenProfile={setSelectedTenantProfile}
+                    onOpenStory={setOpenStoryTenantId}
                     onShare={handleShare}
                     onQuickComment={addComment}
                   />

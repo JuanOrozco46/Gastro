@@ -376,6 +376,13 @@ export interface RemotePaymentResponse {
     currency: string;
     publicKey: string;
     signature: string;
+    wompiMerchantId?: string | null;
+    splitConfig?: {
+      restaurantMerchantId?: string | null;
+      restaurantPayoutCents: number;
+      platformFeeCents: number;
+      gatewayFeeCents: number;
+    };
   };
 }
 
@@ -420,7 +427,9 @@ export async function createRemotePayment(
         amountInCents: data.amountInCents,
         currency: data.currency,
         publicKey: data.publicKey,
-        signature: data.signature
+        signature: data.signature,
+        wompiMerchantId: data.wompiMerchantId ?? null,
+        splitConfig: data.splitConfig
       } : undefined
     };
   } catch (err: unknown) {

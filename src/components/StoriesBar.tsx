@@ -19,6 +19,8 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 interface StoriesBarProps {
   onOrderProduct: (productId: string, tenantSlug: string) => void;
   onOpenRestaurantProfile?: (tenantId: string) => void;
+  targetTenantStoryId?: string | null;
+  onTargetTenantStoryConsumed?: () => void;
 }
 
 const PHOTO_STORY_DURATION_MS = 6000;
@@ -26,7 +28,9 @@ const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 export const StoriesBar: React.FC<StoriesBarProps> = ({
   onOrderProduct,
-  onOpenRestaurantProfile
+  onOpenRestaurantProfile,
+  targetTenantStoryId,
+  onTargetTenantStoryConsumed
 }) => {
   const { stories, tenants, selectedCityId, selectedZoneId } = useApp();
   const prefersReducedMotion = useReducedMotion();
@@ -152,7 +156,7 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({
     setProgress(0);
   }, []);
 
-  const openStory = (story: Story, startIndex = 0) => {
+  const openStory = useCallback((story: Story, startIndex = 0) => {
     const items = story.items || [];
     if (items.length === 0) return;
     setDirection(1);
@@ -162,7 +166,20 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({
     setIsHoldingUiHidden(false);
     setActiveStory({ story, itemIndex: startIndex });
     markStoryViewed(story.id);
-  };
+  }, [markStoryViewed, resetProgress]);
+
+  useEffect(() => {
+    if (!targetTenantStoryId) return;
+    const match = cityFilteredStories.find(
+      s => s.tenantId === targetTenantStoryId || s.id === targetTenantStoryId
+    );
+    if (match && (match.items || []).length > 0) {
+      queueMicrotask(() => {
+        openStory(match, 0);
+      });
+    }
+    onTargetTenantStoryConsumed?.();
+  }, [targetTenantStoryId, cityFilteredStories, onTargetTenantStoryConsumed, openStory]);
 
   const jumpToRestaurantStory = useCallback(
     (targetStory: Story, dir: 1 | -1) => {

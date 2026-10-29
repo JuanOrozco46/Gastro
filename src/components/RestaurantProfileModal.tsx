@@ -579,12 +579,25 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                 </div>
               ) : (
                 tenantPosts.map(post => (
-                  <div key={post.id} className="gf-grid-card">
+                  <div
+                    key={post.id}
+                    className="gf-grid-card"
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`${post.dishName} - ${post.likes} me gusta`}
+                    onClick={() => {
+                      if (post.productId) {
+                        onOrderProduct(post.productId, tenant.slug);
+                      } else if (post.image) {
+                        setLightboxImageUrl(post.image);
+                      }
+                    }}
+                  >
                     <img loading="lazy" decoding="async" src={post.image} alt={post.dishName} className="gf-grid-img" />
                     
                     {post.mediaType === 'video' && (
-                      <div className="gf-grid-video-badge">
-                        <Play size={12} fill="white" /> VIDEO
+                      <div className="gf-grid-video-badge" title="Publicación de video">
+                        <Play size={11} fill="white" />
                       </div>
                     )}
 
@@ -596,13 +609,15 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                       </div>
                       {post.productId && (
                         <button
+                          type="button"
                           className="gf-grid-order-btn"
                           disabled={!isOpenNow}
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             onOrderProduct(post.productId, tenant.slug);
                           }}
                         >
-                          <ShoppingBag size={13} />
+                          <ShoppingBag size={12} />
                           ${post.price.toLocaleString('es-CO')}
                         </button>
                       )}
@@ -619,9 +634,10 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
               {/* Rating Summary Card */}
               <div
                 style={{
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.09)',
-                  borderRadius: '18px',
+                  background: 'var(--neutral-surface)',
+                  border: '1px solid var(--neutral-border)',
+                  boxShadow: 'var(--shadow-sm)',
+                  borderRadius: 'var(--radius-lg)',
                   padding: '18px',
                   display: 'flex',
                   flexWrap: 'wrap',
@@ -630,7 +646,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                 }}
               >
                 <div style={{ textAlign: 'center', minWidth: '110px' }}>
-                  <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#FBBF24', lineHeight: 1 }}>
+                  <div style={{ fontSize: '2.4rem', fontWeight: 900, color: 'var(--primary-dark)', lineHeight: 1 }}>
                     {effectiveRatingAvg.toFixed(1)}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '3px', margin: '6px 0' }}>
@@ -655,13 +671,13 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                     return (
                       <div key={star} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.76rem' }}>
                         <span style={{ width: '28px', color: 'var(--text-muted)', fontWeight: 700 }}>{star} ★</span>
-                        <div style={{ flex: 1, height: '7px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                        <div style={{ flex: 1, height: '7px', borderRadius: '999px', background: 'var(--neutral-border)', overflow: 'hidden' }}>
                           <div
                             style={{
                               width: `${pct}%`,
                               height: '100%',
                               borderRadius: '999px',
-                              background: 'linear-gradient(90deg, #F59E0B, #FBBF24)'
+                              background: 'linear-gradient(90deg, #F59E0B, #EA580C)'
                             }}
                           />
                         </div>
@@ -679,9 +695,9 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                 <form
                   onSubmit={handleSubmitReview}
                   style={{
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid rgba(245, 158, 11, 0.24)',
-                    borderRadius: '18px',
+                    background: 'var(--neutral-surface-alt)',
+                    border: '1px solid var(--neutral-border)',
+                    borderRadius: 'var(--radius-lg)',
                     padding: '16px',
                     display: 'flex',
                     flexDirection: 'column',
@@ -695,14 +711,14 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                           width: '36px',
                           height: '36px',
                           borderRadius: '50%',
-                          background: '#0F172A',
-                          border: '1px solid rgba(255,255,255,0.14)',
+                          background: 'var(--primary-subtle)',
+                          border: '1px solid var(--primary-border)',
                           overflow: 'hidden',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontWeight: 800,
-                          color: 'white'
+                          color: 'var(--primary-dark)'
                         }}
                       >
                         {currentUser.avatarUrl ? (
@@ -712,7 +728,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                         )}
                       </div>
                       <div>
-                        <strong style={{ fontSize: '0.88rem', color: 'white', display: 'block' }}>
+                        <strong style={{ fontSize: '0.88rem', color: 'var(--text-main)', display: 'block' }}>
                           Califica tu experiencia en {tenant.name}
                         </strong>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -726,9 +742,9 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                         value={selectedOrderId}
                         onChange={e => setCustomOrderId(e.target.value)}
                         style={{
-                          background: 'rgba(15, 23, 42, 0.85)',
-                          color: '#10B981',
-                          border: '1px solid rgba(16, 185, 129, 0.35)',
+                          background: 'var(--neutral-surface)',
+                          color: 'var(--success-text)',
+                          border: '1px solid var(--success-border)',
                           borderRadius: '10px',
                           padding: '6px 10px',
                           fontSize: '0.76rem',
@@ -770,13 +786,13 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                             <Star
                               size={26}
                               fill={active ? '#F59E0B' : 'none'}
-                              color={active ? '#F59E0B' : '#64748B'}
+                              color={active ? '#F59E0B' : 'var(--neutral-border)'}
                             />
                           </button>
                         );
                       })}
                     </div>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#FBBF24' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--primary-dark)' }}>
                       {RATING_LABELS[hoverRating || ratingInput]}
                     </span>
                   </div>
@@ -796,9 +812,9 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                             fontSize: '0.74rem',
                             fontWeight: 700,
                             cursor: 'pointer',
-                            border: isSelected ? '1px solid #F59E0B' : '1px solid rgba(255,255,255,0.12)',
-                            background: isSelected ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.04)',
-                            color: isSelected ? '#FBBF24' : 'var(--text-muted)',
+                            border: isSelected ? '1px solid var(--primary)' : '1px solid var(--neutral-border)',
+                            background: isSelected ? 'var(--primary-subtle)' : 'var(--neutral-surface)',
+                            color: isSelected ? 'var(--primary-dark)' : 'var(--text-muted)',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -818,11 +834,11 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                       maxLength={600}
                       style={{
                         width: '100%',
-                        background: 'rgba(15, 23, 42, 0.7)',
-                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'var(--neutral-surface)',
+                        border: '1px solid var(--neutral-border)',
                         borderRadius: '12px',
                         padding: '10px 12px',
-                        color: 'white',
+                        color: 'var(--text-main)',
                         fontSize: '0.85rem',
                         resize: 'vertical'
                       }}
@@ -830,7 +846,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
 
                     {/* Optional Photo Preview */}
                     {reviewImageUrl && (
-                      <div style={{ position: 'relative', width: '96px', height: '72px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(245, 158, 11, 0.45)' }}>
+                      <div style={{ position: 'relative', width: '96px', height: '72px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--primary)' }}>
                         <img src={reviewImageUrl} alt="Foto adjunta" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         <button
                           type="button"
@@ -865,15 +881,15 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                           gap: '6px',
                           padding: '7px 12px',
                           borderRadius: '10px',
-                          border: '1px dashed rgba(255,255,255,0.2)',
-                          background: 'rgba(255,255,255,0.03)',
-                          color: '#CBD5E1',
+                          border: '1px dashed var(--neutral-border)',
+                          background: 'var(--neutral-surface)',
+                          color: 'var(--text-muted)',
                           fontSize: '0.76rem',
                           fontWeight: 700,
                           cursor: isUploadingPhoto ? 'wait' : 'pointer'
                         }}
                       >
-                        <Camera size={14} style={{ color: '#F59E0B' }} />
+                        <Camera size={14} style={{ color: 'var(--primary)' }} />
                         {isUploadingPhoto ? 'Subiendo foto...' : reviewImageUrl ? 'Cambiar foto' : 'Añadir foto del plato (opcional)'}
                         <input
                           type="file"
@@ -916,14 +932,14 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                   style={{
                     textAlign: 'center',
                     padding: '2.2rem 1.5rem',
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px dashed rgba(255,255,255,0.12)',
+                    background: 'var(--neutral-surface-alt)',
+                    border: '1px dashed var(--neutral-border)',
                     borderRadius: '16px',
                     color: 'var(--text-muted)'
                   }}
                 >
-                  <MessageSquare size={32} style={{ color: '#F59E0B', margin: '0 auto 8px' }} />
-                  <strong style={{ display: 'block', color: 'white', marginBottom: '4px' }}>
+                  <MessageSquare size={32} style={{ color: 'var(--primary)', margin: '0 auto 8px' }} />
+                  <strong style={{ display: 'block', color: 'var(--text-main)', marginBottom: '4px' }}>
                     Sé el primero en dejar una reseña
                   </strong>
                   <span style={{ fontSize: '0.83rem' }}>
@@ -936,8 +952,9 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                     <div
                       key={review.id}
                       style={{
-                        background: 'rgba(255, 255, 255, 0.035)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: 'var(--neutral-surface)',
+                        border: '1px solid var(--neutral-border)',
+                        boxShadow: 'var(--shadow-sm)',
                         borderRadius: '16px',
                         padding: '14px 16px',
                         display: 'flex',
@@ -952,14 +969,14 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                               width: '38px',
                               height: '38px',
                               borderRadius: '50%',
-                              background: '#0F172A',
-                              border: '1px solid rgba(255,255,255,0.14)',
+                              background: 'var(--primary-subtle)',
+                              border: '1px solid var(--primary-border)',
                               overflow: 'hidden',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               fontWeight: 800,
-                              color: 'white',
+                              color: 'var(--primary-dark)',
                               flexShrink: 0
                             }}
                           >
@@ -971,9 +988,9 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                           </div>
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <strong style={{ fontSize: '0.9rem', color: 'white' }}>{review.userName}</strong>
+                              <strong style={{ fontSize: '0.9rem', color: 'var(--text-main)' }}>{review.userName}</strong>
                               {review.userHandle && (
-                                <span style={{ fontSize: '0.76rem', color: 'var(--primary)', fontWeight: 700 }}>
+                                <span style={{ fontSize: '0.76rem', color: 'var(--primary-dark)', fontWeight: 700 }}>
                                   @{review.userHandle}
                                 </span>
                               )}
@@ -987,9 +1004,9 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                                     fontWeight: 800,
                                     padding: '2px 7px',
                                     borderRadius: '999px',
-                                    background: 'rgba(16, 185, 129, 0.15)',
-                                    color: '#10B981',
-                                    border: '1px solid rgba(16, 185, 129, 0.3)'
+                                    background: 'var(--success-subtle)',
+                                    color: 'var(--success-text)',
+                                    border: '1px solid var(--success-border)'
                                   }}
                                 >
                                   <CheckCircle2 size={11} /> Pedido verificado
@@ -1003,7 +1020,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                                     key={star}
                                     size={12}
                                     fill={star <= review.rating ? '#F59E0B' : 'none'}
-                                    color={star <= review.rating ? '#F59E0B' : '#475569'}
+                                    color={star <= review.rating ? '#F59E0B' : 'var(--neutral-border)'}
                                   />
                                 ))}
                               </div>
@@ -1021,9 +1038,9 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                             onClick={() => handleDeleteReview(review.id)}
                             title="Eliminar reseña"
                             style={{
-                              background: 'rgba(239, 68, 68, 0.12)',
-                              border: '1px solid rgba(239, 68, 68, 0.25)',
-                              color: '#F87171',
+                              background: 'var(--danger-subtle)',
+                              border: '1px solid var(--danger-border)',
+                              color: 'var(--danger-text)',
                               borderRadius: '8px',
                               padding: '5px 8px',
                               cursor: 'pointer',
@@ -1048,8 +1065,8 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                                 fontSize: '0.72rem',
                                 padding: '2px 8px',
                                 borderRadius: '999px',
-                                background: 'rgba(245, 158, 11, 0.12)',
-                                color: '#FBBF24',
+                                background: 'var(--primary-subtle)',
+                                color: 'var(--primary-dark)',
                                 fontWeight: 700
                               }}
                             >
@@ -1060,7 +1077,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                       )}
 
                       {review.comment && (
-                        <p style={{ margin: 0, fontSize: '0.88rem', color: '#E2E8F0', lineHeight: 1.5 }}>
+                        <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
                           {review.comment}
                         </p>
                       )}
@@ -1077,7 +1094,7 @@ export const RestaurantProfileModal: React.FC<RestaurantProfileModalProps> = ({
                               maxHeight: '130px',
                               borderRadius: '10px',
                               objectFit: 'cover',
-                              border: '1px solid rgba(255,255,255,0.14)',
+                              border: '1px solid var(--neutral-border)',
                               cursor: 'zoom-in'
                             }}
                           />

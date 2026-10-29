@@ -246,10 +246,10 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
       <div 
         className="directory-controls-card"
         style={{
-          background: 'var(--glass-medium)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '24px'
+          background: 'var(--neutral-surface)',
+          border: '1px solid var(--neutral-border)',
+          borderRadius: '24px',
+          boxShadow: 'var(--shadow-card)'
         }}
       >
         {/* Search Bar & View Mode Toggles */}
@@ -382,15 +382,15 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
           style={{
             textAlign: 'center',
             padding: '4rem 2rem',
-            background: 'var(--glass-light)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'var(--neutral-surface)',
+            border: '1px solid var(--neutral-border)',
             borderRadius: '24px',
-            color: 'var(--text-muted)'
+            color: 'var(--text-muted)',
+            boxShadow: 'var(--shadow-card)'
           }}
         >
           <div className="gf-spinner" style={{ margin: '0 auto 1rem', width: '36px', height: '36px', border: '3px solid var(--primary-glass-border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-          <h3 style={{ fontSize: '1.4rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
+          <h3 style={{ fontSize: '1.4rem', color: 'var(--text-main)', fontWeight: 900, marginBottom: '8px' }}>
             Cargando el directorio...
           </h3>
           <p style={{ fontSize: '0.92rem' }}>Explorando las mejores cocinas independientes para ti.</p>
@@ -400,23 +400,23 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
           style={{
             textAlign: 'center',
             padding: '4rem 2rem',
-            background: 'var(--glass-light)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
+            background: 'var(--neutral-surface)',
+            border: '1px solid var(--danger-border)',
             borderRadius: '24px',
-            color: 'var(--text-muted)'
+            color: 'var(--text-muted)',
+            boxShadow: 'var(--shadow-card)'
           }}
         >
           <X size={54} style={{ color: '#EF4444', margin: '0 auto 1rem' }} />
-          <h3 style={{ fontSize: '1.4rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>
+          <h3 style={{ fontSize: '1.4rem', color: 'var(--text-main)', fontWeight: 900, marginBottom: '8px' }}>
             No fue posible cargar los restaurantes
           </h3>
           <p style={{ fontSize: '0.92rem' }}>{catalogError}</p>
         </div>
       ) : cityTenants.length === 0 ? (
-        <div className="directory-empty-state" style={{ background: 'var(--glass-light)', borderColor: 'var(--primary-glass-border)', color: 'var(--text-muted)', padding: '3.5rem 2rem' }}>
+        <div className="directory-empty-state" style={{ background: 'var(--neutral-surface)', borderColor: 'var(--neutral-border)', color: 'var(--text-muted)', padding: '3.5rem 2rem' }}>
           <Store size={52} className="empty-icon" style={{ color: 'var(--primary)' }} />
-          <h3 style={{ color: 'white', marginTop: '1rem', fontWeight: 900 }}>
+          <h3 style={{ color: 'var(--text-main)', marginTop: '1rem', fontWeight: 900 }}>
             Aún no hay restaurantes registrados en {activeCity ? activeCity.name : 'esta ciudad'}
           </h3>
           <p style={{ maxWidth: '460px', margin: '0.5rem auto 1.5rem', lineHeight: 1.5 }}>
@@ -434,9 +434,9 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
           </button>
         </div>
       ) : filteredTenants.length === 0 ? (
-        <div className="directory-empty-state" style={{ background: 'var(--glass-light)', borderColor: 'rgba(255, 255, 255, 0.1)', color: 'var(--text-muted)' }}>
+        <div className="directory-empty-state" style={{ background: 'var(--neutral-surface)', borderColor: 'var(--neutral-border)', color: 'var(--text-muted)' }}>
           <Store size={48} className="empty-icon" style={{ color: 'var(--primary)' }} />
-          <h3 style={{ color: 'white', marginTop: '1rem' }}>No encontramos restaurantes con ese criterio</h3>
+          <h3 style={{ color: 'var(--text-main)', marginTop: '1rem' }}>No encontramos restaurantes con ese criterio</h3>
           <p>Intenta buscando con otro término o seleccionando la categoría "Todas".</p>
           <button
             className="btn btn-outline"
@@ -478,9 +478,8 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                 transition={{ duration: 0.25 }}
                 className={`tenant-card ${!tenant.isOpen ? 'tenant-closed' : ''}`}
                 style={{
-                  background: 'var(--glass-medium)',
-                  backdropFilter: 'blur(20px)',
-                  borderColor: 'rgba(255, 255, 255, 0.09)',
+                  background: 'var(--neutral-surface)',
+                  borderColor: 'var(--neutral-border)',
                   borderRadius: '24px'
                 }}
               >
@@ -548,7 +547,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                 <div className="tenant-card-body">
                   <div className="tenant-title-row">
                     <div>
-                      <h3 className="tenant-name" style={{ color: 'white', fontWeight: 900 }}>
+                      <h3 className="tenant-name" style={{ color: 'var(--text-main)', fontWeight: 900 }}>
                         {tenant.name}
                         <span title="Local Verificado"><CheckCircle2 size={16} className="verified-icon" /></span>
                       </h3>
@@ -562,9 +561,9 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                             <span style={{
                               fontSize: '0.7rem',
                               fontWeight: 700,
-                              color: '#FBBF24',
-                              background: 'rgba(245, 158, 11, 0.14)',
-                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              color: '#B45309',
+                              background: 'rgba(180, 83, 9, 0.10)',
+                              border: '1px solid rgba(180, 83, 9, 0.25)',
                               padding: '2px 8px',
                               borderRadius: '999px',
                               display: 'inline-flex',
@@ -642,7 +641,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                   {tenant.specialties && tenant.specialties.length > 0 && (
                     <div className="tenant-specialties-chips">
                       {tenant.specialties.map((spec, i) => (
-                        <span key={i} className="specialty-chip" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
+                        <span key={i} className="specialty-chip" style={{ background: 'var(--neutral-surface-alt)', color: 'var(--text-muted)', border: '1px solid var(--neutral-border)' }}>
                           {spec}
                         </span>
                       ))}
@@ -671,7 +670,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                     <button
                       type="button"
                       className="btn btn-outline tenant-btn-info"
-                      style={{ borderRadius: '12px', borderColor: 'rgba(245, 158, 11, 0.3)', color: '#FBBF24', gap: '5px', padding: '0 12px' }}
+                      style={{ borderRadius: '12px', borderColor: 'rgba(180, 83, 9, 0.3)', color: '#B45309', gap: '5px', padding: '0 12px' }}
                       onClick={() => {
                         setCurrentTenantBySlug(tenant.slug);
                         if (onOpenTenantProfile) {
@@ -689,7 +688,7 @@ export const RestaurantDirectory: React.FC<RestaurantDirectoryProps> = ({
                     <button
                       type="button"
                       className="btn btn-outline tenant-btn-info"
-                      style={{ borderRadius: '12px', borderColor: 'rgba(255,255,255,0.15)', color: 'white' }}
+                      style={{ borderRadius: '12px', borderColor: 'var(--neutral-border)', color: 'var(--text-main)' }}
                       onClick={() => {
                         if (onOpenTenantProfile) {
                           onOpenTenantProfile(tenant.id, 'info');

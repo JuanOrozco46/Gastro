@@ -55,7 +55,7 @@ export const PaymentStatus: React.FC<PaymentStatusProps> = ({
     
     if (!supabase) return;
 
-    // Luego suscribimos a futuros cambios
+    // Luego suscribimos a futuros cambios y activamos respaldo para reconexión móvil (Nequi / PSE / App Bancaria)
     const channel = supabase
       .channel(`payment_${paymentId}`)
       .on(
@@ -72,14 +72,36 @@ export const PaymentStatus: React.FC<PaymentStatusProps> = ({
           }
         }
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
+      .subscribe((subStatus) => {
+        if (subStatus === 'SUBSCRIBED') {
           console.log('✅ Suscrito a eventos de pago');
         }
       });
 
+    const handleVisibilityOrFocus = () => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        void fetchCurrentStatus();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleVisibilityOrFocus);
+      document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    }
+
+    const pollInterval = window.setInterval(() => {
+      if (isMounted) {
+        void fetchCurrentStatus();
+      }
+    }, 4000);
+
     return () => {
       isMounted = false;
+      window.clearInterval(pollInterval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleVisibilityOrFocus);
+        document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      }
       if (supabase && channel) {
         supabase.removeChannel(channel);
       }

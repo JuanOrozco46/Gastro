@@ -241,7 +241,7 @@ describe('GastroSync QA Hardening — Payment & Security Suite', () => {
     );
     assert.match(customerApp, /gs-rappi-address-trigger/);
     assert.match(customerApp, /gs-top-logout-btn/);
-    assert.match(customerApp, /<StoriesBar onOrderProduct=\{handleOrder\} \/>/);
+    assert.match(customerApp, /<StoriesBar[\s\S]*?onOrderProduct=\{handleOrder\}/);
 
     const headerTsx = fs.readFileSync(path.join(ROOT, 'src', 'components', 'Header.tsx'), 'utf8');
     assert.match(headerTsx, /userRole === 'login' \|\| userRole === 'client_delivery'/);

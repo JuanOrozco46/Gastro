@@ -261,11 +261,15 @@ serve(async (req) => {
 
     const { data: restaurantRow } = await supabaseAdmin
       .from('restaurants')
-      .select('commission_rate')
+      .select('commission_rate, wompi_merchant_id')
       .eq('id', order.restaurant_id)
       .single();
 
     const commissionRate = restaurantRow?.commission_rate ? Number(restaurantRow.commission_rate) : 0.03;
+    const wompiMerchantId =
+      typeof restaurantRow?.wompi_merchant_id === 'string' && restaurantRow.wompi_merchant_id.trim().length > 0
+        ? restaurantRow.wompi_merchant_id.trim()
+        : null;
 
     // 1. Comisión libre para GastroSync (3% exacto por defecto)
     const platformFee = Math.round(canonicalTotal * commissionRate);
@@ -304,17 +308,25 @@ serve(async (req) => {
 
     const allowSandboxSimulation = Deno.env.get('ALLOW_SANDBOX_SIMULATION') === 'true';
 
-    // Return ONLY public parameters to frontend
+    // Return ONLY public parameters to frontend (including Wompi Marketplace Split metadata when configured)
     return new Response(
       JSON.stringify({ 
         success: true, 
         paymentId: paymentRecord.id, 
         orderId: orderId,
+        restaurantId: order.restaurant_id,
+        wompiMerchantId: wompiMerchantId,
         providerReference: providerReference,
         amountInCents: amountInCents,
         currency: currency,
         publicKey: publicKey,
         signature: signature,
+        splitConfig: {
+          restaurantMerchantId: wompiMerchantId,
+          restaurantPayoutCents: Math.round(restaurantPayout * 100),
+          platformFeeCents: Math.round(platformFee * 100),
+          gatewayFeeCents: Math.round(gatewayFee * 100)
+        },
         ...(allowSandboxSimulation ? { sandboxUrl: `#sandbox-simulate:${providerReference}` } : {})
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }

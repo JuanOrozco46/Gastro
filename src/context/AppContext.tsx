@@ -1348,10 +1348,10 @@ const location = useLocationSlice();
     }
   };
 
-  const retryRemotePayment = async (orderId: string): Promise<{ success: boolean; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }> => {
+  const retryRemotePayment = async (orderId: string, deviceId?: string): Promise<{ success: boolean; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }> => {
     setIsSubmittingOrder(true);
     setOrderError(null);
-    const paymentRes = await createRemotePayment(orderId, 'wompi');
+    const paymentRes = await createRemotePayment(orderId, 'wompi', deviceId);
     setIsSubmittingOrder(false);
     if (!paymentRes.success) {
       setOrderError(paymentRes.error || 'No fue posible reintentar el pago remoto.');
@@ -1506,7 +1506,7 @@ const location = useLocationSlice();
 
       if (!paymentRes.success) {
         setOrderError(paymentRes.error || 'El pedido se creó, pero falló la inicialización del pago remoto.');
-        return { success: false };
+        return { success: false, isRemote: true, orderId: res.orderId };
       }
 
       clearCart();
@@ -2630,6 +2630,18 @@ const location = useLocationSlice();
       }
 
       const reviewerEmail = currentUser.email;
+
+      if (activatedTenantId && (targetApp.payoutAccountNumber || targetApp.wompiMerchantId)) {
+        await updateRemoteTenant(activatedTenantId, {
+          payoutBankName: targetApp.payoutBankName || 'Bancolombia',
+          payoutAccountType: targetApp.payoutAccountType || 'ahorros',
+          payoutAccountNumber: targetApp.payoutAccountNumber || '',
+          payoutAccountHolder: targetApp.payoutAccountHolder || targetApp.ownerName,
+          payoutDocumentType: targetApp.payoutDocumentType || 'NIT',
+          payoutDocumentNumber: targetApp.payoutDocumentNumber || '',
+          wompiMerchantId: targetApp.wompiMerchantId || undefined,
+        });
+      }
 
       setRestaurantApplications(prev => prev.map(app => {
         if (app.id === applicationId) {

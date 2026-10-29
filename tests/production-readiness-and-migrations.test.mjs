@@ -199,5 +199,47 @@ describe('GastroSync Production Readiness — Migrations 060/061, Dispatch & Fin
     assert.match(feedCode, /IntersectionObserver/, 'PostCard debe reproducir y pausar videos inline según visibilidad en viewport');
     assert.match(feedCode, /gf-ig-shop-tag/, 'PostCard debe incluir etiqueta flotante estilo Instagram Shopping');
     assert.match(feedCode, /gf-inline-comment-form/, 'PostCard debe permitir agregar comentario rápido inline');
+    assert.match(feedCode, /onOpenStory=\{setOpenStoryTenantId\}/, 'CustomerDeliveryApp debe conectar el anillo del post directamente al visor de historias');
+    assert.match(feedCode, /gf-feed-skeleton/, 'CustomerDeliveryApp debe usar esqueletos shimmer de feed durante la carga');
+
+    const storiesBarCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'StoriesBar.tsx'), 'utf8');
+    assert.match(storiesBarCode, /targetTenantStoryId/, 'StoriesBar debe soportar apertura dirigida de historias por restaurante');
+
+    const commentsCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'CommentsModal.tsx'), 'utf8');
+    assert.match(commentsCode, /gf-comment-reply-action/, 'CommentsModal debe permitir responder mencionando al usuario');
+    assert.match(commentsCode, /toggleCommentLike/, 'CommentsModal debe permitir dar me gusta a comentarios individuales');
+
+    const reviewsModalCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'RestaurantProfileModal.tsx'), 'utf8');
+    assert.match(reviewsModalCode, /var\(--neutral-surface\)/, 'RestaurantProfileModal debe usar tokens Warm Gastronomy en reseñas');
+    assert.match(reviewsModalCode, /gf-grid-card/, 'RestaurantProfileModal debe usar cuadrícula interactiva de publicaciones');
+  });
+
+  it('verifica blindaje Go-To-Market: reintento idempotente Wompi, reconexión móvil Nequi/PSE, variables CSS y PWA/SEO', () => {
+    const paymentModalCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'PaymentModal.tsx'), 'utf8');
+    assert.match(paymentModalCode, /createdRemoteOrderId/, 'PaymentModal debe conservar createdRemoteOrderId para evitar órdenes duplicadas');
+    assert.match(paymentModalCode, /lockedTenantId/, 'PaymentModal debe fijar lockedTenantId para no cambiar de restaurante al vaciar el carrito');
+
+    const paymentStatusCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'PaymentStatus.tsx'), 'utf8');
+    assert.match(paymentStatusCode, /visibilitychange/, 'PaymentStatus debe reconsultar al regresar de Nequi/App bancaria (visibilitychange)');
+
+    const cssCode = fs.readFileSync(path.join(ROOT, 'src', 'index.css'), 'utf8');
+    assert.match(cssCode, /--primary-dark:/, 'index.css debe declarar --primary-dark en :root');
+    assert.match(cssCode, /--success-subtle:/, 'index.css debe declarar --success-subtle en :root');
+    assert.match(cssCode, /--danger-subtle:/, 'index.css debe declarar --danger-subtle en :root');
+
+    const manifestRaw = fs.readFileSync(path.join(ROOT, 'public', 'site.webmanifest'), 'utf8');
+    assert.match(manifestRaw, /#FAF7F2/, 'site.webmanifest debe usar el color de fondo Warm Gastronomy (#FAF7F2)');
+    assert.ok(fs.existsSync(path.join(ROOT, 'public', 'robots.txt')), 'Debe existir public/robots.txt');
+    assert.ok(fs.existsSync(path.join(ROOT, 'public', 'sitemap.xml')), 'Debe existir public/sitemap.xml');
+
+    const partnerModalCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'PartnerApplicationModal.tsx'), 'utf8');
+    assert.match(partnerModalCode, /payoutAccountNumber/, 'PartnerApplicationModal debe solicitar cuenta bancaria o billetera de desembolso');
+    assert.match(partnerModalCode, /wompiMerchantId/, 'PartnerApplicationModal debe permitir ID de Comercio Wompi Split opcional');
+
+    const profileTabCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'RestaurantAdmin', 'ProfileTab.tsx'), 'utf8');
+    assert.match(profileTabCode, /payoutAccountNumber/, 'ProfileTab debe permitir editar y guardar la cuenta bancaria de desembolso');
+
+    const adminCode = fs.readFileSync(path.join(ROOT, 'src', 'components', 'RestaurantAdmin.tsx'), 'utf8');
+    assert.match(adminCode, /Configurar Cuenta de Desembolso/, 'RestaurantAdmin debe mostrar alerta directa cuando falte cuenta bancaria de desembolso');
   });
 });

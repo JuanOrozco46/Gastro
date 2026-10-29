@@ -17,8 +17,16 @@ function timingSafeEqualStrings(a: string, b: string): boolean {
 }
 
 // Helper: Calculate Wompi Event Checksum to validate webhook authenticity
-async function verifyWompiChecksum(payload: any, eventsSecret: string): Promise<boolean> {
-  if (!payload.signature || !payload.signature.properties || typeof payload.signature.checksum !== 'string') {
+async function verifyWompiChecksum(
+  payload: {
+    signature?: { properties?: string[]; checksum?: string };
+    data?: Record<string, unknown>;
+    timestamp?: string | number;
+    sent_at?: string | number;
+  },
+  eventsSecret: string
+): Promise<boolean> {
+  if (!payload.signature || !Array.isArray(payload.signature.properties) || typeof payload.signature.checksum !== 'string') {
     return false;
   }
   try {
@@ -27,9 +35,13 @@ async function verifyWompiChecksum(payload: any, eventsSecret: string): Promise<
     
     for (const propPath of props) {
       const parts = propPath.split('.');
-      let val: any = payload.data;
+      let val: unknown = payload.data;
       for (const part of parts) {
-        val = val?.[part];
+        if (val && typeof val === 'object' && part in (val as Record<string, unknown>)) {
+          val = (val as Record<string, unknown>)[part];
+        } else {
+          val = undefined;
+        }
       }
       concatenated += String(val ?? '');
     }

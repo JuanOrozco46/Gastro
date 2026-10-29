@@ -180,6 +180,13 @@ export interface RestaurantApplication {
   termsAcceptedAt?: number;
   termsVersion?: string;
   notes?: string;
+  payoutBankName?: string;
+  payoutAccountType?: string;
+  payoutAccountNumber?: string;
+  payoutAccountHolder?: string;
+  payoutDocumentType?: string;
+  payoutDocumentNumber?: string;
+  wompiMerchantId?: string;
   reviewedAt?: number;
   reviewedByEmail?: string;
   reviewNote?: string;

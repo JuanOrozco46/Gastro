@@ -4,7 +4,9 @@
   /* GastroSync — Warm Gastronomy Identity */
   --primary: #C85A38;
   --primary-hover: #A84830;
+  --primary-dark: #A84424;
   --primary-light: rgba(200, 90, 56, 0.10);
+  --primary-subtle: rgba(200, 90, 56, 0.10);
   --primary-border: rgba(200, 90, 56, 0.30);
   --primary-glass: rgba(200, 90, 56, 0.12);
   --primary-glass-border: rgba(200, 90, 56, 0.20);
@@ -14,12 +16,18 @@
   --secondary: #6B8C6A;
   --secondary-hover: #547053;
   --secondary-light: rgba(107, 140, 106, 0.12);
+  --success-subtle: rgba(46, 125, 91, 0.10);
+  --success-text: #1E5E41;
+  --success-border: rgba(46, 125, 91, 0.28);
 
   --tertiary: #8B6F47;
   --tertiary-light: rgba(139, 111, 71, 0.1);
 
   --danger: #B91C1C;
   --danger-light: rgba(185, 28, 28, 0.08);
+  --danger-subtle: rgba(196, 59, 59, 0.10);
+  --danger-border: rgba(196, 59, 59, 0.28);
+  --danger-text: #9E2A2B;
   --warning: #B45309;
   --warning-light: rgba(180, 83, 9, 0.10);
 
@@ -6462,6 +6470,34 @@ input:focus, select:focus, textarea:focus {
   gap: 4px;
   cursor: pointer;
   padding-top: 8px;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.gf-comment-like-btn.is-liked {
+  color: var(--primary);
+  transform: scale(1.05);
+}
+
+.gf-comment-footer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 5px;
+}
+
+.gf-comment-reply-action {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.gf-comment-reply-action:hover {
+  color: var(--primary-dark);
 }
 
 .gf-comments-footer-wrap {
@@ -6745,48 +6781,84 @@ input:focus, select:focus, textarea:focus {
 
 .gf-profile-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+@media (min-width: 640px) {
+  .gf-profile-grid {
+    gap: 8px;
+  }
 }
 
 .gf-grid-card {
   position: relative;
-  height: 220px;
-  border-radius: var(--radius-sm);
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  border-radius: var(--radius-xs);
   overflow: hidden;
   border: 1px solid var(--neutral-border);
+  background: var(--neutral-surface-alt);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.gf-grid-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
 
 .gf-grid-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.gf-grid-card:hover .gf-grid-img {
+  transform: scale(1.04);
 }
 
 .gf-grid-video-badge {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(20, 17, 15, 0.75);
+  top: 6px;
+  right: 6px;
+  background: rgba(20, 17, 15, 0.72);
   color: #FAF7F2;
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-weight: 800;
-  padding: 3px 6px;
+  padding: 3px 5px;
   border-radius: var(--radius-xs);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
+  backdrop-filter: blur(4px);
+  z-index: 2;
 }
 
 .gf-grid-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(20, 17, 15, 0.88) 0%, transparent 62%);
+  background: linear-gradient(to top, rgba(20, 17, 15, 0.88) 0%, rgba(20, 17, 15, 0.35) 60%, transparent 100%);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 10px;
+  padding: 6px;
+  opacity: 1;
+  transition: opacity 0.18s ease;
+  z-index: 1;
+}
+
+@media (min-width: 640px) {
+  .gf-grid-overlay {
+    opacity: 0;
+    padding: 10px;
+  }
+  .gf-grid-card:hover .gf-grid-overlay {
+    opacity: 1;
+  }
 }
 
 .gf-grid-title {
@@ -12869,6 +12941,128 @@ body {
   .gf-tab-pill,
   .gf-filter-chip {
     min-height: 44px;
+  }
+}
+
+/* ── Instagram-Style Feed Loading Skeletons ── */
+.gf-feed-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.gf-skeleton-post-card {
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+  background: var(--neutral-surface);
+  border: 1px solid var(--neutral-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 680px) {
+  .gf-skeleton-post-card {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+}
+
+.gf-skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.gf-skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.gf-skeleton-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.gf-skeleton-line {
+  height: 10px;
+  border-radius: 6px;
+}
+
+.gf-skeleton-line.tiny {
+  width: 35%;
+  height: 8px;
+}
+
+.gf-skeleton-line.short {
+  width: 55%;
+}
+
+.gf-skeleton-line.medium {
+  width: 75%;
+}
+
+.gf-skeleton-line.long {
+  width: 90%;
+}
+
+.gf-skeleton-media {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+}
+
+.gf-skeleton-footer {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gf-skeleton-actions-row {
+  display: flex;
+  gap: 14px;
+}
+
+.gf-skeleton-action {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.gf-shimmer-pulse {
+  background: linear-gradient(
+    90deg,
+    var(--neutral-surface-alt) 0%,
+    var(--neutral-border) 50%,
+    var(--neutral-surface-alt) 100%
+  );
+  background-size: 200% 100%;
+  animation: gfShimmerPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes gfShimmerPulse {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gf-shimmer-pulse {
+    animation: none;
+    background: var(--neutral-surface-alt);
   }
 }
 

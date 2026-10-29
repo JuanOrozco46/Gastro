@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { openLegalCenter } from '../utils/legalNavigation';
 import { useApp } from '../context/useApp';
 import { motion } from 'framer-motion';
-import { X, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck, Upload, Image, Clock, FileText, AlertCircle, Lock, Eye, EyeOff, Store, Sparkles, Check, ShoppingBag, Bike, QrCode } from 'lucide-react';
+import { X, CheckCircle2, MapPin, Phone, Mail, User, ShieldCheck, Upload, Image, Clock, FileText, AlertCircle, Lock, Eye, EyeOff, Store, Sparkles, Check, ShoppingBag, Bike, QrCode, Landmark } from 'lucide-react';
 import type { OrderFulfillment } from '../types';
 import { PLATFORM_COMMISSION_RATE, ensureColombiaCityAndZone } from '../services/supabaseDataService';
 import {
@@ -93,6 +93,15 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
   const [deliveryRadiusKm, setDeliveryRadiusKm] = useState('');
   const [notes, setNotes] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
+
+  // Payout / Bank dispersion & Wompi Split fields
+  const [payoutBankName, setPayoutBankName] = useState('Bancolombia');
+  const [payoutAccountType, setPayoutAccountType] = useState('ahorros');
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
+  const [payoutAccountHolder, setPayoutAccountHolder] = useState('');
+  const [payoutDocumentType, setPayoutDocumentType] = useState('NIT');
+  const [payoutDocumentNumber, setPayoutDocumentNumber] = useState('');
+  const [wompiMerchantId, setWompiMerchantId] = useState('');
 
   // States para compresión
   const [logoCompression, setLogoCompression] = useState<{ original: number, final: number } | null>(null);
@@ -277,6 +286,21 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     setAccountNotice(null);
     if (!validate()) return;
 
+    const payoutErrors: Record<string, string> = {};
+    if (!payoutAccountNumber.trim()) {
+      payoutErrors.payoutAccountNumber = 'Ingresa el número de cuenta, celular (Nequi/Daviplata) o Llave Bre-B donde recibirás tus ventas.';
+    }
+    if (!payoutAccountHolder.trim()) {
+      payoutErrors.payoutAccountHolder = 'Ingresa el nombre del titular o razón social de la cuenta.';
+    }
+    if (!payoutDocumentNumber.trim()) {
+      payoutErrors.payoutDocumentNumber = 'Ingresa el NIT o cédula del titular de la cuenta.';
+    }
+    if (Object.keys(payoutErrors).length > 0) {
+      setErrors(prev => ({ ...prev, ...payoutErrors }));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       let resolvedCityId = effectiveCityId;
@@ -320,6 +344,13 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
         deliveryFee: deliveryModes.includes('restaurant_delivery') && deliveryFee !== '' ? Number(deliveryFee) : undefined,
         deliveryRadiusKm: deliveryModes.includes('restaurant_delivery') && deliveryRadiusKm !== '' ? Number(deliveryRadiusKm) : undefined,
         notes: notes.trim() || undefined,
+        payoutBankName,
+        payoutAccountType,
+        payoutAccountNumber: payoutAccountNumber.trim(),
+        payoutAccountHolder: payoutAccountHolder.trim(),
+        payoutDocumentType,
+        payoutDocumentNumber: payoutDocumentNumber.trim(),
+        wompiMerchantId: wompiMerchantId.trim() || undefined,
         commissionRateAccepted: termsAccepted ? PLATFORM_COMMISSION_RATE : undefined,
         termsVersion: '2026-10'
       }, { logo: logoFile, banner: bannerFile });
@@ -383,6 +414,13 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     setDeliveryFee('');
     setDeliveryRadiusKm('');
     setNotes('');
+    setPayoutBankName('Bancolombia');
+    setPayoutAccountType('ahorros');
+    setPayoutAccountNumber('');
+    setPayoutAccountHolder('');
+    setPayoutDocumentType('NIT');
+    setPayoutDocumentNumber('');
+    setWompiMerchantId('');
     setTermsAccepted(false);
     setLogoCompression(null);
     setBannerCompression(null);
@@ -408,6 +446,9 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     isCustomZone ? !!customZoneName.trim() : !!effectiveZoneId,
     !!address.trim(),
     deliveryModes.length > 0,
+    !!payoutAccountNumber.trim(),
+    !!payoutAccountHolder.trim(),
+    !!payoutDocumentNumber.trim(),
     termsAccepted,
   ];
   const completed = requiredChecks.filter(Boolean).length;
@@ -420,6 +461,7 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
     (isCustomCity ? !!customCityName.trim() : !!effectiveCityId) &&
     (isCustomZone ? !!customZoneName.trim() : !!effectiveZoneId) &&
     !!address.trim();
+  const payoutDone = Boolean(payoutAccountNumber.trim() && payoutAccountHolder.trim() && payoutDocumentNumber.trim());
 
   const stepOffset = authMode === 'remote' ? 1 : 0;
 
@@ -892,6 +934,144 @@ export const PartnerApplicationModal: React.FC<PartnerApplicationModalProps> = (
                     <label htmlFor="notes">Notas adicionales <span className="pam-opt">Opcional</span></label>
                     <textarea id="notes" rows={2} placeholder="Cuéntanos sobre tu carta, especialidades o inquietudes..."
                       value={notes} onChange={e => setNotes(e.target.value)} className="pam-input no-icon" />
+                  </div>
+                </div>
+              </section>
+
+              {/* 7. Cuenta Bancaria o Billetera para Recibir tus Pagos */}
+              <section className="pam-section">
+                <SectionHead
+                  step={6 + stepOffset}
+                  title="Cuenta bancaria o billetera para recibir tus ventas"
+                  desc="Aquí recibirás automáticamente el desembolso neto de tus ventas digitales en Colombia."
+                  done={payoutDone}
+                />
+                <div className="pam-grid">
+                  <div className="pam-field">
+                    <label htmlFor="payoutBankName">Entidad bancaria o billetera <em>*</em></label>
+                    <div className="pam-input-wrap">
+                      <Landmark size={16} className="pam-icon" />
+                      <select
+                        id="payoutBankName"
+                        value={payoutBankName}
+                        onChange={e => setPayoutBankName(e.target.value)}
+                        className="pam-input"
+                      >
+                        <option value="Bancolombia">Bancolombia</option>
+                        <option value="Nequi">Nequi</option>
+                        <option value="Daviplata">Daviplata</option>
+                        <option value="Llave Bre-B">Llave Bre-B (Banco de la República)</option>
+                        <option value="Davivienda">Davivienda</option>
+                        <option value="Banco de Bogotá">Banco de Bogotá</option>
+                        <option value="BBVA Colombia">BBVA Colombia</option>
+                        <option value="Scotiabank Colpatria">Scotiabank Colpatria</option>
+                        <option value="Banco de Occidente">Banco de Occidente</option>
+                        <option value="Lulo Bank">Lulo Bank</option>
+                        <option value="Nu Colombia">Nu Colombia</option>
+                        <option value="RappiPay">RappiPay</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pam-field">
+                    <label htmlFor="payoutAccountType">Tipo de producto <em>*</em></label>
+                    <div className="pam-input-wrap">
+                      <Landmark size={16} className="pam-icon" />
+                      <select
+                        id="payoutAccountType"
+                        value={payoutAccountType}
+                        onChange={e => setPayoutAccountType(e.target.value)}
+                        className="pam-input"
+                      >
+                        <option value="ahorros">Cuenta de Ahorros</option>
+                        <option value="corriente">Cuenta Corriente</option>
+                        <option value="billetera_digital">Billetera Digital (Nequi / Daviplata)</option>
+                        <option value="llave_breb">Llave Bre-B (Inmediata)</option>
+                        <option value="wompi_split">Dispersión Automática Wompi Split</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pam-field">
+                    <label htmlFor="payoutAccountNumber">Número de cuenta / Celular / Llave Bre-B <em>*</em></label>
+                    <div className="pam-input-wrap">
+                      <Landmark size={16} className="pam-icon" />
+                      <input
+                        id="payoutAccountNumber"
+                        type="text"
+                        placeholder="Ej: 3145550199 o 40291827364"
+                        value={payoutAccountNumber}
+                        onChange={e => { setPayoutAccountNumber(e.target.value); clearFieldError('payoutAccountNumber'); }}
+                        aria-invalid={!!errors.payoutAccountNumber}
+                        aria-describedby={errors.payoutAccountNumber ? 'payoutAccountNumber-error' : undefined}
+                        className={inputCls('payoutAccountNumber')}
+                      />
+                    </div>
+                    <FieldError name="payoutAccountNumber" error={errors.payoutAccountNumber} />
+                  </div>
+
+                  <div className="pam-field">
+                    <label htmlFor="payoutAccountHolder">Nombre del titular o razón social <em>*</em></label>
+                    <div className="pam-input-wrap">
+                      <User size={16} className="pam-icon" />
+                      <input
+                        id="payoutAccountHolder"
+                        type="text"
+                        placeholder="Ej: Inversiones Gastronómicas S.A.S."
+                        value={payoutAccountHolder}
+                        onChange={e => { setPayoutAccountHolder(e.target.value); clearFieldError('payoutAccountHolder'); }}
+                        aria-invalid={!!errors.payoutAccountHolder}
+                        aria-describedby={errors.payoutAccountHolder ? 'payoutAccountHolder-error' : undefined}
+                        className={inputCls('payoutAccountHolder')}
+                      />
+                    </div>
+                    <FieldError name="payoutAccountHolder" error={errors.payoutAccountHolder} />
+                  </div>
+
+                  <div className="pam-field">
+                    <label htmlFor="payoutDocumentNumber">Documento del titular (NIT / CC) <em>*</em></label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select
+                        aria-label="Tipo de documento del titular"
+                        value={payoutDocumentType}
+                        onChange={e => setPayoutDocumentType(e.target.value)}
+                        className="pam-input no-icon"
+                        style={{ width: '92px', flexShrink: 0 }}
+                      >
+                        <option value="NIT">NIT</option>
+                        <option value="CC">CC</option>
+                        <option value="CE">CE</option>
+                      </select>
+                      <input
+                        id="payoutDocumentNumber"
+                        type="text"
+                        placeholder="Ej: 901.442.881-2"
+                        value={payoutDocumentNumber}
+                        onChange={e => { setPayoutDocumentNumber(e.target.value); clearFieldError('payoutDocumentNumber'); }}
+                        aria-invalid={!!errors.payoutDocumentNumber}
+                        aria-describedby={errors.payoutDocumentNumber ? 'payoutDocumentNumber-error' : undefined}
+                        className={inputCls('payoutDocumentNumber', 'no-icon')}
+                      />
+                    </div>
+                    <FieldError name="payoutDocumentNumber" error={errors.payoutDocumentNumber} />
+                  </div>
+
+                  <div className="pam-field">
+                    <label htmlFor="wompiMerchantId">
+                      ID Comercio Wompi Split <span className="pam-opt">Opcional</span>
+                    </label>
+                    <div className="pam-input-wrap">
+                      <ShieldCheck size={16} className="pam-icon" />
+                      <input
+                        id="wompiMerchantId"
+                        type="text"
+                        placeholder="pub_prod_xxxxxxxxxxxx (si ya tienes cuenta Wompi)"
+                        value={wompiMerchantId}
+                        onChange={e => setWompiMerchantId(e.target.value)}
+                        className="pam-input"
+                      />
+                    </div>
+                    <span className="pam-hint">Si no tienes cuenta Wompi propia, dispersamos directamente a tu banco o Nequi.</span>
                   </div>
                 </div>
               </section>

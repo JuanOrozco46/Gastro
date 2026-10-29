@@ -513,6 +513,41 @@ export const RestaurantAdmin: React.FC = () => {
         })}
       </nav>
 
+      {/* ── ALERTA DE CUENTA BANCARIA DE DESEMBOLSO PENDIENTE ── */}
+      {!operatingTenant.payoutAccountNumber && (
+        <div
+          role="status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+            padding: '12px 16px',
+            marginBottom: '1rem',
+            borderRadius: '14px',
+            background: 'rgba(217, 119, 6, 0.1)',
+            border: '1px solid rgba(217, 119, 6, 0.35)',
+            color: 'var(--text-main)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.84rem' }}>
+            <AlertCircle size={18} style={{ color: '#D97706', flexShrink: 0 }} />
+            <span>
+              <strong>Cuenta bancaria de desembolso pendiente:</strong> Configura tu banco, Nequi, Daviplata o Llave Bre-B para recibir las transferencias de tus ventas digitales (97% neto).
+            </span>
+          </div>
+          <button
+            type="button"
+            className="pam-btn-primary"
+            style={{ padding: '7px 14px', fontSize: '0.78rem', borderRadius: '10px' }}
+            onClick={() => setActiveTab('profile')}
+          >
+            Configurar Cuenta de Desembolso
+          </button>
+        </div>
+      )}
+
       <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={activeTab}

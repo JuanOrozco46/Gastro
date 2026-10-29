@@ -42,8 +42,11 @@ interface PaymentModalProps {
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, orderType = 'pickup', prefilledTableId, prefilledTableToken, entryPoint }) => {
-  const { cart, cities, zones, selectedCityId, setSelectedCity, tenants, currentTenant: contextTenant, currentUser, submitOrderWithPayment, retryRemotePayment, updateUserProfile, authMode, isSubmittingOrder, orderError } = useApp();
-  const currentTenant = (cart[0]?.product?.tenantId ? tenants.find(t => t.id === cart[0].product.tenantId) : undefined) || contextTenant;
+  const { cart, clearCart, cities, zones, selectedCityId, setSelectedCity, tenants, currentTenant: contextTenant, currentUser, submitOrderWithPayment, retryRemotePayment, updateUserProfile, authMode, isSubmittingOrder, orderError } = useApp();
+  const [lockedTenantId, setLockedTenantId] = useState<string | null>(() => cart[0]?.product?.tenantId || null);
+  const [createdRemoteOrderId, setCreatedRemoteOrderId] = useState<string | null>(null);
+  const activeTenantId = cart[0]?.product?.tenantId || lockedTenantId;
+  const currentTenant = (activeTenantId ? tenants.find(t => t.id === activeTenantId) : undefined) || contextTenant;
   const tenantCityName = cities.find(c => c.id === currentTenant.cityId)?.name || 'Colombia';
   const tenantZoneName = zones.find(z => z.id === currentTenant.zoneId)?.name;
   const userSelectedCityName = cities.find(c => c.id === selectedCityId)?.name;
@@ -153,6 +156,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       setFormError(null);
       setSuccess(false);
       setConfirmCrossCity(false);
+      setCreatedRemoteOrderId(null);
+      if (cart[0]?.product?.tenantId) {
+        setLockedTenantId(cart[0].product.tenantId);
+      }
       setFulfillment(initialMode);
       if (currentUser?.name) setCustomerName(currentUser.name);
       if (currentUser?.phone) setCustomerPhone(currentUser.phone);
@@ -194,7 +201,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
       return;
     }
 
-    if (cart.length === 0) {
+    if (cart.length === 0 && !createdRemoteOrderId) {
       setFormError('El carrito está vacío.');
       return;
     }
@@ -338,20 +345,42 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, ord
     let successResult = false;
 
     if (authMode === 'remote') {
-      const res = await submitOrderWithPayment(checkoutDetails, method);
-      if (res.success && res.orderId && res.paymentId) {
-        if (res.wompiConfig) {
-          setWompiConfig(res.wompiConfig as WompiCheckoutConfig);
-        } else {
-          setPendingPaymentInfo({
-            orderId: res.orderId,
-            paymentId: res.paymentId,
-            sandboxUrl: res.sandboxUrl
-          });
+      setLockedTenantId(currentTenant.id);
+      if (createdRemoteOrderId && method !== 'cash') {
+        const retryRes = await retryRemotePayment(createdRemoteOrderId, checkoutDetails.deviceId);
+        if (retryRes.success && retryRes.paymentId) {
+          clearCart();
+          if (retryRes.wompiConfig) {
+            setWompiConfig(retryRes.wompiConfig as WompiCheckoutConfig);
+          } else {
+            setPendingPaymentInfo({
+              orderId: createdRemoteOrderId,
+              paymentId: retryRes.paymentId,
+              sandboxUrl: retryRes.sandboxUrl
+            });
+          }
+          return;
         }
-        return;
+        successResult = false;
+      } else {
+        const res = await submitOrderWithPayment(checkoutDetails, method);
+        if (res.orderId) {
+          setCreatedRemoteOrderId(res.orderId);
+        }
+        if (res.success && res.orderId && res.paymentId) {
+          if (res.wompiConfig) {
+            setWompiConfig(res.wompiConfig as WompiCheckoutConfig);
+          } else {
+            setPendingPaymentInfo({
+              orderId: res.orderId,
+              paymentId: res.paymentId,
+              sandboxUrl: res.sandboxUrl
+            });
+          }
+          return;
+        }
+        successResult = res.success;
       }
-      successResult = res.success;
     } else {
       setLoading(true);
       const transaction = await PaymentSimulatorService.processPayment({

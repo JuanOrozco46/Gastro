@@ -799,6 +799,21 @@ export async function submitLiveApplication(
 
     const newId = crypto.randomUUID();
     const normalizedEmail = appData.ownerEmail.trim().toLowerCase();
+
+    const payoutMetaPayload = appData.payoutAccountNumber
+      ? `[PAYOUT_META:${JSON.stringify({
+          b: appData.payoutBankName || 'Bancolombia',
+          t: appData.payoutAccountType || 'ahorros',
+          n: appData.payoutAccountNumber.trim(),
+          h: appData.payoutAccountHolder?.trim() || '',
+          dt: appData.payoutDocumentType || 'NIT',
+          dn: appData.payoutDocumentNumber?.trim() || '',
+          w: appData.wompiMerchantId?.trim() || undefined,
+        })}]`
+      : '';
+    const serializedNotes =
+      [appData.notes?.trim(), payoutMetaPayload].filter(Boolean).join('\n').slice(0, 980) || undefined;
+
     // Los visitantes anónimos NO pueden leer la tabla (RLS), por eso no se usa .select():
     // la unicidad de pendientes la garantizan los índices únicos parciales de la migración 022.
     const { error } = await supabase.from('restaurant_applications').insert([{
@@ -821,7 +836,7 @@ export async function submitLiveApplication(
       schedule_hours: appData.scheduleHours,
       logo_url: appData.logoUrl || null,
       banner_url: appData.bannerUrl || null,
-      notes: appData.notes,
+      notes: serializedNotes,
       commission_rate_accepted: appData.commissionRateAccepted,
       terms_version: appData.termsVersion,
       status: 'submitted'
@@ -868,6 +883,13 @@ export async function submitLiveApplication(
         logoUrl: appData.logoUrl,
         bannerUrl: appData.bannerUrl,
         notes: appData.notes,
+        payoutBankName: appData.payoutBankName,
+        payoutAccountType: appData.payoutAccountType,
+        payoutAccountNumber: appData.payoutAccountNumber,
+        payoutAccountHolder: appData.payoutAccountHolder,
+        payoutDocumentType: appData.payoutDocumentType,
+        payoutDocumentNumber: appData.payoutDocumentNumber,
+        wompiMerchantId: appData.wompiMerchantId,
         commissionRateAccepted: appData.commissionRateAccepted,
         termsVersion: appData.termsVersion,
         status: 'submitted',
@@ -902,37 +924,66 @@ export async function fetchLiveApplications(): Promise<RestaurantApplication[]> 
       return signed?.signedUrl;
     };
 
-    return await Promise.all(data.map(async (app: Record<string, unknown>): Promise<RestaurantApplication> => ({
-      id: app.id as string,
-      ownerName: app.owner_name as string,
-      ownerEmail: app.owner_email as string,
-      ownerPhone: app.owner_phone as string,
-      restaurantName: app.restaurant_name as string,
-      category: app.category as string,
-      cityId: app.city_id as string,
-      zoneId: app.zone_id as string,
-      address: app.address as string,
-      description: (app.description as string | null) ?? undefined,
-      whatsapp: app.whatsapp as string | undefined,
-      minOrder: app.min_order as number | undefined,
-      deliveryModes: app.delivery_modes as OrderFulfillment[],
-      deliveryFee: app.delivery_fee as number | undefined,
-      deliveryRadiusKm: app.delivery_radius_km as number | undefined,
-      estimatedDeliveryMinutes: (app.estimated_delivery_minutes as number | null) ?? undefined,
-      scheduleHours: (app.schedule_hours as string | null) ?? undefined,
-      logoUrl: ((app.logo_url as string | null) || undefined) ?? await signPath(app.logo_path),
-      bannerUrl: ((app.banner_url as string | null) || undefined) ?? await signPath(app.banner_path),
-      commissionRateAccepted: app.commission_rate_accepted !== null && app.commission_rate_accepted !== undefined ? Number(app.commission_rate_accepted) : undefined,
-      termsAcceptedAt: app.terms_accepted_at ? new Date(app.terms_accepted_at as string).getTime() : undefined,
-      termsVersion: (app.terms_version as string | null) ?? undefined,
-      notes: app.notes as string | undefined,
-      status: app.status as RestaurantApplication['status'],
-      submittedAt: new Date(app.created_at as string).getTime(),
-      reviewedAt: app.reviewed_at ? new Date(app.reviewed_at as string).getTime() : undefined,
-      reviewNote: app.review_note as string | undefined,
-      activatedAt: app.activated_at ? new Date(app.activated_at as string).getTime() : undefined,
-      activatedTenantId: app.activated_restaurant_id as string | undefined,
-    })));
+    return await Promise.all(data.map(async (app: Record<string, unknown>): Promise<RestaurantApplication> => {
+      const rawNotes = typeof app.notes === 'string' ? app.notes : '';
+      const payoutMatch = rawNotes.match(/\[PAYOUT_META:(\{.*?\})\]/);
+      let parsedPayout: {
+        b?: string;
+        t?: string;
+        n?: string;
+        h?: string;
+        dt?: string;
+        dn?: string;
+        w?: string;
+      } = {};
+      if (payoutMatch?.[1]) {
+        try {
+          parsedPayout = JSON.parse(payoutMatch[1]) as typeof parsedPayout;
+        } catch {
+          /* ignore malformed JSON */
+        }
+      }
+      const cleanNotes = rawNotes.replace(/\n?\[PAYOUT_META:\{.*?\}\]/g, '').trim() || undefined;
+
+      return {
+        id: app.id as string,
+        ownerName: app.owner_name as string,
+        ownerEmail: app.owner_email as string,
+        ownerPhone: app.owner_phone as string,
+        restaurantName: app.restaurant_name as string,
+        category: app.category as string,
+        cityId: app.city_id as string,
+        zoneId: app.zone_id as string,
+        address: app.address as string,
+        description: (app.description as string | null) ?? undefined,
+        whatsapp: app.whatsapp as string | undefined,
+        minOrder: app.min_order as number | undefined,
+        deliveryModes: app.delivery_modes as OrderFulfillment[],
+        deliveryFee: app.delivery_fee as number | undefined,
+        deliveryRadiusKm: app.delivery_radius_km as number | undefined,
+        estimatedDeliveryMinutes: (app.estimated_delivery_minutes as number | null) ?? undefined,
+        scheduleHours: (app.schedule_hours as string | null) ?? undefined,
+        logoUrl: ((app.logo_url as string | null) || undefined) ?? await signPath(app.logo_path),
+        bannerUrl: ((app.banner_url as string | null) || undefined) ?? await signPath(app.banner_path),
+        commissionRateAccepted: app.commission_rate_accepted !== null && app.commission_rate_accepted !== undefined ? Number(app.commission_rate_accepted) : undefined,
+        termsAcceptedAt: app.terms_accepted_at ? new Date(app.terms_accepted_at as string).getTime() : undefined,
+        termsVersion: (app.terms_version as string | null) ?? undefined,
+        notes: cleanNotes,
+        payoutBankName: (app.payout_bank_name as string | null) || parsedPayout.b || undefined,
+        payoutAccountType: (app.payout_account_type as string | null) || parsedPayout.t || undefined,
+        payoutAccountNumber: (app.payout_account_number as string | null) || parsedPayout.n || undefined,
+        payoutAccountHolder: (app.payout_account_holder as string | null) || parsedPayout.h || undefined,
+        payoutDocumentType: (app.payout_document_type as string | null) || parsedPayout.dt || undefined,
+        payoutDocumentNumber: (app.payout_document_number as string | null) || parsedPayout.dn || undefined,
+        wompiMerchantId: (app.wompi_merchant_id as string | null) || parsedPayout.w || undefined,
+        status: app.status as RestaurantApplication['status'],
+        submittedAt: new Date(app.created_at as string).getTime(),
+        reviewedAt: app.reviewed_at ? new Date(app.reviewed_at as string).getTime() : undefined,
+        reviewNote: app.review_note as string | undefined,
+        activatedAt: app.activated_at ? new Date(app.activated_at as string).getTime() : undefined,
+        activatedTenantId: app.activated_restaurant_id as string | undefined,
+      };
+    }));
   } catch (err: unknown) {
     console.warn('⚠️ Excepción al consultar aplicaciones en Supabase:', err);
     reportDataError('solicitudes', 'No se pudieron cargar las solicitudes de restaurantes.');

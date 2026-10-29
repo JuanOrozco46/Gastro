@@ -566,7 +566,7 @@ const SuperAdminViewContent: React.FC = () => {
               ADMINISTRACIÓN DE PLATAFORMA GASTROSYNC
             </span>
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'white', margin: 0 }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
             🛡️ Panel de Control del Administrador de Plataforma
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: '4px', margin: 0 }}>
@@ -579,10 +579,10 @@ const SuperAdminViewContent: React.FC = () => {
           className="superadmin-tabs-bar"
           style={{
             display: 'flex',
-            background: 'rgba(255,255,255,0.05)',
+            background: 'var(--neutral-surface)',
             padding: '4px',
             borderRadius: '14px',
-            border: '1px solid rgba(255,255,255,0.1)',
+            border: '1px solid var(--neutral-border)',
             overflowX: 'auto',
             maxWidth: '100%'
           }}
@@ -633,7 +633,7 @@ const SuperAdminViewContent: React.FC = () => {
           {/* City Filter & Quick National City/Zone Creator */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <label htmlFor="admin-city-filter" style={{ fontSize: '0.8rem', fontWeight: 800, color: 'white' }}>
+              <label htmlFor="admin-city-filter" style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)' }}>
                 <MapPin size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
                 Filtrar por ciudad ({cities.filter(c => c.isActive).length} activas):
               </label>
@@ -895,6 +895,32 @@ const SuperAdminViewContent: React.FC = () => {
                           )}
                         </div>
 
+                        {/* Payout & Bank Dispersion Info */}
+                        {app.payoutAccountNumber && (
+                          <div style={{ background: 'rgba(16, 185, 129, 0.06)', padding: '12px 14px', borderRadius: '14px', border: '1px solid rgba(16, 185, 129, 0.22)' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10B981', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                              🏦 Cuenta de Dispersión (97%)
+                            </span>
+                            <div style={{ fontSize: '0.84rem', color: 'white', fontWeight: 800, marginBottom: '2px' }}>
+                              {app.payoutBankName || 'Bancolombia'} · {app.payoutAccountType || 'ahorros'}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              Cuenta/Llave: <code style={{ color: 'white', fontWeight: 700 }}>{app.payoutAccountNumber}</code>
+                            </div>
+                            {app.payoutAccountHolder && (
+                              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                Titular: <strong style={{ color: 'white' }}>{app.payoutAccountHolder}</strong>{' '}
+                                {app.payoutDocumentNumber ? `(${app.payoutDocumentType || 'NIT'} ${app.payoutDocumentNumber})` : ''}
+                              </div>
+                            )}
+                            {app.wompiMerchantId && (
+                              <div style={{ fontSize: '0.74rem', color: '#10B981', marginTop: '4px', fontWeight: 700 }}>
+                                ⚡ Wompi Split ID: <code>{app.wompiMerchantId}</code>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                       </div>
 
                       {/* Extended Business Profile */}
@@ -1073,7 +1099,7 @@ const SuperAdminViewContent: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Ventas Brutas Red ({computedNetworkSettlements.length} locales)</div>
-                <strong style={{ fontSize: '1.3rem', color: 'white' }}>{formatCopOrZero(networkGrossSales)}</strong>
+                <strong style={{ fontSize: '1.3rem', color: 'var(--text-main)' }}>{formatCopOrZero(networkGrossSales)}</strong>
                 <div style={{ fontSize: '0.72rem', color: '#10B981', fontWeight: 700 }}>
                   Neto Aliados: {formatCopOrZero(totalRestaurantPayouts)}
                 </div>
@@ -1086,8 +1112,8 @@ const SuperAdminViewContent: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Utilidad Libre GastroSync (3% Neto)</div>
-                <strong style={{ fontSize: '1.3rem', color: 'white' }}>{formatCopOrZero(totalEthicalFees)}</strong>
-                <div style={{ fontSize: '0.71rem', color: '#94A3B8', fontWeight: 700 }}>
+                <strong style={{ fontSize: '1.3rem', color: 'var(--text-main)' }}>{formatCopOrZero(totalEthicalFees)}</strong>
+                <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)', fontWeight: 700 }}>
                   Pasarela Wompi (2.65%+700+IVA): {formatCopOrZero(totalWompiGatewayFees)}
                 </div>
               </div>
@@ -1167,27 +1193,27 @@ const SuperAdminViewContent: React.FC = () => {
                     return (
                       <tr key={row.restaurantId} style={{ borderBottom: '1px solid var(--neutral-border)' }}>
                         <td style={{ padding: '12px 8px' }}>
-                          <div style={{ fontWeight: 800, color: 'white', fontSize: '0.86rem' }}>
+                          <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.86rem' }}>
                             {row.restaurantName}
                           </div>
                           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                             /r/{row.restaurantSlug} · {row.completedOrdersCount} pedidos efectivos
                           </div>
                           {row.payoutAccountNumber ? (
-                            <div style={{ fontSize: '0.71rem', color: '#38BDF8', marginTop: '3px', fontWeight: 700 }}>
+                            <div style={{ fontSize: '0.71rem', color: '#0E7490', marginTop: '3px', fontWeight: 700 }}>
                               🏦 {row.payoutBankName} ({row.payoutAccountType}) · {row.payoutAccountNumber}
                               {row.wompiMerchantId ? ` · Wompi: ${row.wompiMerchantId}` : ''}
                             </div>
                           ) : (
-                            <div style={{ fontSize: '0.7rem', color: '#F59E0B', marginTop: '3px' }}>
+                            <div style={{ fontSize: '0.7rem', color: '#B45309', marginTop: '3px' }}>
                               ⚠️ Sin cuenta de dispersión configurada
                             </div>
                           )}
                         </td>
 
                         <td style={{ padding: '12px 8px', textAlign: 'right' }}>
-                          <strong style={{ color: 'white', display: 'block' }}>{formatCopOrZero(row.cashSalesCop)}</strong>
-                          <span style={{ fontSize: '0.7rem', color: '#F59E0B' }}>
+                          <strong style={{ color: 'var(--text-main)', display: 'block' }}>{formatCopOrZero(row.cashSalesCop)}</strong>
+                          <span style={{ fontSize: '0.7rem', color: '#B45309' }}>
                             3% Efec: {formatCopOrZero(row.cashCommissionCop)} ({row.cashOrdersCount} ped.)
                           </span>
                         </td>
@@ -1313,8 +1339,8 @@ const SuperAdminViewContent: React.FC = () => {
                               {new Date(rec.createdAt).toLocaleString('es-CO')}
                             </div>
                           </td>
-                          <td style={{ padding: '10px', color: 'white', fontWeight: 700 }}>{restName}</td>
-                          <td style={{ padding: '10px', color: 'white' }}>
+                          <td style={{ padding: '10px', color: 'var(--text-main)', fontWeight: 700 }}>{restName}</td>
+                          <td style={{ padding: '10px', color: 'var(--text-main)' }}>
                             {rec.settlementType === 'platform_payout_to_restaurant'
                               ? '🏦 Dispersión Neto al Restaurante'
                               : rec.settlementType === 'restaurant_payment_to_platform'
@@ -1427,11 +1453,11 @@ const SuperAdminViewContent: React.FC = () => {
                             <code style={{ color: 'var(--tertiary)', fontSize: '0.75rem' }}>{tx.id}</code>
                             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Auth: #{tx.authorizationCode}</div>
                           </td>
-                          <td style={{ padding: '10px', color: 'white', fontWeight: 600 }}>
+                          <td style={{ padding: '10px', color: 'var(--text-main)', fontWeight: 600 }}>
                             {tenants.find(t => t.id === tx.tenantId)?.name || 'Restaurante'}
                           </td>
-                          <td style={{ padding: '10px', color: 'white' }}>Split Automático Pasarela</td>
-                          <td style={{ padding: '10px', color: 'white', fontWeight: 600 }}>{methodEmoji}</td>
+                          <td style={{ padding: '10px', color: 'var(--text-main)' }}>Split Automático Pasarela</td>
+                          <td style={{ padding: '10px', color: 'var(--text-main)', fontWeight: 600 }}>{methodEmoji}</td>
                           <td style={{ padding: '10px', textAlign: 'right', color: 'var(--secondary)', fontWeight: 700 }}>{formatCop(tx.restaurantPayout)}</td>
                           <td style={{ padding: '10px', textAlign: 'right', color: 'var(--tertiary)', fontWeight: 700 }}>{formatCop(tx.platformFee)}</td>
                           <td style={{ padding: '10px', textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.72rem' }}>Auto</td>

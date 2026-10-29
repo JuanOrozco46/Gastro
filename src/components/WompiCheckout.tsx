@@ -9,6 +9,13 @@ export interface WompiCheckoutConfig {
   currency: string;
   publicKey: string;
   signature: string;
+  wompiMerchantId?: string | null;
+  splitConfig?: {
+    restaurantMerchantId?: string | null;
+    restaurantPayoutCents: number;
+    platformFeeCents: number;
+    gatewayFeeCents: number;
+  };
 }
 
 interface WompiCheckoutProps {

@@ -678,7 +678,13 @@ export const LoginScreen: React.FC = () => {
 
             <div className="gs-auth-status-badge">
               <span className={`gs-auth-status-dot ${authMode === 'demo' ? 'demo' : ''}`} />
-              <span>{authMode === 'demo' ? 'Modo Demo Local' : 'Red Activa en Vivo'}</span>
+              <span>
+                {authMode === 'demo'
+                  ? import.meta.env.PROD
+                    ? 'Modo Local sin Servidor'
+                    : 'Modo Demo Local'
+                  : 'Red Activa en Vivo'}
+              </span>
             </div>
           </div>
 

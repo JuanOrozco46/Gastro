@@ -93,7 +93,7 @@ export interface AppContextType {
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
   submitOrderWithPayment: (typeOrDetails: string | CheckoutDetails, method: PaymentMethod, transaction?: Transaction) => Promise<{ success: boolean; isRemote?: boolean; orderId?: string; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }>;
-  retryRemotePayment: (orderId: string) => Promise<{ success: boolean; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }>;
+  retryRemotePayment: (orderId: string, deviceId?: string) => Promise<{ success: boolean; paymentId?: string; sandboxUrl?: string; wompiConfig?: unknown }>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<boolean>;
   acceptAndStartCooking: (orderId: string) => Promise<boolean>;
   confirmCashPayment: (paymentId: string, orderId: string) => Promise<{ success: boolean; error?: string }>;

@@ -296,13 +296,12 @@ const OrderCard: React.FC<OrderCardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       className={`card ${order.status === 'delivered' ? 'order-delivered' : ''}`}
       style={{
-        background: 'var(--glass-medium)',
-        backdropFilter: 'blur(20px)',
-        border: order.status === 'delivered' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid var(--primary-border)',
+        background: 'var(--neutral-surface)',
+        border: order.status === 'delivered' ? '1px solid var(--neutral-border)' : '1px solid var(--primary-border)',
         borderRadius: '24px',
         padding: '1.5rem',
         marginBottom: '1.25rem',
-        boxShadow: order.status === 'delivered' ? '0 10px 30px rgba(0,0,0,0.3)' : '0 12px 36px var(--primary-glow)'
+        boxShadow: order.status === 'delivered' ? 'var(--shadow-card)' : '0 12px 36px var(--primary-glow)'
       }}
     >
       {/* Order Header */}
@@ -312,8 +311,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
             width: '48px', 
             height: '48px', 
             borderRadius: '16px', 
-            background: '#0F172A', 
-            border: '1px solid var(--primary-glass-border)',
+            background: 'var(--neutral-surface-alt)', 
+            border: '1px solid var(--neutral-border)',
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
@@ -335,7 +334,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
             )}
           </div>
           <div>
-            <h4 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white' }}>{tenantName}</h4>
+            <h4 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-main)' }}>{tenantName}</h4>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
               <span className="badge badge-secondary" style={{ fontSize: '0.72rem', padding: '2px 8px', fontWeight: 800 }}>
                 {fulfillmentLabel}
@@ -345,12 +344,12 @@ const OrderCard: React.FC<OrderCardProps> = ({
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--neutral-surface-alt)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--neutral-border)' }}>
                 #{order.id.slice(0, 8)}
               </span>
               <button 
                 onClick={handleCopyId} 
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
                 title="Copiar ID completo"
               >
                 {copied ? <Check size={12} color="#10B981" /> : <Copy size={12} />}
@@ -375,7 +374,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
           >
             {cfg.icon} {cfg.label}
           </span>
-          <strong style={{ fontSize: '1.1rem', fontWeight: 900, color: 'white', marginTop: '2px' }}>
+          <strong style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '2px' }}>
             ${order.total.toLocaleString('es-CO')} COP
           </strong>
         </div>
@@ -389,9 +388,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
           gap: '8px',
           padding: '8px 12px',
           borderRadius: '12px',
-          background: 'rgba(56, 189, 248, 0.1)',
-          border: '1px solid rgba(56, 189, 248, 0.2)',
-          color: '#38BDF8',
+          background: 'rgba(14, 116, 144, 0.08)',
+          border: '1px solid rgba(14, 116, 144, 0.2)',
+          color: '#0E7490',
           fontSize: '0.82rem',
           marginBottom: '1rem',
           fontWeight: 600
@@ -409,9 +408,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
           gap: '8px',
           padding: '8px 12px',
           borderRadius: '12px',
-          background: 'rgba(245, 158, 11, 0.1)',
-          border: '1px solid rgba(245, 158, 11, 0.2)',
-          color: '#F59E0B',
+          background: 'rgba(180, 83, 9, 0.08)',
+          border: '1px solid rgba(180, 83, 9, 0.2)',
+          color: '#B45309',
           fontSize: '0.82rem',
           marginBottom: '1rem',
           fontWeight: 600
@@ -424,23 +423,23 @@ const OrderCard: React.FC<OrderCardProps> = ({
       {/* Progress Track or Cancellation Notice */}
       {order.status === 'cancelled' ? (
         <div style={{
-          background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.25)',
+          background: 'var(--danger-subtle)',
+          border: '1px solid var(--danger-border)',
           borderRadius: '16px',
           padding: '1rem',
           marginBottom: '1.25rem',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          color: '#FCA5A5',
+          color: 'var(--danger-text)',
           fontSize: '0.85rem'
         }}>
-          <Package size={22} color="#EF4444" style={{ flexShrink: 0 }} />
+          <Package size={22} color="#B91C1C" style={{ flexShrink: 0 }} />
           <div>
-            <strong style={{ display: 'block', color: 'white', marginBottom: '2px' }}>Pedido Cancelado</strong>
+            <strong style={{ display: 'block', color: 'var(--danger-text)', marginBottom: '2px' }}>Pedido Cancelado</strong>
             <span style={{ display: 'block' }}>
               {order.cancellationReason?.trim()
-                ? <>Motivo: <strong style={{ color: 'white' }}>{order.cancellationReason.trim()}</strong></>
+                ? <>Motivo: <strong style={{ color: 'var(--text-main)' }}>{order.cancellationReason.trim()}</strong></>
                 : 'Este pedido fue cancelado por el restaurante.'}
             </span>
             {order.paymentMethod !== 'cash' && (order.paymentStatus === 'refunded' || order.paymentStatus === 'approved') && (
@@ -452,11 +451,11 @@ const OrderCard: React.FC<OrderCardProps> = ({
         </div>
       ) : order.status !== 'delivered' && (
         <div style={{
-          background: 'rgba(0,0,0,0.3)',
+          background: 'var(--neutral-surface-alt)',
           borderRadius: '18px',
           padding: '1.25rem 1rem',
           marginBottom: '1.25rem',
-          border: '1px solid rgba(255,255,255,0.06)'
+          border: '1px solid var(--neutral-border)'
         }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', position: 'relative' }}>
             {steps.map(step => {
@@ -469,7 +468,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
                     width: '34px',
                     height: '34px',
                     borderRadius: '50%',
-                    background: active ? stepCfg.color : 'rgba(255,255,255,0.1)',
+                    background: active ? stepCfg.color : 'var(--neutral-surface)',
+                    border: active ? 'none' : '1px solid var(--neutral-border)',
                     color: active ? 'white' : 'var(--text-muted)',
                     display: 'flex',
                     alignItems: 'center',
@@ -480,7 +480,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                   }}>
                     {stepCfg.icon}
                   </div>
-                  <span style={{ fontSize: '0.72rem', fontWeight: active ? 800 : 500, color: active ? 'white' : 'var(--text-muted)', display: 'block' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: active ? 800 : 500, color: active ? 'var(--text-main)' : 'var(--text-muted)', display: 'block' }}>
                     {stepCfg.label}
                   </span>
                 </div>
@@ -509,10 +509,10 @@ const OrderCard: React.FC<OrderCardProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '10px 14px',
-          background: 'rgba(255, 255, 255, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          background: 'var(--neutral-surface-alt)',
+          border: '1px solid var(--neutral-border)',
           borderRadius: '14px',
-          color: 'var(--text-muted)',
+          color: 'var(--text-main)',
           fontSize: '0.85rem',
           fontWeight: 700,
           cursor: 'pointer'
@@ -532,11 +532,11 @@ const OrderCard: React.FC<OrderCardProps> = ({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            style={{ overflow: 'hidden', marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}
+            style={{ overflow: 'hidden', marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed var(--neutral-border)' }}
           >
             {order.items.map((item, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
-                <span style={{ color: 'white' }}>
+                <span style={{ color: 'var(--text-main)' }}>
                   <strong style={{ color: 'var(--primary)', marginRight: '6px' }}>{item.qty}×</strong> {item.name}
                 </span>
                 <span style={{ color: 'var(--text-muted)' }}>${(item.price * item.qty).toLocaleString('es-CO')}</span>
@@ -545,28 +545,28 @@ const OrderCard: React.FC<OrderCardProps> = ({
 
             {/* Economic Breakdown if subtotal available */}
             {order.subtotal !== undefined && (
-              <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--neutral-border)', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                   <span>Subtotal productos:</span>
-                  <span style={{ color: 'white' }}>${order.subtotal.toLocaleString('es-CO')} COP</span>
+                  <span style={{ color: 'var(--text-main)' }}>${order.subtotal.toLocaleString('es-CO')} COP</span>
                 </div>
                 {order.deliveryFeeApplied !== undefined && order.deliveryFeeApplied > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                     <span>Tarifa de entrega:</span>
-                    <span style={{ color: '#38BDF8' }}>${order.deliveryFeeApplied.toLocaleString('es-CO')} COP</span>
+                    <span style={{ color: '#0E7490', fontWeight: 700 }}>${order.deliveryFeeApplied.toLocaleString('es-CO')} COP</span>
                   </div>
                 )}
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--neutral-border)', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
               {order.paymentMethod && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <CreditCard size={14} />
                   {PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}
                 </span>
               )}
-              <span>Total Pago: <strong style={{ color: 'white', fontSize: '0.95rem' }}>${order.total.toLocaleString('es-CO')} COP</strong></span>
+              <span>Total Pago: <strong style={{ color: 'var(--text-main)', fontSize: '0.95rem' }}>${order.total.toLocaleString('es-CO')} COP</strong></span>
             </div>
           </motion.div>
         )}
@@ -616,9 +616,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
                       setIsEditingReview(true);
                     }}
                     style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.14)',
-                      color: 'white',
+                      background: 'var(--neutral-surface)',
+                      border: '1px solid var(--neutral-border)',
+                      color: 'var(--text-main)',
                       borderRadius: '8px',
                       padding: '4px 10px',
                       fontSize: '0.74rem',
@@ -633,9 +633,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
                       type="button"
                       onClick={() => onOpenTenantReviews(order.tenantId)}
                       style={{
-                        background: 'rgba(245, 158, 11, 0.16)',
-                        border: '1px solid rgba(245, 158, 11, 0.35)',
-                        color: '#FBBF24',
+                        background: 'var(--primary-subtle)',
+                        border: '1px solid var(--primary-border)',
+                        color: 'var(--primary-dark)',
                         borderRadius: '8px',
                         padding: '4px 10px',
                         fontSize: '0.74rem',
@@ -657,8 +657,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
                         fontSize: '0.7rem',
                         padding: '2px 8px',
                         borderRadius: '999px',
-                        background: 'rgba(245, 158, 11, 0.15)',
-                        color: '#FBBF24',
+                        background: 'var(--primary-subtle)',
+                        color: 'var(--primary-dark)',
                         fontWeight: 700
                       }}
                     >
@@ -668,7 +668,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                 </div>
               )}
               {existingReview.comment && (
-                <p style={{ margin: 0, fontSize: '0.84rem', color: '#E2E8F0' }}>
+                <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-main)' }}>
                   "{existingReview.comment}"
                 </p>
               )}
@@ -682,7 +682,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                       height: '100px',
                       objectFit: 'cover',
                       borderRadius: '10px',
-                      border: '1px solid rgba(255,255,255,0.14)'
+                      border: '1px solid var(--neutral-border)'
                     }}
                   />
                 </div>
@@ -714,7 +714,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
             <form onSubmit={handleSaveReview} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div>
-                  <strong style={{ fontSize: '0.88rem', color: '#FBBF24', display: 'block' }}>
+                  <strong style={{ fontSize: '0.88rem', color: 'var(--primary-dark)', display: 'block' }}>
                     ⭐ ¿Qué tal estuvo tu pedido en {tenantName}?
                   </strong>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -741,7 +741,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                         <Star
                           size={22}
                           fill={active ? '#F59E0B' : 'none'}
-                          color={active ? '#F59E0B' : '#64748B'}
+                          color={active ? '#F59E0B' : 'var(--neutral-border)'}
                         />
                       </button>
                     );
@@ -763,9 +763,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
                         fontSize: '0.72rem',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        border: selected ? '1px solid #F59E0B' : '1px solid rgba(255,255,255,0.12)',
-                        background: selected ? 'rgba(245, 158, 11, 0.22)' : 'rgba(255,255,255,0.04)',
-                        color: selected ? '#FBBF24' : 'var(--text-muted)'
+                        border: selected ? '1px solid var(--primary)' : '1px solid var(--neutral-border)',
+                        background: selected ? 'var(--primary-subtle)' : 'var(--neutral-surface)',
+                        color: selected ? 'var(--primary-dark)' : 'var(--text-muted)'
                       }}
                     >
                       {tag}
@@ -783,15 +783,15 @@ const OrderCard: React.FC<OrderCardProps> = ({
                     gap: '6px',
                     padding: '6px 12px',
                     borderRadius: '10px',
-                    border: '1px dashed rgba(245, 158, 11, 0.4)',
-                    background: 'rgba(245, 158, 11, 0.1)',
-                    color: '#FBBF24',
+                    border: '1px dashed var(--neutral-border)',
+                    background: 'var(--neutral-surface)',
+                    color: 'var(--text-muted)',
                     fontSize: '0.76rem',
                     fontWeight: 800,
                     cursor: isUploadingPhoto ? 'wait' : 'pointer'
                   }}
                 >
-                  <Camera size={14} />
+                  <Camera size={14} style={{ color: 'var(--primary)' }} />
                   <span>{isUploadingPhoto ? 'Subiendo foto...' : reviewImageUrl ? 'Cambiar foto del pedido' : '📸 Subir foto de tu pedido (opcional)'}</span>
                   <input
                     type="file"
@@ -812,7 +812,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                         height: '54px',
                         objectFit: 'cover',
                         borderRadius: '8px',
-                        border: '1px solid rgba(255,255,255,0.2)'
+                        border: '1px solid var(--neutral-border)'
                       }}
                     />
                     <button
@@ -851,11 +851,11 @@ const OrderCard: React.FC<OrderCardProps> = ({
                   style={{
                     flex: 1,
                     minWidth: '200px',
-                    background: 'rgba(15, 23, 42, 0.75)',
-                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'var(--neutral-surface)',
+                    border: '1px solid var(--neutral-border)',
                     borderRadius: '10px',
                     padding: '8px 12px',
-                    color: 'white',
+                    color: 'var(--text-main)',
                     fontSize: '0.82rem',
                     resize: 'vertical'
                   }}
@@ -987,17 +987,17 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp, onOpenTenantRevi
         style={{
           textAlign: 'center',
           padding: '4rem 2rem',
-          background: 'var(--glass-medium)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          background: 'var(--neutral-surface)',
+          border: '1px solid var(--neutral-border)',
           borderRadius: '32px',
           maxWidth: '600px',
           margin: '2rem auto',
-          color: 'var(--text-muted)'
+          color: 'var(--text-muted)',
+          boxShadow: 'var(--shadow-card)'
         }}
       >
         <Package size={56} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
-        <h3 style={{ fontSize: '1.5rem', color: 'white', fontWeight: 900, marginBottom: '8px' }}>Aún no tienes pedidos registrados</h3>
+        <h3 style={{ fontSize: '1.5rem', color: 'var(--text-main)', fontWeight: 900, marginBottom: '8px' }}>Aún no tienes pedidos registrados</h3>
         <p style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>
           Realiza tu primer pedido desde la red social gastronómica o la carta digital en mesa para rastrearlo en tiempo real.
         </p>
@@ -1045,10 +1045,10 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp, onOpenTenantRevi
               <Sparkles size={20} />
             </div>
             <div>
-              <strong style={{ color: 'white', fontSize: '0.96rem', display: 'block', fontWeight: 900 }}>
+              <strong style={{ color: 'var(--text-main)', fontSize: '0.96rem', display: 'block', fontWeight: 900 }}>
                 ¡Cuéntanos cómo estuvo tu pedido en {tenantMap[unreviewedDeliveredOrders[0].tenantId]?.name || 'el restaurante'}!
               </strong>
-              <span style={{ color: '#FDE68A', fontSize: '0.8rem' }}>
+              <span style={{ color: '#B45309', fontSize: '0.8rem', fontWeight: 600 }}>
                 Tienes {unreviewedDeliveredOrders.length}{' '}
                 {unreviewedDeliveredOrders.length === 1 ? 'pedido entregado' : 'pedidos entregados'} pendiente
                 {unreviewedDeliveredOrders.length === 1 ? '' : 's'} por calificar.
@@ -1082,7 +1082,7 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp, onOpenTenantRevi
         <section style={{ marginBottom: '2.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.25rem' }}>
             <RefreshCw size={20} style={{ color: 'var(--primary)', animation: 'spin 3s linear infinite' }} />
-            <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: 'white' }}>Pedidos en Curso</h3>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--text-main)' }}>Pedidos en Curso</h3>
             <span className="badge badge-primary">{activeOrders.length} en seguimiento</span>
           </div>
           <div>
@@ -1111,7 +1111,7 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ onNeedHelp, onOpenTenantRevi
         <section>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.25rem' }}>
             <CheckCircle2 size={20} style={{ color: '#10B981' }} />
-            <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: 'white' }}>Historial de Pedidos Completados</h3>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--text-main)' }}>Historial de Pedidos Completados</h3>
           </div>
           <div>
             {pastOrders.map(order => {
