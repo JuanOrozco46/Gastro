@@ -1,32 +1,68 @@
-# React + TypeScript + Vite
+# 🍽️ GastroSync
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+> Plataforma integral de gestión gastronómica, delivery, cocina digital (KDS) y transacciones seguras para restaurantes y comensales.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Inicio Rápido para Desarrolladores
 
-## React Compiler
+Si vas a desarrollar en el proyecto, asegúrate de estar trabajando sobre la rama de desarrollo:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# 1. Clonar y cambiar a la rama develop
+git clone https://github.com/JuanOrozco46/Gastro.git
+cd GastroSync
+git checkout develop
 
-## Expanding the Oxlint configuration
+# 2. Instalar dependencias
+npm install
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+# 3. Configurar variables de entorno
+cp .env.example .env
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+# 4. Iniciar servidor local
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+---
+
+## 🛠️ Stack Tecnológico
+
+- **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite](https://vitejs.dev/)
+- **Estilos & Animaciones**: Tailwind CSS, [Framer Motion](https://www.framer.com/motion/), [Lucide React](https://lucide.dev/)
+- **Backend & Base de Datos**: [Supabase](https://supabase.com/) (PostgreSQL, Row Level Security, Edge Functions)
+- **Pagos**: Pasarela Wompi Colombia (integridad SHA-256)
+- **Calidad & Testing**: [Oxlint](https://oxc.rs/), Node Test Runner nativo (`node --test`), TypeScript Strict
+
+---
+
+## 🧪 Scripts de Verificación
+
+```bash
+npm run dev      # Servidor de desarrollo con HMR
+npm run lint     # Linter ultrarrápido con Oxlint
+npm test         # Suite de pruebas unitarias y de integración
+npm run build    # Compilación y verificación de tipos (tsc -b + vite build)
+npm run preview  # Previsualizar el bundle de producción
+```
+
+---
+
+## 🌿 Flujo de Ramas y Contribución
+
+Este repositorio sigue el estándar **GitFlow**:
+- **`main`**: Producción estable.
+- **`develop`**: Rama base para el desarrollo diario e integración de features.
+- Todas las ramas de características (`feature/*`) o correcciones (`bugfix/*`) deben salir y fusionarse hacia **`develop`** mediante Pull Request.
+
+Para conocer la guía completa de convenciones de commits, plantillas y buenas prácticas, consulta **[CONTRIBUTING.md](./CONTRIBUTING.md)**.
+
+---
+
+## 📚 Documentación Adicional
+
+- [Guía de Contribución](./CONTRIBUTING.md)
+- [Arquitectura y Diseño](./DESIGN.md)
+- [Definición de Producto](./PRODUCT.md)
+- [Guía de Despliegue](./DEPLOYMENT.md)
+- [Cumplimiento Legal (Colombia)](./LEGAL_COMPLIANCE_CO.md)
